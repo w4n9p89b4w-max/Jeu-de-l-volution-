@@ -40,18 +40,9 @@
 
 
   function emojiArbre(col, row) {
-    let prochePlage = false, procheMontagne = false;
-    for (let dr = -2; dr <= 2; dr++) {
-      for (let dc = -2; dc <= 2; dc++) {
-        const nc = col + dc, nr = row + dr;
-        if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
-        const b = etat.tuiles[nr][nc];
-        if (b === 'plage' || b === 'ocean') prochePlage = true;
-        else if (b === 'montagne' || b === 'carriere') procheMontagne = true;
-      }
-    }
-    if (prochePlage) return '🌴';
-    if (procheMontagne) return '🌲';
+    const b = etat.tuiles[row][col];
+    if (b === 'plage') return '🌴';
+    if (b === 'foret') return '🌲';
     return '🌳';
   }
 
@@ -230,7 +221,7 @@
   function genererNoeudsRessources() {
     const noeuds = new Map();
 
-    const tuilesParBiome = { foret: [], carriere: [], montagne: [], plaine: [], eau: [] };
+    const tuilesParBiome = { foret: [], carriere: [], montagne: [], plaine: [], plage: [], eau: [] };
     for (let row = 0; row < LIGNES; row++) {
       for (let col = 0; col < COLONNES; col++) {
         const b = etat.tuiles[row][col];
@@ -238,7 +229,8 @@
         else if (b === 'carriere') tuilesParBiome.carriere.push([col, row]);
         else if (b === 'montagne') tuilesParBiome.montagne.push([col, row]);
         else if (b === 'plaine') tuilesParBiome.plaine.push([col, row]);
-        else if (b === 'riviere' || b === 'plage' || b === 'ocean') tuilesParBiome.eau.push([col, row]);
+        else if (b === 'plage') tuilesParBiome.plage.push([col, row]);
+        else if (b === 'riviere' || b === 'ocean') tuilesParBiome.eau.push([col, row]);
       }
     }
 
@@ -275,11 +267,13 @@
     }
 
     placerGroupes(tuilesParBiome.foret, 'arbre', 30, 5, 7, 2, ['foret']);
+    placerGroupes(tuilesParBiome.plaine, 'arbre', 80, 5, 7, 2, ['plaine']);
+    placerGroupes(tuilesParBiome.plage, 'arbre', 25, 5, 7, 1, ['plage']);
     placerGroupes(tuilesParBiome.foret, 'gibier', 110, 5, 7, 2, ['foret']);
     placerGroupes(tuilesParBiome.carriere, 'roche', 20, 5, 7, 2, ['carriere']);
     placerGroupes(tuilesParBiome.montagne, 'roche', 70, 5, 7, 2, ['montagne']);
     placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 5, 7, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 5, 7, 2, ['riviere', 'plage', 'ocean']);
+    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 5, 7, 2, ['riviere', 'ocean']);
 
     for (const noeud of noeuds.values()) {
       if (noeud.type === 'arbre') noeud.emoji = emojiArbre(noeud.col, noeud.row);
