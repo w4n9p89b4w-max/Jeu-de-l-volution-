@@ -111,7 +111,7 @@
       batiments: new Map(), // "col,row" -> type de bâtiment
       zonesDebloquees: new Set([4]),
       ressources: { bois: 20, pierre: 10, nourriture: 20 },
-      population: 6,
+      villageois: [],
       capacitePopulation: 8,
       niveau: 1,
       xp: 0,
@@ -226,11 +226,178 @@
           if (r < 0.22) type = 'poisson';
         }
         if (type) {
-          noeuds.set(col + ',' + row, { type, col, row, travailleurs: 0 });
+          noeuds.set(col + ',' + row, { type, col, row });
         }
       }
     }
     return noeuds;
+  }
+
+  // ============================================================
+  // Villageois : entités animées (tâches assignées + errance au repos)
+  // ============================================================
+
+  let villageoisIdCompteur = 0;
+
+  function aleatoire(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function nbPopulation() {
+    return etat.villageois.length;
+  }
+
+  function compterTravailleurs(cle) {
+    let n = 0;
+    for (const v of etat.villageois) if (v.assigneA === cle) n++;
+    return n;
+  }
+
+  function population_libre() {
+    let n = 0;
+    for (const v of etat.villageois) if (v.assigneA === null) n++;
+    return n;
+  }
+
+  function tuileMarchable(col, row) {
+    if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return false;
+    const b = etat.tuiles[row][col];
+    return b !== 'ocean' && b !== 'riviere';
+  }
+
+  function trouverTuileMarchable(centreCol, centreRow, rayon) {
+    for (let tentative = 0; tentative < 40; tentative++) {
+      const col = Math.max(0, Math.min(COLONNES - 1, Math.round(centreCol + aleatoire(-rayon, rayon))));
+      const row = Math.max(0, Math.min(LIGNES - 1, Math.round(centreRow + aleatoire(-rayon, rayon))));
+      if (tuileMarchable(col, row)) return { col, row };
+    }
+    return { col: Math.round(centreCol), row: Math.round(centreRow) };
+  }
+
+  function creerVillageois(col, row) {
+    return {
+      id: villageoisIdCompteur++,
+      x: col * TAILLE_TUILE + TAILLE_TUILE / 2,
+      y: row * TAILLE_TUILE + TAILLE_TUILE / 2,
+      assigneA: null,
+      cibleX: undefined,
+      cibleY: undefined,
+      mode: 'attente',
+      pause: aleatoire(0, 2),
+      vitesseBase: aleatoire(22, 32),
+      phase: Math.random() * Math.PI * 2,
+      enMouvement: false,
+      travaille: false,
+    };
+  }
+
+  function genererVillageoisInitiaux(n) {
+    const cx = COLONNES / 2, cy = LIGNES / 2;
+    const liste = [];
+    for (let i = 0; i < n; i++) {
+      const { col, row } = trouverTuileMarchable(cx, cy, 3);
+      liste.push(creerVillageois(col, row));
+    }
+    return liste;
+  }
+
+  function choisirNouvelleCibleErrance(v) {
+    const col = Math.round(v.x / TAILLE_TUILE);
+    const row = Math.round(v.y / TAILLE_TUILE);
+    for (let tentative = 0; tentative < 10; tentative++) {
+      const nc = Math.max(0, Math.min(COLONNES - 1, col + Math.round(aleatoire(-2.5, 2.5))));
+      const nr = Math.max(0, Math.min(LIGNES - 1, row + Math.round(aleatoire(-2.5, 2.5))));
+      if (!tuileMarchable(nc, nr)) continue;
+      if (!etat.zonesDebloquees.has(zoneDeCase(nc, nr))) continue;
+      v.cibleX = nc * TAILLE_TUILE + TAILLE_TUILE / 2 + aleatoire(-6, 6);
+      v.cibleY = nr * TAILLE_TUILE + TAILLE_TUILE / 2 + aleatoire(-6, 6);
+      return;
+    }
+    v.cibleX = v.x;
+    v.cibleY = v.y;
+  }
+
+  function mettreAJourVillageois(dt) {
+    const parNoeud = new Map();
+    for (const v of etat.villageois) {
+      if (!v.assigneA) continue;
+      if (!parNoeud.has(v.assigneA)) parNoeud.set(v.assigneA, []);
+      parNoeud.get(v.assigneA).push(v);
+    }
+
+    for (const v of etat.villageois) {
+      if (v.assigneA) {
+        const [col, row] = v.assigneA.split(',').map(Number);
+        const groupe = parNoeud.get(v.assigneA);
+        const idx = groupe.indexOf(v);
+        const angleOffset = (idx / Math.max(1, groupe.length)) * Math.PI * 2;
+        const rayon = groupe.length > 1 ? TAILLE_TUILE * 0.38 : 0;
+        const tx = col * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.cos(angleOffset) * rayon;
+        const ty = row * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.sin(angleOffset) * rayon;
+        const d = Math.hypot(tx - v.x, ty - v.y);
+        v.enMouvement = d > 2;
+        v.travaille = !v.enMouvement;
+        if (v.enMouvement) {
+          const pas = Math.min(d, v.vitesseBase * 1.6 * dt);
+          v.x += (tx - v.x) / d * pas;
+          v.y += (ty - v.y) / d * pas;
+        }
+      } else {
+        v.travaille = false;
+        if (v.mode === 'attente') {
+          v.enMouvement = false;
+          v.pause -= dt;
+          if (v.pause <= 0) {
+            choisirNouvelleCibleErrance(v);
+            v.mode = 'marche';
+          }
+        } else {
+          const d = Math.hypot(v.cibleX - v.x, v.cibleY - v.y);
+          if (d < 2) {
+            v.mode = 'attente';
+            v.pause = aleatoire(1, 3);
+            v.enMouvement = false;
+          } else {
+            const pas = Math.min(d, v.vitesseBase * dt);
+            v.x += (v.cibleX - v.x) / d * pas;
+            v.y += (v.cibleY - v.y) / d * pas;
+            v.enMouvement = true;
+          }
+        }
+      }
+    }
+  }
+
+  function dessinerVillageois(temps) {
+    const t = temps / 1000;
+    for (const v of etat.villageois) {
+      const x = v.x - camera.x;
+      const y = v.y - camera.y;
+      if (x < -20 || x > canvas.width + 20 || y < -20 || y > canvas.height + 20) continue;
+
+      let offsetY = 0, echelleY = 1;
+      if (v.travaille) {
+        const osc = Math.sin(t * 7 + v.phase);
+        offsetY = osc * 1.5;
+        echelleY = 1 + osc * 0.08;
+      } else if (v.enMouvement) {
+        offsetY = Math.abs(Math.sin(t * 9 + v.phase)) * -2;
+      }
+
+      ctx.save();
+      ctx.translate(x, y + 3);
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 6, 2.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+      ctx.translate(0, offsetY);
+      ctx.scale(1, echelleY);
+      ctx.font = (TAILLE_TUILE * 0.58) + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🧑', 0, -4);
+      ctx.restore();
+    }
   }
 
   // ============================================================
@@ -241,6 +408,7 @@
     etat = creerEtatInitial();
     etat.tuiles = genererCarte();
     etat.noeuds = genererNoeudsRessources();
+    etat.villageois = genererVillageoisInitiaux(6);
     caseSelectionnee = null;
     modeConstruction = null;
     mettreAJourPalette();
@@ -329,7 +497,7 @@
     ctxMini.strokeRect(camera.x * ratioX, camera.y * ratioY, canvas.width * ratioX, canvas.height * ratioY);
   }
 
-  function dessinerCarte() {
+  function dessinerCarte(temps) {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -360,14 +528,15 @@
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(TYPES_RESSOURCE_NOEUD[noeud.type].emoji, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2);
-          if (noeud.travailleurs > 0) {
+          const nbTravailleurs = compterTravailleurs(cle);
+          if (nbTravailleurs > 0) {
             ctx.fillStyle = '#0b1220';
             ctx.beginPath();
             ctx.arc(x + TAILLE_TUILE - 6, y + 6, 6, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#3ddc84';
             ctx.font = 'bold 9px sans-serif';
-            ctx.fillText(String(noeud.travailleurs), x + TAILLE_TUILE - 6, y + 7);
+            ctx.fillText(String(nbTravailleurs), x + TAILLE_TUILE - 6, y + 7);
           }
         }
 
@@ -377,6 +546,8 @@
         }
       }
     }
+
+    dessinerVillageois(temps);
 
     // Étiquette + cadenas au centre des zones verrouillées visibles
     for (let i = 0; i < 9; i++) {
@@ -573,12 +744,13 @@
       html += `<p>${def.emoji} <b>${def.nom}</b><br>${def.desc}</p>`;
     } else if (noeud) {
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
+      const nbTravailleurs = compterTravailleurs(cle);
       const idle = population_libre();
-      html += `<p>${def.emoji} <b>${def.nom}</b><br>Travailleurs assignés : ${noeud.travailleurs} / ${def.max}</p>`;
+      html += `<p>${def.emoji} <b>${def.nom}</b><br>Travailleurs assignés : ${nbTravailleurs} / ${def.max}</p>`;
       html += `<div class="ligne-action">
-        <button id="btnRetirer" ${noeud.travailleurs <= 0 ? 'disabled' : ''}>− Retirer</button>
+        <button id="btnRetirer" ${nbTravailleurs <= 0 ? 'disabled' : ''}>− Retirer</button>
         <span>👥 ${idle} libres</span>
-        <button id="btnAssigner" ${(idle <= 0 || noeud.travailleurs >= def.max) ? 'disabled' : ''}>+ Assigner</button>
+        <button id="btnAssigner" ${(idle <= 0 || nbTravailleurs >= def.max) ? 'disabled' : ''}>+ Assigner</button>
       </div>`;
     } else {
       html += '<p class="astuce">Case libre. Passez en mode Construire pour y bâtir quelque chose.</p>';
@@ -588,14 +760,20 @@
 
     const btnA = document.getElementById('btnAssigner');
     const btnR = document.getElementById('btnRetirer');
-    if (btnA) btnA.addEventListener('click', () => { noeud.travailleurs++; afficherSelection(); });
-    if (btnR) btnR.addEventListener('click', () => { noeud.travailleurs = Math.max(0, noeud.travailleurs - 1); afficherSelection(); });
-  }
-
-  function population_libre() {
-    let assignes = 0;
-    for (const n of etat.noeuds.values()) assignes += n.travailleurs;
-    return Math.max(0, etat.population - assignes);
+    if (btnA) btnA.addEventListener('click', () => {
+      const libre = etat.villageois.find(v => v.assigneA === null);
+      if (libre) libre.assigneA = cle;
+      afficherSelection();
+    });
+    if (btnR) btnR.addEventListener('click', () => {
+      const assigne = etat.villageois.find(v => v.assigneA === cle);
+      if (assigne) {
+        assigne.assigneA = null;
+        assigne.mode = 'attente';
+        assigne.pause = aleatoire(0.2, 1);
+      }
+      afficherSelection();
+    });
   }
 
   // ============================================================
@@ -607,10 +785,12 @@
     let gain = { bois: 0, pierre: 0, nourriture: 0 };
 
     for (const noeud of etat.noeuds.values()) {
-      if (noeud.travailleurs <= 0) continue;
+      const cle = noeud.col + ',' + noeud.row;
+      const nbTravailleurs = compterTravailleurs(cle);
+      if (nbTravailleurs <= 0) continue;
       if (!etat.zonesDebloquees.has(zoneDeCase(noeud.col, noeud.row))) continue;
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
-      const production = noeud.travailleurs * def.taux * m[def.ressource];
+      const production = nbTravailleurs * def.taux * m[def.ressource];
       gain[def.ressource] += production;
     }
 
@@ -625,12 +805,22 @@
     etat.ressources.nourriture = Math.min(cap, etat.ressources.nourriture + gain.nourriture);
 
     // Reproduction de la population
-    if (etat.ressources.nourriture >= 15 && etat.population < etat.capacitePopulation) {
+    if (etat.ressources.nourriture >= 15 && nbPopulation() < etat.capacitePopulation) {
       const chance = 0.15 * m.natalite;
       if (Math.random() < chance) {
-        etat.population++;
         etat.ressources.nourriture -= 10;
-        notifier('👶 La population a grandi ! (' + etat.population + ')');
+        const maisons = [...etat.batiments.entries()].filter(([, type]) => type === 'maison');
+        let colNaissance, rowNaissance;
+        if (maisons.length > 0) {
+          const [cle] = maisons[Math.floor(Math.random() * maisons.length)];
+          [colNaissance, rowNaissance] = cle.split(',').map(Number);
+        } else {
+          colNaissance = COLONNES / 2;
+          rowNaissance = LIGNES / 2;
+        }
+        const pos = trouverTuileMarchable(colNaissance, rowNaissance, 2);
+        etat.villageois.push(creerVillageois(pos.col, pos.row));
+        notifier('👶 La population a grandi ! (' + nbPopulation() + ')');
       }
     }
 
@@ -728,7 +918,7 @@
     document.getElementById('stPierreCap').textContent = cap;
     document.getElementById('stNourriture').textContent = Math.floor(etat.ressources.nourriture);
     document.getElementById('stNourritureCap').textContent = cap;
-    document.getElementById('stPopulation').textContent = etat.population;
+    document.getElementById('stPopulation').textContent = nbPopulation();
     document.getElementById('stCapacite').textContent = etat.capacitePopulation;
     document.getElementById('stNiveau').textContent = etat.niveau;
     document.getElementById('stPoints').textContent = etat.pointsTech;
@@ -772,7 +962,8 @@
       clamperCamera();
     }
 
-    dessinerCarte();
+    mettreAJourVillageois(dt);
+    dessinerCarte(temps);
     dessinerMinicarte();
     requestAnimationFrame(boucleRendu);
   }
