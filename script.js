@@ -242,19 +242,19 @@
 
     function placerGroupes(listeTuiles, type, tuilesParGroupe, tailleMin, tailleMax, rayon, biomesAutorises) {
       if (listeTuiles.length === 0) return;
-      const distanceMinCentres = Math.max(rayon * 5, tailleMax + 9);
+      const distanceMinCentres = Math.max(rayon * 5, tailleMax + 12);
       const centres = centresToutesZones;
       const nbGroupes = Math.max(1, Math.round(listeTuiles.length / tuilesParGroupe));
       for (let g = 0; g < nbGroupes; g++) {
-        let ccol, crow, essaiCentre = 0;
-        do {
+        let ccol, crow, valide = false;
+        for (let essaiCentre = 0; essaiCentre < 60; essaiCentre++) {
           [ccol, crow] = listeTuiles[Math.floor(Math.random() * listeTuiles.length)];
-          essaiCentre++;
-        } while (
-          essaiCentre < 30 &&
-          (noeuds.has(ccol + ',' + crow) || centres.some(c => Math.hypot(c[0] - ccol, c[1] - crow) < distanceMinCentres))
-        );
-        if (noeuds.has(ccol + ',' + crow)) continue;
+          if (noeuds.has(ccol + ',' + crow)) continue;
+          if (centres.some(c => Math.hypot(c[0] - ccol, c[1] - crow) < distanceMinCentres)) continue;
+          valide = true;
+          break;
+        }
+        if (!valide) continue;
         centres.push([ccol, crow]);
 
         // Fait grandir la grappe case par case, en ne posant chaque nouvelle
