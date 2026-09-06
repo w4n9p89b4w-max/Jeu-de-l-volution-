@@ -236,6 +236,7 @@
     }
 
     const centresParType = {};
+    let zoneIdCompteur = 0;
 
     function placerGroupes(listeTuiles, type, tuilesParGroupe, tailleMin, tailleMax, rayon, biomesAutorises) {
       if (listeTuiles.length === 0) return;
@@ -254,6 +255,7 @@
         );
         centres.push([ccol, crow]);
 
+        const zoneId = zoneIdCompteur++;
         const combien = Math.round(aleatoire(tailleMin, tailleMax));
         let places = 0, tentatives = 0;
         while (places < combien && tentatives < combien * 6) {
@@ -264,20 +266,20 @@
           const cle = col + ',' + row;
           if (noeuds.has(cle)) continue;
           if (!biomesAutorises.includes(etat.tuiles[row][col])) continue;
-          noeuds.set(cle, { type, col, row });
+          noeuds.set(cle, { type, col, row, zoneId });
           places++;
         }
       }
     }
 
-    placerGroupes(tuilesParBiome.foret, 'arbre', 30, 5, 7, 2, ['foret']);
-    placerGroupes(tuilesParBiome.plaine, 'arbre', 80, 5, 7, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.plage, 'arbre', 25, 5, 7, 1, ['plage']);
-    placerGroupes(tuilesParBiome.foret, 'gibier', 110, 5, 7, 2, ['foret']);
-    placerGroupes(tuilesParBiome.carriere, 'roche', 20, 5, 7, 2, ['carriere']);
-    placerGroupes(tuilesParBiome.montagne, 'roche', 70, 5, 7, 2, ['montagne']);
-    placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 5, 7, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 5, 7, 2, ['riviere', 'ocean']);
+    placerGroupes(tuilesParBiome.foret, 'arbre', 30, 3, 7, 2, ['foret']);
+    placerGroupes(tuilesParBiome.plaine, 'arbre', 80, 3, 7, 2, ['plaine']);
+    placerGroupes(tuilesParBiome.plage, 'arbre', 25, 3, 7, 1, ['plage']);
+    placerGroupes(tuilesParBiome.foret, 'gibier', 110, 3, 7, 2, ['foret']);
+    placerGroupes(tuilesParBiome.carriere, 'roche', 20, 3, 7, 2, ['carriere']);
+    placerGroupes(tuilesParBiome.montagne, 'roche', 70, 3, 7, 2, ['montagne']);
+    placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 3, 7, 2, ['plaine']);
+    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 3, 7, 2, ['riviere', 'ocean']);
 
     for (const noeud of noeuds.values()) {
       if (noeud.type === 'arbre') noeud.emoji = emojiArbre(noeud.col, noeud.row);
@@ -304,6 +306,12 @@
     let n = 0;
     for (const v of etat.villageois) if (v.assigneA === cle) n++;
     return n;
+  }
+
+  function noeudsDeLaZone(zoneId) {
+    const liste = [];
+    for (const n of etat.noeuds.values()) if (n.zoneId === zoneId) liste.push(n);
+    return liste;
   }
 
   function population_libre() {
@@ -624,11 +632,20 @@
 
     // Sélection
     if (caseSelectionnee) {
-      const x = caseSelectionnee.col * TAILLE_TUILE - camera.x;
-      const y = caseSelectionnee.row * TAILLE_TUILE - camera.y;
+      let tuilesAContourer;
+      if (caseSelectionnee.verrouillee) {
+        tuilesAContourer = [caseSelectionnee];
+      } else {
+        const noeudSel = etat.noeuds.get(caseSelectionnee.col + ',' + caseSelectionnee.row);
+        tuilesAContourer = noeudSel ? noeudsDeLaZone(noeudSel.zoneId) : [caseSelectionnee];
+      }
       ctx.strokeStyle = '#ffd93d';
       ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, y + 1, TAILLE_TUILE - 2, TAILLE_TUILE - 2);
+      for (const t of tuilesAContourer) {
+        const x = t.col * TAILLE_TUILE - camera.x;
+        const y = t.row * TAILLE_TUILE - camera.y;
+        ctx.strokeRect(x + 1, y + 1, TAILLE_TUILE - 2, TAILLE_TUILE - 2);
+      }
     }
   }
 
@@ -801,13 +818,16 @@
     } else if (noeud) {
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const emojiNoeud = noeud.emoji || def.emoji;
-      const nbTravailleurs = compterTravailleurs(cle);
+      const zone = noeudsDeLaZone(noeud.zoneId);
+      const capaciteZone = zone.length * def.max;
+      let travailleursZone = 0;
+      for (const n of zone) travailleursZone += compterTravailleurs(n.col + ',' + n.row);
       const idle = population_libre();
-      html += `<p>${emojiNoeud} <b>${def.nom}</b><br>Travailleurs assignés : ${nbTravailleurs} / ${def.max}</p>`;
+      html += `<p>${emojiNoeud} <b>${def.nom}</b><br>Zone de ${zone.length} ressource${zone.length > 1 ? 's' : ''}<br>Travailleurs assignés : ${travailleursZone} / ${capaciteZone}</p>`;
       html += `<div class="ligne-action">
-        <button id="btnRetirer" ${nbTravailleurs <= 0 ? 'disabled' : ''}>− Retirer</button>
+        <button id="btnRetirer" ${travailleursZone <= 0 ? 'disabled' : ''}>− Retirer</button>
         <span>👥 ${idle} libres</span>
-        <button id="btnAssigner" ${(idle <= 0 || nbTravailleurs >= def.max) ? 'disabled' : ''}>+ Assigner</button>
+        <button id="btnAssigner" ${(idle <= 0 || travailleursZone >= capaciteZone) ? 'disabled' : ''}>+ Assigner</button>
       </div>`;
     } else {
       html += '<p class="astuce">Case libre. Passez en mode Construire pour y bâtir quelque chose.</p>';
@@ -818,16 +838,24 @@
     const btnA = document.getElementById('btnAssigner');
     const btnR = document.getElementById('btnRetirer');
     if (btnA) btnA.addEventListener('click', () => {
+      const def = TYPES_RESSOURCE_NOEUD[noeud.type];
+      const zone = noeudsDeLaZone(noeud.zoneId);
+      const cibleNoeud = zone.find(n => compterTravailleurs(n.col + ',' + n.row) < def.max);
       const libre = etat.villageois.find(v => v.assigneA === null);
-      if (libre) libre.assigneA = cle;
+      if (cibleNoeud && libre) libre.assigneA = cibleNoeud.col + ',' + cibleNoeud.row;
       afficherSelection();
     });
     if (btnR) btnR.addEventListener('click', () => {
-      const assigne = etat.villageois.find(v => v.assigneA === cle);
-      if (assigne) {
-        assigne.assigneA = null;
-        assigne.mode = 'attente';
-        assigne.pause = aleatoire(0.2, 1);
+      const zone = noeudsDeLaZone(noeud.zoneId);
+      for (const n of zone) {
+        const cleN = n.col + ',' + n.row;
+        const assigne = etat.villageois.find(v => v.assigneA === cleN);
+        if (assigne) {
+          assigne.assigneA = null;
+          assigne.mode = 'attente';
+          assigne.pause = aleatoire(0.2, 1);
+          break;
+        }
       }
       afficherSelection();
     });
