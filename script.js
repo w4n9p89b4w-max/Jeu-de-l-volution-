@@ -223,9 +223,20 @@
 
     function placerGroupes(listeTuiles, type, tuilesParGroupe, tailleMin, tailleMax, rayon, biomesAutorises) {
       if (listeTuiles.length === 0) return;
+      const distanceMinCentres = rayon * 3.5;
+      const centres = [];
       const nbGroupes = Math.max(1, Math.round(listeTuiles.length / tuilesParGroupe));
       for (let g = 0; g < nbGroupes; g++) {
-        const [ccol, crow] = listeTuiles[Math.floor(Math.random() * listeTuiles.length)];
+        let ccol, crow, essaiCentre = 0;
+        do {
+          [ccol, crow] = listeTuiles[Math.floor(Math.random() * listeTuiles.length)];
+          essaiCentre++;
+        } while (
+          essaiCentre < 20 &&
+          centres.some(c => Math.hypot(c[0] - ccol, c[1] - crow) < distanceMinCentres)
+        );
+        centres.push([ccol, crow]);
+
         const combien = Math.round(aleatoire(tailleMin, tailleMax));
         let places = 0, tentatives = 0;
         while (places < combien && tentatives < combien * 6) {
@@ -242,12 +253,12 @@
       }
     }
 
-    placerGroupes(tuilesParBiome.foret, 'arbre', 22, 5, 9, 2, ['foret']);
-    placerGroupes(tuilesParBiome.foret, 'gibier', 90, 2, 3, 1.5, ['foret']);
-    placerGroupes(tuilesParBiome.carriere, 'roche', 14, 4, 7, 2, ['carriere']);
-    placerGroupes(tuilesParBiome.montagne, 'roche', 50, 2, 4, 2, ['montagne']);
-    placerGroupes(tuilesParBiome.plaine, 'gibier', 70, 2, 4, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.eau, 'poisson', 18, 3, 6, 2, ['riviere', 'plage', 'ocean']);
+    placerGroupes(tuilesParBiome.foret, 'arbre', 30, 5, 10, 2, ['foret']);
+    placerGroupes(tuilesParBiome.foret, 'gibier', 110, 5, 10, 2, ['foret']);
+    placerGroupes(tuilesParBiome.carriere, 'roche', 20, 5, 10, 2, ['carriere']);
+    placerGroupes(tuilesParBiome.montagne, 'roche', 70, 5, 10, 2, ['montagne']);
+    placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 5, 10, 2, ['plaine']);
+    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 5, 10, 2, ['riviere', 'plage', 'ocean']);
 
     return noeuds;
   }
