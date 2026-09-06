@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeu de l'Évolution — Civilisation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="barre-haut">
+    <h1>🏕️ Jeu de l'Évolution</h1>
+
+    <div class="ressources">
+      <span class="ress" title="Bois">🪵 <b id="stBois">0</b>/<span id="stBoisCap">0</span></span>
+      <span class="ress" title="Pierre">🪨 <b id="stPierre">0</b>/<span id="stPierreCap">0</span></span>
+      <span class="ress" title="Nourriture">🍖 <b id="stNourriture">0</b>/<span id="stNourritureCap">0</span></span>
+      <span class="ress" title="Population">👥 <b id="stPopulation">0</b>/<span id="stCapacite">0</span></span>
+    </div>
+
+    <div class="progression">
+      <span class="niveau">Niveau <b id="stNiveau">1</b></span>
+      <div class="barre-xp"><div id="barreXpRemplie" class="barre-xp-remplie"></div></div>
+      <span class="points-tech">🔬 <b id="stPoints">0</b> pts</span>
+      <button id="btnTech">Technologies</button>
+    </div>
+
+    <div class="vitesse">
+      <button id="btnPause">⏸ Pause</button>
+      <button id="btnNouvellePartie">↺ Nouvelle carte</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage">
+      <canvas id="carte"></canvas>
+      <canvas id="minicarte" title="Cliquez pour naviguer"></canvas>
+      <div class="aide-navigation">🖱️ Glisser pour déplacer la caméra · Flèches / ZQSD pour naviguer</div>
+    </div>
+
+    <aside class="panneau">
+      <section class="bloc">
+        <h2>Mode</h2>
+        <div class="controles">
+          <button id="btnModeExplorer" class="mode-actif">🔍 Explorer</button>
+          <button id="btnModeConstruire">🏗️ Construire</button>
+        </div>
+        <div id="paletteConstruction" class="palette" hidden></div>
+      </section>
+
+      <section class="bloc">
+        <h2>Sélection</h2>
+        <div id="contenuSelection" class="selection">
+          <p class="astuce">Cliquez sur une case de la carte pour l'inspecter.</p>
+        </div>
+      </section>
+
+      <section class="bloc">
+        <h2>Légende des biomes</h2>
+        <ul class="legende" id="legendeBiomes"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <div id="modalTech" class="modal" hidden>
+    <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>🔬 Arbre technologique</h2>
+        <button id="fermerTech">✕</button>
+      </div>
+      <p class="astuce">Dépensez vos points de technologie (gagnés en montant de niveau) pour débloquer des améliorations et de nouvelles zones de récolte.</p>
+      <div id="grilleTech" class="grille-tech"></div>
+    </div>
+  </div>
+
+  <div id="notifications" class="notifications"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
