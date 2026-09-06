@@ -22,6 +22,7 @@
     riviere:  { nom: 'Rivière',  couleur: '#3d7fc4' },
     montagne: { nom: 'Montagne', couleur: '#8b8680' },
     carriere: { nom: 'Carrière', couleur: '#6f6459' },
+    neige:    { nom: 'Neige',    couleur: '#eef3f5' },
   };
 
   const TYPES_RESSOURCE_NOEUD = {
@@ -169,7 +170,7 @@
         let biome;
         if (e < 0.30) biome = 'ocean';
         else if (e < 0.35) biome = 'plage';
-        else if (e > 0.78) biome = 'montagne';
+        else if (e > 0.65) biome = 'neige';
         else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
         else biome = (h > 0.52 ? 'foret' : 'plaine');
 
@@ -185,7 +186,7 @@
       tentativesRivieres++;
       const c0 = Math.floor(Math.random() * COLONNES);
       const r0 = Math.floor(Math.random() * LIGNES);
-      if (tuiles[r0][c0] !== 'montagne') continue;
+      if (tuiles[r0][c0] !== 'montagne' && tuiles[r0][c0] !== 'neige') continue;
 
       let col = c0, row = r0, pas = 0;
       const parcours = [];
