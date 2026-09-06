@@ -208,28 +208,47 @@
 
   function genererNoeudsRessources() {
     const noeuds = new Map();
+
+    const tuilesParBiome = { foret: [], carriere: [], montagne: [], plaine: [], eau: [] };
     for (let row = 0; row < LIGNES; row++) {
       for (let col = 0; col < COLONNES; col++) {
-        const biome = etat.tuiles[row][col];
-        let type = null;
-        const r = Math.random();
-        if (biome === 'foret') {
-          if (r < 0.30) type = 'arbre';
-          else if (r < 0.38) type = 'gibier';
-        } else if (biome === 'carriere') {
-          if (r < 0.55) type = 'roche';
-        } else if (biome === 'montagne') {
-          if (r < 0.20) type = 'roche';
-        } else if (biome === 'plaine') {
-          if (r < 0.10) type = 'gibier';
-        } else if (biome === 'riviere' || biome === 'plage' || biome === 'ocean') {
-          if (r < 0.22) type = 'poisson';
-        }
-        if (type) {
-          noeuds.set(col + ',' + row, { type, col, row });
+        const b = etat.tuiles[row][col];
+        if (b === 'foret') tuilesParBiome.foret.push([col, row]);
+        else if (b === 'carriere') tuilesParBiome.carriere.push([col, row]);
+        else if (b === 'montagne') tuilesParBiome.montagne.push([col, row]);
+        else if (b === 'plaine') tuilesParBiome.plaine.push([col, row]);
+        else if (b === 'riviere' || b === 'plage' || b === 'ocean') tuilesParBiome.eau.push([col, row]);
+      }
+    }
+
+    function placerGroupes(listeTuiles, type, tuilesParGroupe, tailleMin, tailleMax, rayon, biomesAutorises) {
+      if (listeTuiles.length === 0) return;
+      const nbGroupes = Math.max(1, Math.round(listeTuiles.length / tuilesParGroupe));
+      for (let g = 0; g < nbGroupes; g++) {
+        const [ccol, crow] = listeTuiles[Math.floor(Math.random() * listeTuiles.length)];
+        const combien = Math.round(aleatoire(tailleMin, tailleMax));
+        let places = 0, tentatives = 0;
+        while (places < combien && tentatives < combien * 6) {
+          tentatives++;
+          const col = ccol + Math.round(aleatoire(-rayon, rayon));
+          const row = crow + Math.round(aleatoire(-rayon, rayon));
+          if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) continue;
+          const cle = col + ',' + row;
+          if (noeuds.has(cle)) continue;
+          if (!biomesAutorises.includes(etat.tuiles[row][col])) continue;
+          noeuds.set(cle, { type, col, row });
+          places++;
         }
       }
     }
+
+    placerGroupes(tuilesParBiome.foret, 'arbre', 22, 5, 9, 2, ['foret']);
+    placerGroupes(tuilesParBiome.foret, 'gibier', 90, 2, 3, 1.5, ['foret']);
+    placerGroupes(tuilesParBiome.carriere, 'roche', 14, 4, 7, 2, ['carriere']);
+    placerGroupes(tuilesParBiome.montagne, 'roche', 50, 2, 4, 2, ['montagne']);
+    placerGroupes(tuilesParBiome.plaine, 'gibier', 70, 2, 4, 2, ['plaine']);
+    placerGroupes(tuilesParBiome.eau, 'poisson', 18, 3, 6, 2, ['riviere', 'plage', 'ocean']);
+
     return noeuds;
   }
 
