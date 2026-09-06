@@ -238,6 +238,8 @@
     const centresParType = {};
     let zoneIdCompteur = 0;
 
+    const VOISINS_ORTHO = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+
     function placerGroupes(listeTuiles, type, tuilesParGroupe, tailleMin, tailleMax, rayon, biomesAutorises) {
       if (listeTuiles.length === 0) return;
       const distanceMinCentres = Math.max(rayon * 5, 8);
@@ -250,24 +252,32 @@
           [ccol, crow] = listeTuiles[Math.floor(Math.random() * listeTuiles.length)];
           essaiCentre++;
         } while (
-          essaiCentre < 20 &&
-          centres.some(c => Math.hypot(c[0] - ccol, c[1] - crow) < distanceMinCentres)
+          essaiCentre < 30 &&
+          (noeuds.has(ccol + ',' + crow) || centres.some(c => Math.hypot(c[0] - ccol, c[1] - crow) < distanceMinCentres))
         );
+        if (noeuds.has(ccol + ',' + crow)) continue;
         centres.push([ccol, crow]);
 
+        // Fait grandir la grappe case par case, en ne posant chaque nouvelle
+        // ressource que sur une case orthogonalement adjacente à la grappe :
+        // toutes les ressources d'une même zone se touchent ainsi forcément.
         const zoneId = zoneIdCompteur++;
         const combien = Math.round(aleatoire(tailleMin, tailleMax));
-        let places = 0, tentatives = 0;
-        while (places < combien && tentatives < combien * 6) {
+        const placees = [[ccol, crow]];
+        noeuds.set(ccol + ',' + crow, { type, col: ccol, row: crow, zoneId });
+
+        let tentatives = 0;
+        while (placees.length < combien && tentatives < combien * 20) {
           tentatives++;
-          const col = ccol + Math.round(aleatoire(-rayon, rayon));
-          const row = crow + Math.round(aleatoire(-rayon, rayon));
+          const [bc, br] = placees[Math.floor(Math.random() * placees.length)];
+          const [dc, dr] = VOISINS_ORTHO[Math.floor(Math.random() * VOISINS_ORTHO.length)];
+          const col = bc + dc, row = br + dr;
           if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) continue;
           const cle = col + ',' + row;
           if (noeuds.has(cle)) continue;
           if (!biomesAutorises.includes(etat.tuiles[row][col])) continue;
           noeuds.set(cle, { type, col, row, zoneId });
-          places++;
+          placees.push([col, row]);
         }
       }
     }
