@@ -410,13 +410,18 @@
   // Interactions : navigation caméra
   // ============================================================
 
-  canvas.addEventListener('mousedown', (e) => {
+  let glisserPointerId = null;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (glisserPointerId !== null) return;
+    glisserPointerId = e.pointerId;
     glisser = true;
     aBouge = false;
     glisserOrigine = { x: e.clientX, y: e.clientY, camX: camera.x, camY: camera.y };
+    canvas.setPointerCapture(e.pointerId);
   });
-  window.addEventListener('mousemove', (e) => {
-    if (!glisser || !glisserOrigine) return;
+  canvas.addEventListener('pointermove', (e) => {
+    if (!glisser || e.pointerId !== glisserPointerId || !glisserOrigine) return;
     const dx = e.clientX - glisserOrigine.x;
     const dy = e.clientY - glisserOrigine.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) aBouge = true;
@@ -424,16 +429,18 @@
     camera.y = glisserOrigine.camY - dy;
     clamperCamera();
   });
-  window.addEventListener('mouseup', (e) => {
+  function terminerGlisser(e) {
+    if (e.pointerId !== glisserPointerId) return;
     if (glisser && !aBouge) {
       const rect = canvas.getBoundingClientRect();
-      if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        gererClicCarte(e.clientX - rect.left, e.clientY - rect.top);
-      }
+      gererClicCarte(e.clientX - rect.left, e.clientY - rect.top);
     }
     glisser = false;
     glisserOrigine = null;
-  });
+    glisserPointerId = null;
+  }
+  canvas.addEventListener('pointerup', terminerGlisser);
+  canvas.addEventListener('pointercancel', terminerGlisser);
 
   minicarte.addEventListener('click', (e) => {
     const rect = minicarte.getBoundingClientRect();
