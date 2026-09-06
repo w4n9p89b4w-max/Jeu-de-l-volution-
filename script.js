@@ -253,12 +253,12 @@
       }
     }
 
-    placerGroupes(tuilesParBiome.foret, 'arbre', 30, 5, 10, 2, ['foret']);
-    placerGroupes(tuilesParBiome.foret, 'gibier', 110, 5, 10, 2, ['foret']);
-    placerGroupes(tuilesParBiome.carriere, 'roche', 20, 5, 10, 2, ['carriere']);
-    placerGroupes(tuilesParBiome.montagne, 'roche', 70, 5, 10, 2, ['montagne']);
-    placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 5, 10, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 5, 10, 2, ['riviere', 'plage', 'ocean']);
+    placerGroupes(tuilesParBiome.foret, 'arbre', 30, 5, 7, 2, ['foret']);
+    placerGroupes(tuilesParBiome.foret, 'gibier', 110, 5, 7, 2, ['foret']);
+    placerGroupes(tuilesParBiome.carriere, 'roche', 20, 5, 7, 2, ['carriere']);
+    placerGroupes(tuilesParBiome.montagne, 'roche', 70, 5, 7, 2, ['montagne']);
+    placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 5, 7, 2, ['plaine']);
+    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 5, 7, 2, ['riviere', 'plage', 'ocean']);
 
     return noeuds;
   }
