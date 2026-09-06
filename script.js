@@ -6,13 +6,13 @@
   // ============================================================
 
   const TAILLE_TUILE = 28;
-  const COLONNES = 70;
-  const LIGNES = 46;
+  const COLONNES = 132;
+  const LIGNES = 84;
   const LARGEUR_MONDE = TAILLE_TUILE * COLONNES;
   const HAUTEUR_MONDE = TAILLE_TUILE * LIGNES;
   const NB_ZONES_COTE = 3; // grille de zones 3x3
   const TICK_MS = 2000;
-  const VITESSE_PAN = 380; // px/s au clavier
+  const VITESSE_PAN = 520; // px/s au clavier
 
   const BIOMES = {
     ocean:    { nom: 'Océan',    couleur: '#1c4f7c' },
@@ -169,7 +169,7 @@
     // Traçage de quelques rivières depuis des sommets vers l'océan
     let tentativesRivieres = 0;
     let riviereCreees = 0;
-    while (riviereCreees < 4 && tentativesRivieres < 400) {
+    while (riviereCreees < 7 && tentativesRivieres < 700) {
       tentativesRivieres++;
       const c0 = Math.floor(Math.random() * COLONNES);
       const r0 = Math.floor(Math.random() * LIGNES);
@@ -177,7 +177,7 @@
 
       let col = c0, row = r0, pas = 0;
       const parcours = [];
-      while (pas < 250) {
+      while (pas < 400) {
         pas++;
         parcours.push([col, row]);
         if (tuiles[row][col] === 'ocean') break;
