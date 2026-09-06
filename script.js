@@ -235,10 +235,13 @@
       }
     }
 
+    const centresParType = {};
+
     function placerGroupes(listeTuiles, type, tuilesParGroupe, tailleMin, tailleMax, rayon, biomesAutorises) {
       if (listeTuiles.length === 0) return;
-      const distanceMinCentres = rayon * 3.5;
-      const centres = [];
+      const distanceMinCentres = Math.max(rayon * 5, 8);
+      if (!centresParType[type]) centresParType[type] = [];
+      const centres = centresParType[type];
       const nbGroupes = Math.max(1, Math.round(listeTuiles.length / tuilesParGroupe));
       for (let g = 0; g < nbGroupes; g++) {
         let ccol, crow, essaiCentre = 0;
