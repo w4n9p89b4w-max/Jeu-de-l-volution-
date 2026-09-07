@@ -37,6 +37,25 @@
   const RESSOURCE_EMOJI = { bois: '🪵', pierre: '🪨', nourriture: '🍖' };
   const GAIN_PAR_VOYAGE = 4; // ressources rapportées à chaque aller-retour complet
   const DUREE_RECOLTE = 3;   // secondes passées sur la ressource avant de repartir
+  const DUREE_ENFANCE = 60;  // secondes avant qu'un enfant devienne adulte et puisse travailler
+
+  // Outils assignables : chacun donne un métier et, pour la plupart, un bonus
+  // de récolte sur le type de ressource correspondant.
+  const OUTILS = {
+    hache:  { nom: 'Hache',         emoji: '🪓', cout: { bois: 8 },             noeudCible: 'arbre',   metier: 'Bûcheron' },
+    pioche: { nom: 'Pioche',        emoji: '⛏️', cout: { pierre: 8 },           noeudCible: 'roche',   metier: 'Mineur' },
+    arc:    { nom: 'Arc',           emoji: '🏹', cout: { bois: 10, pierre: 4 }, noeudCible: 'gibier',  metier: 'Chasseur' },
+    canne:  { nom: 'Canne à pêche', emoji: '🎣', cout: { bois: 6 },             noeudCible: 'poisson', metier: 'Pêcheur' },
+    torche: { nom: 'Torche',        emoji: '🔦', cout: { bois: 4 },             noeudCible: null,      metier: 'Éclaireur' },
+    epee:   { nom: 'Épée',          emoji: '🗡️', cout: { bois: 6, pierre: 6 },  noeudCible: null,      metier: 'Garde' },
+  };
+
+  const PRENOMS_H = ['Aro', 'Talyn', 'Bren', 'Corvin', 'Doran', 'Ewald', 'Fenn', 'Garrick', 'Hurin', 'Ivo'];
+  const PRENOMS_F = ['Aïna', 'Brielle', 'Cora', 'Delphine', 'Elowen', 'Fara', 'Githa', 'Hana', 'Ilse', 'Joss'];
+  function tirerPrenom(genre) {
+    const liste = genre === 'f' ? PRENOMS_F : PRENOMS_H;
+    return liste[Math.floor(Math.random() * liste.length)];
+  }
 
   // Illustrations dessinées à la main pour les ressources et les villageois
   // (remplacent les emoji correspondants une fois chargées).
@@ -105,15 +124,32 @@
     return '🌳';
   }
 
+  // Arbre technologique à quatre branches.
+  const BRANCHES_TECH = {
+    metier:              'Métiers',
+    exploration:          'Exploration',
+    elevage_agriculture:  'Élevage & agriculture',
+    technologie:          'Technologie',
+  };
+
   const TECHS = [
-    { id: 'outils_bois',   nom: 'Outils en pierre',      desc: '+50% de récolte de bois.', cout: 1, prerequis: [], effet: m => m.bois *= 1.5 },
-    { id: 'outils_pierre', nom: 'Pics miniers',          desc: '+50% de récolte de pierre.', cout: 1, prerequis: [], effet: m => m.pierre *= 1.5 },
-    { id: 'chasse',        nom: 'Techniques de chasse',  desc: '+50% de récolte de gibier et poisson.', cout: 1, prerequis: [], effet: m => m.nourriture *= 1.5 },
-    { id: 'agriculture',   nom: 'Agriculture',           desc: 'Les champs produisent deux fois plus.', cout: 2, prerequis: ['outils_bois'], effet: m => m.champ *= 2 },
-    { id: 'elevage',       nom: 'Élevage',                desc: 'Débloque la construction des enclos à animaux.', cout: 2, prerequis: ['chasse'], effet: () => {} },
-    { id: 'urbanisme',     nom: 'Urbanisme',              desc: '-25% de coût de construction.', cout: 2, prerequis: [], effet: m => m.coutConstruction *= 0.75 },
-    { id: 'entreposage',   nom: 'Grands entrepôts',       desc: '+100 capacité de stockage de base.', cout: 1, prerequis: [], effet: m => m.stockageBonus += 100 },
-    { id: 'natalite',      nom: 'Médecine ancestrale',    desc: '+40% de vitesse de reproduction.', cout: 2, prerequis: ['agriculture'], effet: m => m.natalite *= 1.4 },
+    // --- Métiers : améliore les outils et les gains des professions ---
+    { id: 'outils_bois',   nom: 'Outils en pierre',      desc: '+50% de récolte de bois.', cout: 1, prerequis: [], branche: 'metier', effet: m => m.bois *= 1.5 },
+    { id: 'outils_pierre', nom: 'Pics miniers',          desc: '+50% de récolte de pierre.', cout: 1, prerequis: [], branche: 'metier', effet: m => m.pierre *= 1.5 },
+    { id: 'chasse',        nom: 'Techniques de chasse',  desc: '+50% de récolte de gibier et de poisson.', cout: 1, prerequis: [], branche: 'metier', effet: m => m.nourriture *= 1.5 },
+    { id: 'forge',         nom: 'Forge',                 desc: '-30% de coût de fabrication des outils.', cout: 2, prerequis: ['outils_pierre'], branche: 'metier', effet: m => m.coutOutils *= 0.7 },
+    { id: 'corporations',  nom: 'Corporations de métier', desc: '+25% de bonus pour les villageois équipés d\'un outil adapté.', cout: 2, prerequis: ['forge'], branche: 'metier', effet: m => m.bonusMetier *= 1.25 },
+
+    // --- Élevage & agriculture : nourriture et croissance de la population ---
+    { id: 'agriculture',   nom: 'Agriculture',           desc: 'Les champs produisent deux fois plus.', cout: 2, prerequis: [], branche: 'elevage_agriculture', effet: m => m.champ *= 2 },
+    { id: 'elevage',       nom: 'Élevage',                desc: 'Débloque la construction des enclos à animaux.', cout: 2, prerequis: ['chasse'], branche: 'elevage_agriculture', effet: () => {} },
+    { id: 'natalite',      nom: 'Médecine ancestrale',    desc: '+40% de vitesse de reproduction.', cout: 2, prerequis: ['agriculture'], branche: 'elevage_agriculture', effet: m => m.natalite *= 1.4 },
+    { id: 'vie_famille',   nom: 'Vie de famille',         desc: '+50% de chances de formation de nouveaux couples.', cout: 1, prerequis: [], branche: 'elevage_agriculture', effet: m => m.coupleChance *= 1.5 },
+
+    // --- Technologie : constructions et infrastructure ---
+    { id: 'urbanisme',     nom: 'Urbanisme',              desc: '-25% de coût de construction.', cout: 2, prerequis: [], branche: 'technologie', effet: m => m.coutConstruction *= 0.75 },
+    { id: 'entreposage',   nom: 'Grands entrepôts',       desc: '+100 capacité de stockage de base.', cout: 1, prerequis: [], branche: 'technologie', effet: m => m.stockageBonus += 100 },
+    { id: 'charpente',     nom: 'Charpente avancée',      desc: '-20% de durée de construction.', cout: 2, prerequis: ['urbanisme'], branche: 'technologie', effet: m => m.dureeConstruction *= 0.8 },
   ];
 
   const NOMS_ZONES = ['Nord-Ouest', 'Nord', 'Nord-Est', 'Ouest', 'Centre', 'Est', 'Sud-Ouest', 'Sud', 'Sud-Est'];
@@ -127,6 +163,7 @@
       cout: bord ? 1 : 2,
       prerequis: bord ? [] : [1, 3, 5, 7].filter(b => estAdjacent(b, i)).map(b => 'zone_' + b),
       zone: i,
+      branche: 'exploration',
       effet: () => {},
     });
   }
@@ -185,7 +222,7 @@
       xp: 0,
       pointsTech: 0,
       techsAcquises: new Set(),
-      multiplicateurs: { bois: 1, pierre: 1, nourriture: 1, champ: 1, enclos: 1, natalite: 1, coutConstruction: 1, stockageBonus: 0 },
+      multiplicateurs: { bois: 1, pierre: 1, nourriture: 1, champ: 1, enclos: 1, natalite: 1, coutConstruction: 1, stockageBonus: 0, coutOutils: 1, bonusMetier: 1, coupleChance: 1, dureeConstruction: 1 },
       tempsJeu: DUREE_JOUR * 0.15, // démarre le matin
       meteo: 'clair',
       meteoMinuteur: aleatoire(35, 70),
@@ -590,7 +627,7 @@
 
   function population_libre() {
     let n = 0;
-    for (const v of etat.villageois) if (v.assigneA === null) n++;
+    for (const v of etat.villageois) if (v.assigneA === null && !v.estEnfant) n++;
     return n;
   }
 
@@ -610,8 +647,10 @@
   }
 
   function creerVillageois(col, row, genre) {
+    const genreFinal = genre || (Math.random() < 0.5 ? 'h' : 'f');
     return {
       id: villageoisIdCompteur++,
+      prenom: tirerPrenom(genreFinal),
       x: col * TAILLE_TUILE + TAILLE_TUILE / 2,
       y: row * TAILLE_TUILE + TAILLE_TUILE / 2,
       assigneA: null,
@@ -625,9 +664,14 @@
       travaille: false,
       charge: 0,
       ressourceType: null,
-      genre: genre || (Math.random() < 0.5 ? 'h' : 'f'),
+      genre: genreFinal,
       outil: null,
       tempsRecolte: 0,
+      partenaireId: null,
+      estEnfant: false,
+      age: 0,
+      parentA: null,
+      parentB: null,
     };
   }
 
@@ -643,6 +687,10 @@
       const v = creerVillageois(col, row, genres ? genres[i] : undefined);
       if (outils) v.outil = outils[i];
       liste.push(v);
+    }
+    if (n === 2) {
+      liste[0].partenaireId = liste[1].id;
+      liste[1].partenaireId = liste[0].id;
     }
     return liste;
   }
@@ -721,6 +769,15 @@
   }
 
   function mettreAJourVillageois(dt) {
+    for (const v of etat.villageois) {
+      if (!v.estEnfant) continue;
+      v.age += dt;
+      if (v.age >= DUREE_ENFANCE) {
+        v.estEnfant = false;
+        notifier('🧑 ' + v.prenom + ' a grandi et peut désormais travailler.');
+      }
+    }
+
     const parNoeud = new Map();
     for (const v of etat.villageois) {
       if (!v.assigneA || v.mode === 'rapporte') continue;
@@ -770,7 +827,7 @@
               v.tempsRecolte = 0;
               const def = TYPES_RESSOURCE_NOEUD[noeud.type];
               let gain = GAIN_PAR_VOYAGE;
-              if ((v.outil === 'hache' && def.ressource === 'bois') || (v.outil === 'pioche' && def.ressource === 'pierre')) gain += 1;
+              if (v.outil && OUTILS[v.outil].noeudCible === noeud.type) gain += Math.round(1 * etat.multiplicateurs.bonusMetier);
               gain = Math.round(gain * etat.multiplicateurs[def.ressource]);
               v.charge = gain;
               v.ressourceType = def.ressource;
@@ -825,14 +882,23 @@
         offsetY = Math.abs(Math.sin(t * 9 + v.phase)) * -2;
       }
 
+      const echelleTaille = v.estEnfant ? 0.62 : 1;
+
       ctx.save();
       ctx.translate(x, y + 3);
+      if (v.id === villageoisSelectionneId) {
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 10 * echelleTaille, 4 * echelleTaille, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = '#e0ac5c';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
       ctx.beginPath();
-      ctx.ellipse(0, 3, 6, 2.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 3, 6 * echelleTaille, 2.2 * echelleTaille, 0, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(0,0,0,0.35)';
       ctx.fill();
       ctx.translate(0, offsetY);
-      ctx.scale(1, echelleY);
+      ctx.scale(echelleTaille, echelleTaille * echelleY);
       const icoVillageois = v.genre === 'f' ? 'humainF' : 'humain';
       if (iconesPretes[icoVillageois]) {
         const tailleH = TAILLE_TUILE * 0.8;
@@ -846,6 +912,9 @@
       if (v.mode === 'rapporte' && v.ressourceType) {
         ctx.font = (TAILLE_TUILE * 0.4) + 'px serif';
         ctx.fillText(RESSOURCE_EMOJI[v.ressourceType], 8, -15);
+      } else if (v.outil) {
+        ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
+        ctx.fillText(OUTILS[v.outil].emoji, 8, -18);
       }
       ctx.restore();
     }
@@ -902,6 +971,7 @@
     placerCampementDepart();
     etat.villageois = genererVillageoisInitiaux(2);
     caseSelectionnee = null;
+    villageoisSelectionneId = null;
     modeConstruction = null;
     propositionConstruction = null;
     masquerOverlayConstruction();
@@ -942,6 +1012,7 @@
   let aBouge = false;
 
   let caseSelectionnee = null;
+  let villageoisSelectionneId = null;
   let modeConstruction = null;
   let caseSurvolee = null;
   let propositionConstruction = null;
@@ -1319,6 +1390,7 @@
 
     const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
     if (!zoneOk) {
+      villageoisSelectionneId = null;
       caseSelectionnee = { col, row, verrouillee: true };
       afficherSelection();
       return;
@@ -1331,6 +1403,23 @@
       return;
     }
 
+    // En mode exploration, un clic proche d'un villageois le sélectionne
+    // (outils / métier / famille) plutôt que la case sous-jacente.
+    const wx = px / zoom + camera.x;
+    const wy = py / zoom + camera.y;
+    let cible = null, meilleureDist = TAILLE_TUILE * 0.55;
+    for (const v of etat.villageois) {
+      const d = Math.hypot(v.x - wx, v.y - wy);
+      if (d < meilleureDist) { meilleureDist = d; cible = v; }
+    }
+    if (cible) {
+      villageoisSelectionneId = cible.id;
+      caseSelectionnee = null;
+      afficherSelection();
+      return;
+    }
+
+    villageoisSelectionneId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
   }
@@ -1475,7 +1564,8 @@
     }
     etat.ressources.bois -= cout.bois;
     etat.ressources.pierre -= cout.pierre;
-    etat.chantiers.push({ type: modeConstruction, cases, tempsRestant: def.duree, dureeTotale: def.duree });
+    const duree = def.duree * etat.multiplicateurs.dureeConstruction;
+    etat.chantiers.push({ type: modeConstruction, cases, tempsRestant: duree, dureeTotale: duree });
     notifier('🚧 Construction de ' + def.nom.toLowerCase() + ' commencée...');
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
@@ -1589,10 +1679,77 @@
   // Sélection : panneau latéral
   // ============================================================
 
+  // Panneau de sélection d'un villageois : métier (dérivé de son outil),
+  // couple et enfants, et fabrication/attribution d'un nouvel outil.
+  function afficherSelectionVillageois(conteneur) {
+    const v = etat.villageois.find(x => x.id === villageoisSelectionneId);
+    if (!v) {
+      villageoisSelectionneId = null;
+      afficherSelection();
+      return;
+    }
+
+    const icone = v.genre === 'f' ? '👩' : '🧑';
+    const genreTxt = v.genre === 'f' ? 'Femme' : 'Homme';
+    const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+    let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${v.estEnfant ? ' · Enfant' : ''}<br>Métier : <b>${metier}</b></p>`;
+
+    if (v.estEnfant) {
+      const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
+      html += `<p class="astuce">Grandit encore ${restant} s avant de pouvoir travailler.</p>`;
+    } else {
+      if (v.partenaireId) {
+        const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
+        html += `<p>💞 En couple avec <b>${partenaire ? partenaire.prenom : '???'}</b></p>`;
+      } else {
+        html += '<p class="astuce">Célibataire.</p>';
+      }
+      const enfants = etat.villageois.filter(e => e.parentA === v.id || e.parentB === v.id);
+      if (enfants.length) html += `<p>👶 Enfant${enfants.length > 1 ? 's' : ''} : ${enfants.map(e => e.prenom).join(', ')}</p>`;
+
+      html += `<p>${v.outil ? OUTILS[v.outil].emoji + ' ' + OUTILS[v.outil].nom + ' équipé(e)' : 'Aucun outil équipé.'}</p>`;
+      html += '<div class="outils-liste">';
+      for (const id in OUTILS) {
+        const def = OUTILS[id];
+        const possede = v.outil === id;
+        const cout = Object.entries(def.cout).map(([r, q]) => Math.ceil(q * etat.multiplicateurs.coutOutils) + ' ' + RESSOURCE_EMOJI[r]).join(' ');
+        html += `<button class="btn-outil${possede ? ' selectionne' : ''}" data-outil="${id}" ${possede ? 'disabled' : ''} title="${def.metier} · ${cout}">${def.emoji} ${def.nom}</button>`;
+      }
+      html += '</div>';
+    }
+
+    conteneur.innerHTML = html;
+
+    if (!v.estEnfant) {
+      conteneur.querySelectorAll('.btn-outil').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.outil;
+          const def = OUTILS[id];
+          const cout = {};
+          for (const r in def.cout) cout[r] = Math.ceil(def.cout[r] * etat.multiplicateurs.coutOutils);
+          for (const r in cout) {
+            if ((etat.ressources[r] || 0) < cout[r]) {
+              notifier('❌ Ressources insuffisantes pour fabriquer : ' + def.nom);
+              return;
+            }
+          }
+          for (const r in cout) etat.ressources[r] -= cout[r];
+          v.outil = id;
+          notifier(def.emoji + ' ' + v.prenom + ' devient ' + def.metier.toLowerCase() + '.');
+          afficherSelection();
+        });
+      });
+    }
+  }
+
   function afficherSelection() {
     const conteneur = document.getElementById('contenuSelection');
+    if (villageoisSelectionneId !== null) {
+      afficherSelectionVillageois(conteneur);
+      return;
+    }
     if (!caseSelectionnee) {
-      conteneur.innerHTML = '<p class="astuce">Cliquez sur une case de la carte pour l\'inspecter.</p>';
+      conteneur.innerHTML = '<p class="astuce">Cliquez sur une case de la carte pour l\'inspecter, ou sur un villageois pour lui attribuer un outil.</p>';
       return;
     }
     const { col, row, verrouillee } = caseSelectionnee;
@@ -1663,7 +1820,7 @@
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const zone = noeudsDeLaZone(noeud.zoneId);
       const cibleNoeud = zone.find(n => compterTravailleurs(n.col + ',' + n.row) < def.max);
-      const libre = etat.villageois.find(v => v.assigneA === null);
+      const libre = etat.villageois.find(v => v.assigneA === null && !v.estEnfant);
       if (cibleNoeud && libre) libre.assigneA = cibleNoeud.col + ',' + cibleNoeud.row;
       afficherSelection();
     });
@@ -1705,28 +1862,68 @@
     etat.ressources.pierre = Math.min(cap, etat.ressources.pierre + gainPassif.pierre);
     etat.ressources.nourriture = Math.min(cap, etat.ressources.nourriture + gainPassif.nourriture);
 
-    // Reproduction de la population
+    evoluerCouples(m);
+
+    // Reproduction de la population : réservée aux couples formés
     if (etat.ressources.nourriture >= 15 && nbPopulation() < etat.capacitePopulation) {
-      const chance = 0.15 * m.natalite;
-      if (Math.random() < chance) {
-        etat.ressources.nourriture -= 10;
-        const maisons = [...etat.batiments.entries()].filter(([, type]) => type === 'maison');
-        let colNaissance, rowNaissance;
-        if (maisons.length > 0) {
-          const [cle] = maisons[Math.floor(Math.random() * maisons.length)];
-          [colNaissance, rowNaissance] = cle.split(',').map(Number);
-        } else {
-          colNaissance = COLONNES / 2;
-          rowNaissance = LIGNES / 2;
+      const couples = couplesFormes();
+      if (couples.length > 0) {
+        const chance = 0.15 * m.natalite;
+        if (Math.random() < chance) {
+          etat.ressources.nourriture -= 10;
+          const [parentA, parentB] = couples[Math.floor(Math.random() * couples.length)];
+          const colNaissance = Math.round(parentA.x / TAILLE_TUILE);
+          const rowNaissance = Math.round(parentA.y / TAILLE_TUILE);
+          const pos = trouverTuileMarchable(colNaissance, rowNaissance, 2);
+          const enfant = creerVillageois(pos.col, pos.row);
+          enfant.estEnfant = true;
+          enfant.parentA = parentA.id;
+          enfant.parentB = parentB.id;
+          etat.villageois.push(enfant);
+          notifier('👶 ' + parentA.prenom + ' et ' + parentB.prenom + ' ont eu un enfant : ' + enfant.prenom + ' !');
         }
-        const pos = trouverTuileMarchable(colNaissance, rowNaissance, 2);
-        etat.villageois.push(creerVillageois(pos.col, pos.row));
-        notifier('👶 La population a grandi ! (' + nbPopulation() + ')');
       }
     }
 
     const xpPassif = (gainPassif.bois + gainPassif.pierre + gainPassif.nourriture) * 0.4;
     if (xpPassif > 0) gagnerXp(xpPassif);
+  }
+
+  // Renvoie les paires de villageois formant un couple, un seul exemplaire par paire.
+  function couplesFormes() {
+    const couples = [];
+    const vus = new Set();
+    for (const v of etat.villageois) {
+      if (v.estEnfant || !v.partenaireId || vus.has(v.id)) continue;
+      const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
+      if (!partenaire) continue;
+      vus.add(v.id);
+      vus.add(partenaire.id);
+      couples.push([v, partenaire]);
+    }
+    return couples;
+  }
+
+  // Formation spontanée de nouveaux couples parmi les adultes célibataires
+  // suffisamment proches les uns des autres.
+  function evoluerCouples(m) {
+    const celibataires = etat.villageois.filter(v => !v.estEnfant && !v.partenaireId);
+    for (let i = 0; i < celibataires.length; i++) {
+      const a = celibataires[i];
+      if (a.partenaireId) continue;
+      for (let j = i + 1; j < celibataires.length; j++) {
+        const b = celibataires[j];
+        if (b.partenaireId || a.genre === b.genre) continue;
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dist > TAILLE_TUILE * 6) continue;
+        if (Math.random() < 0.12 * m.coupleChance) {
+          a.partenaireId = b.id;
+          b.partenaireId = a.id;
+          notifier('💞 ' + a.prenom + ' et ' + b.prenom + ' se sont mis en couple.');
+        }
+        break;
+      }
+    }
   }
 
   function gagnerXp(montant) {
@@ -1762,25 +1959,44 @@
     afficherModalTech();
   }
 
+  // Regroupe les technologies par branche (métier / exploration /
+  // élevage-agriculture / technologie) dans l'arbre technologique.
   function afficherModalTech() {
     const grille = document.getElementById('grilleTech');
     grille.innerHTML = '';
+    const parBranche = {};
     for (const t of TECHS) {
-      const acquise = etat.techsAcquises.has(t.id);
-      const dispo = techDisponible(t);
-      const div = document.createElement('div');
-      div.className = 'carte-tech' + (acquise ? ' acquise' : (!dispo ? ' verrouillee' : ''));
-      div.innerHTML = `<h3>${acquise ? '✅' : (dispo ? '🔓' : '🔒')} ${t.nom}</h3>
-        <p>${t.desc}</p>
-        <span class="cout">${acquise ? 'Acquise' : 'Coût : ' + t.cout + ' pt(s)'}</span>`;
-      if (!acquise && dispo) {
-        const btn = document.createElement('button');
-        btn.textContent = 'Débloquer';
-        btn.disabled = etat.pointsTech < t.cout;
-        btn.addEventListener('click', () => acquerirTech(t));
-        div.appendChild(btn);
+      const cle = t.branche || 'technologie';
+      if (!parBranche[cle]) parBranche[cle] = [];
+      parBranche[cle].push(t);
+    }
+    for (const cle in BRANCHES_TECH) {
+      const liste = parBranche[cle];
+      if (!liste || liste.length === 0) continue;
+      const section = document.createElement('div');
+      section.className = 'branche-tech';
+      section.innerHTML = `<h3>${BRANCHES_TECH[cle]}</h3>`;
+      const sousGrille = document.createElement('div');
+      sousGrille.className = 'grille-tech';
+      for (const t of liste) {
+        const acquise = etat.techsAcquises.has(t.id);
+        const dispo = techDisponible(t);
+        const div = document.createElement('div');
+        div.className = 'carte-tech' + (acquise ? ' acquise' : (!dispo ? ' verrouillee' : ''));
+        div.innerHTML = `<h3>${acquise ? '✅' : (dispo ? '🔓' : '🔒')} ${t.nom}</h3>
+          <p>${t.desc}</p>
+          <span class="cout">${acquise ? 'Acquise' : 'Coût : ' + t.cout + ' pt(s)'}</span>`;
+        if (!acquise && dispo) {
+          const btn = document.createElement('button');
+          btn.textContent = 'Débloquer';
+          btn.disabled = etat.pointsTech < t.cout;
+          btn.addEventListener('click', () => acquerirTech(t));
+          div.appendChild(btn);
+        }
+        sousGrille.appendChild(div);
       }
-      grille.appendChild(div);
+      section.appendChild(sousGrille);
+      grille.appendChild(section);
     }
   }
 
@@ -1840,6 +2056,7 @@
   const DUREE_JOUR = 300;             // secondes pour un cycle jour/nuit complet
   const OBSCURITE_MAX = 0.72;         // opacité max de l'obscurité en pleine nuit
   const RAYON_LUMIERE_FEU = TAILLE_TUILE * 4.5;
+  const RAYON_LUMIERE_TORCHE = TAILLE_TUILE * 2.2;
   const METEO_TIRAGE = ['clair', 'clair', 'clair', 'clair', 'nuageux', 'nuageux', 'pluie'];
 
   // Luminosité 0 (nuit noire) → 1 (plein jour), en douceur sur tout le cycle.
@@ -1914,22 +2131,29 @@
     cctx.fillStyle = `rgba(6, 10, 20, ${obscurite})`;
     cctx.fillRect(camera.x, camera.y, vw, vh);
 
-    cctx.globalCompositeOperation = 'destination-out';
-    for (const [cle, type] of etat.batiments.entries()) {
-      if (type !== 'feu') continue;
-      const [col, row] = cle.split(',').map(Number);
-      const cx = col * TAILLE_TUILE + TAILLE_TUILE / 2;
-      const cy = row * TAILLE_TUILE + TAILLE_TUILE / 2;
-      if (cx < camera.x - RAYON_LUMIERE_FEU || cx > camera.x + vw + RAYON_LUMIERE_FEU) continue;
-      if (cy < camera.y - RAYON_LUMIERE_FEU || cy > camera.y + vh + RAYON_LUMIERE_FEU) continue;
-      const degrade = cctx.createRadialGradient(cx, cy, 0, cx, cy, RAYON_LUMIERE_FEU);
+    function poinconnerLumiere(cx, cy, rayon) {
+      if (cx < camera.x - rayon || cx > camera.x + vw + rayon) return;
+      if (cy < camera.y - rayon || cy > camera.y + vh + rayon) return;
+      const degrade = cctx.createRadialGradient(cx, cy, 0, cx, cy, rayon);
       degrade.addColorStop(0, 'rgba(0,0,0,1)');
       degrade.addColorStop(0.6, 'rgba(0,0,0,0.85)');
       degrade.addColorStop(1, 'rgba(0,0,0,0)');
       cctx.fillStyle = degrade;
       cctx.beginPath();
-      cctx.arc(cx, cy, RAYON_LUMIERE_FEU, 0, Math.PI * 2);
+      cctx.arc(cx, cy, rayon, 0, Math.PI * 2);
       cctx.fill();
+    }
+
+    cctx.globalCompositeOperation = 'destination-out';
+    for (const [cle, type] of etat.batiments.entries()) {
+      if (type !== 'feu') continue;
+      const [col, row] = cle.split(',').map(Number);
+      poinconnerLumiere(col * TAILLE_TUILE + TAILLE_TUILE / 2, row * TAILLE_TUILE + TAILLE_TUILE / 2, RAYON_LUMIERE_FEU);
+    }
+    // Les villageois porteurs d'une torche repoussent l'obscurité autour d'eux.
+    for (const v of etat.villageois) {
+      if (v.outil !== 'torche') continue;
+      poinconnerLumiere(v.x, v.y, RAYON_LUMIERE_TORCHE);
     }
     cctx.globalCompositeOperation = 'source-over';
 
@@ -1989,7 +2213,7 @@
     setInterval(() => {
       if (!enPause) tick();
       majInterface();
-      if (caseSelectionnee && !caseSelectionnee.verrouillee) afficherSelection();
+      if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionneId !== null) afficherSelection();
     }, TICK_MS);
   }
 
