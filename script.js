@@ -1314,7 +1314,9 @@
 
   function masquerOverlayConstruction() {
     boutonsConstruction.hidden = true;
+    boutonsConstruction.style.display = 'none';
     dpadConstruction.hidden = true;
+    dpadConstruction.style.display = 'none';
   }
 
   // Repositionne les boutons Valider/Refuser (au-dessus) et la croix de
@@ -1339,20 +1341,27 @@
     const basEcran = hautEcran + tailleMonde * zoom;
 
     boutonsConstruction.hidden = false;
+    boutonsConstruction.style.display = 'flex';
     dpadConstruction.hidden = false;
+    dpadConstruction.style.display = 'block';
 
-    const largeurBoutons = boutonsConstruction.offsetWidth || 160;
-    let leftBoutons = centreXEcran - largeurBoutons / 2;
-    leftBoutons = Math.max(4, Math.min(sceneRect.width - largeurBoutons - 4, leftBoutons));
-    let topBoutons = hautEcran - boutonsConstruction.offsetHeight - 10;
+    // .getBoundingClientRect() plutôt que offsetWidth/offsetHeight : le <svg>
+    // racine de la croix de déplacement n'expose pas offsetWidth/offsetHeight
+    // (propriétés spécifiques à HTMLElement), contrairement au <div> des
+    // boutons — getBoundingClientRect() fonctionne de façon fiable pour les
+    // deux types d'éléments.
+    const tailleBoutons = boutonsConstruction.getBoundingClientRect();
+    let leftBoutons = centreXEcran - tailleBoutons.width / 2;
+    leftBoutons = Math.max(4, Math.min(sceneRect.width - tailleBoutons.width - 4, leftBoutons));
+    let topBoutons = hautEcran - tailleBoutons.height - 10;
     topBoutons = Math.max(4, topBoutons);
     boutonsConstruction.style.transform = `translate(${leftBoutons}px, ${topBoutons}px)`;
 
-    const largeurDpad = dpadConstruction.offsetWidth || 90;
-    let leftDpad = centreXEcran - largeurDpad / 2;
-    leftDpad = Math.max(4, Math.min(sceneRect.width - largeurDpad - 4, leftDpad));
+    const tailleDpad = dpadConstruction.getBoundingClientRect();
+    let leftDpad = centreXEcran - tailleDpad.width / 2;
+    leftDpad = Math.max(4, Math.min(sceneRect.width - tailleDpad.width - 4, leftDpad));
     let topDpad = basEcran + 10;
-    topDpad = Math.min(sceneRect.height - dpadConstruction.offsetHeight - 4, topDpad);
+    topDpad = Math.min(sceneRect.height - tailleDpad.height - 4, topDpad);
     dpadConstruction.style.transform = `translate(${leftDpad}px, ${topDpad}px)`;
   }
 
