@@ -253,37 +253,6 @@
       tuiles.push(ligne);
     }
 
-    // Lissage : les seuils d'altitude/humidité produisent un semis de petites
-    // taches isolées (« bruit poivre et sel »). Deux passes de vote majoritaire
-    // sur les 8 voisins absorbent ces micro-taches en gardant les grandes
-    // régions intactes, pour des frontières de biomes cohérentes à grande
-    // échelle plutôt qu'un patchwork — la carte gagne ainsi de vraies côtes et
-    // zones, pas seulement des coins arrondis sur du bruit.
-    for (let iteration = 0; iteration < 2; iteration++) {
-      const copie = tuiles.map(l => l.slice());
-      for (let row = 0; row < LIGNES; row++) {
-        for (let col = 0; col < COLONNES; col++) {
-          const compte = {};
-          for (let dr = -1; dr <= 1; dr++) {
-            for (let dc = -1; dc <= 1; dc++) {
-              if (dr === 0 && dc === 0) continue;
-              const nr = row + dr, nc = col + dc;
-              if (nr < 0 || nc < 0 || nr >= LIGNES || nc >= COLONNES) continue;
-              const b = copie[nr][nc];
-              compte[b] = (compte[b] || 0) + 1;
-            }
-          }
-          let majBiome = null, majNombre = 0;
-          for (const b in compte) {
-            if (compte[b] > majNombre) { majNombre = compte[b]; majBiome = b; }
-          }
-          if (majBiome && majBiome !== copie[row][col] && majNombre >= 5) {
-            tuiles[row][col] = majBiome;
-          }
-        }
-      }
-    }
-
     // Traçage de quelques rivières depuis des sommets vers l'océan
     let tentativesRivieres = 0;
     let riviereCreees = 0;
@@ -320,7 +289,83 @@
       }
     }
 
+    genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit);
+
     return tuiles;
+  }
+
+  // Couleur RGB de chaque biome, calculée une fois (évite de reparser le hex
+  // pour chacun des ~2,3M sous-échantillons de la texture).
+  const COULEUR_RGB_BIOME = {};
+  for (const cle in BIOMES) {
+    const hex = BIOMES[cle].couleur;
+    COULEUR_RGB_BIOME[cle] = [
+      parseInt(hex.slice(1, 3), 16),
+      parseInt(hex.slice(3, 5), 16),
+      parseInt(hex.slice(5, 7), 16),
+    ];
+  }
+
+  // Construit la texture de terrain à partir du bruit continu lui-même plutôt
+  // que de la grille de jeu (grossière) : chaque case est sous-échantillonnée
+  // en une grille SOUS x SOUS (soit 100 points par case) et chaque point est
+  // reclassé avec les mêmes seuils que la génération, donnant des frontières
+  // organiques et nettes — sans flou et sans « puzzle » de blocs recollés.
+  // La grille de jeu (sélection, construction, ressources) reste inchangée :
+  // seul le rendu visuel utilise cette résolution plus fine.
+  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit) {
+    const SOUS = 10;
+    const largeurPetite = COLONNES * SOUS;
+    const hauteurPetite = LIGNES * SOUS;
+    const buffer = new Uint8ClampedArray(largeurPetite * hauteurPetite * 4);
+
+    for (let row = 0; row < LIGNES; row++) {
+      for (let col = 0; col < COLONNES; col++) {
+        const estRiviere = tuiles[row][col] === 'riviere';
+        const coulRiviere = estRiviere ? COULEUR_RGB_BIOME.riviere : null;
+        for (let sr = 0; sr < SOUS; sr++) {
+          for (let sc = 0; sc < SOUS; sc++) {
+            let rgb;
+            if (estRiviere) {
+              rgb = coulRiviere;
+            } else {
+              const fcol = col + (sc + 0.5) / SOUS;
+              const frow = row + (sr + 0.5) / SOUS;
+              const e = elevation(fcol, frow);
+              const h = humBruit(fcol / 8, frow / 8, 4);
+              const p = pierreBruit(fcol / 6, frow / 6, 3);
+              let biome;
+              if (e < 0.30) biome = 'ocean';
+              else if (e < 0.35) biome = 'plage';
+              else if (e > 0.65) biome = 'neige';
+              else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
+              else biome = (h > 0.52 ? 'foret' : 'plaine');
+              rgb = COULEUR_RGB_BIOME[biome];
+            }
+            const px = col * SOUS + sc, py = row * SOUS + sr;
+            const idx = (py * largeurPetite + px) * 4;
+            buffer[idx] = rgb[0];
+            buffer[idx + 1] = rgb[1];
+            buffer[idx + 2] = rgb[2];
+            buffer[idx + 3] = 255;
+          }
+        }
+      }
+    }
+
+    const petite = document.createElement('canvas');
+    petite.width = largeurPetite;
+    petite.height = hauteurPetite;
+    petite.getContext('2d').putImageData(new ImageData(buffer, largeurPetite, hauteurPetite), 0, 0);
+
+    const texture = document.createElement('canvas');
+    texture.width = LARGEUR_MONDE;
+    texture.height = HAUTEUR_MONDE;
+    const tctx = texture.getContext('2d');
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(petite, 0, 0, largeurPetite, hauteurPetite, 0, 0, texture.width, texture.height);
+    terrainTexture = texture;
   }
 
   function genererNoeudsRessources() {
@@ -684,7 +729,6 @@
   function nouvellePartie() {
     etat = creerEtatInitial();
     etat.tuiles = genererCarte();
-    genererTextureTerrain();
     etat.noeuds = genererNoeudsRessources();
     placerCampementDepart();
     etat.villageois = genererVillageoisInitiaux(6);
@@ -782,70 +826,6 @@
       }
     }
     minicarteFond = off;
-  }
-
-  // Génère une fois par carte une texture de terrain aux frontières adoucies
-  // (les biomes sont peints en aplats à une résolution suréchantillonnée puis
-  // floutés avant d'être remis à l'échelle finale) : les arêtes rectangulaires
-  // de la grille « fondent » en courbes douces, sans coût de calcul par frame.
-  // Coins d'une tuile : les deux voisins orthogonaux adjacents à ce coin (les
-  // « arêtes ») et le voisin en diagonale. cx/cy repèrent le point de coin
-  // dans le repère de la tuile (0 ou 1) ; a0/a1 balaient le quart de cercle
-  // qui appartient à LA TUILE elle-même à cet endroit (c'est ce quart qui est
-  // repeint avec la couleur du biome en diagonale quand celui-ci est isolé).
-  const COINS_TUILE = [
-    { edge1: [0, -1], edge2: [-1, 0], diag: [-1, -1], cx: 0, cy: 0, a0: 0, a1: Math.PI / 2 },
-    { edge1: [0, -1], edge2: [1, 0], diag: [1, -1], cx: 1, cy: 0, a0: Math.PI / 2, a1: Math.PI },
-    { edge1: [0, 1], edge2: [-1, 0], diag: [-1, 1], cx: 0, cy: 1, a0: -Math.PI / 2, a1: 0 },
-    { edge1: [0, 1], edge2: [1, 0], diag: [1, 1], cx: 1, cy: 1, a0: Math.PI, a1: Math.PI * 1.5 },
-  ];
-
-  // Génère une fois par carte une texture de terrain aux frontières adoucies :
-  // chaque tuile est peinte en aplat, puis tout coin où le biome en diagonale
-  // est isolé (les deux voisins orthogonaux partagent le biome de la tuile)
-  // est repeint d'un quart de cercle de la couleur diagonale. Résultat net,
-  // sans flou : la grille rectangulaire « fond » en courbes nettes, comme une
-  // vraie carte plutôt qu'une grille de blocs — sans coût par frame.
-  function genererTextureTerrain() {
-    const texture = document.createElement('canvas');
-    texture.width = LARGEUR_MONDE;
-    texture.height = HAUTEUR_MONDE;
-    const tctx = texture.getContext('2d');
-
-    function biomeEn(col, row) {
-      if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return null;
-      return etat.tuiles[row][col];
-    }
-
-    for (let row = 0; row < LIGNES; row++) {
-      for (let col = 0; col < COLONNES; col++) {
-        tctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
-        tctx.fillRect(col * TAILLE_TUILE, row * TAILLE_TUILE, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
-      }
-    }
-
-    const RAYON = TAILLE_TUILE * 0.5;
-    for (let row = 0; row < LIGNES; row++) {
-      for (let col = 0; col < COLONNES; col++) {
-        const b = etat.tuiles[row][col];
-        for (const coin of COINS_TUILE) {
-          const e1 = biomeEn(col + coin.edge1[0], row + coin.edge1[1]);
-          const e2 = biomeEn(col + coin.edge2[0], row + coin.edge2[1]);
-          const d = biomeEn(col + coin.diag[0], row + coin.diag[1]);
-          if (e1 !== b || e2 !== b || d === null || d === b) continue;
-          const px = (col + coin.cx) * TAILLE_TUILE;
-          const py = (row + coin.cy) * TAILLE_TUILE;
-          tctx.fillStyle = BIOMES[d].couleur;
-          tctx.beginPath();
-          tctx.moveTo(px, py);
-          tctx.arc(px, py, RAYON, coin.a0, coin.a1);
-          tctx.closePath();
-          tctx.fill();
-        }
-      }
-    }
-
-    terrainTexture = texture;
   }
 
   function dessinerMinicarte() {
