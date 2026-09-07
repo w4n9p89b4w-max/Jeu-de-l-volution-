@@ -28,14 +28,15 @@
   };
 
   const TYPES_RESSOURCE_NOEUD = {
-    arbre:   { ressource: 'bois',       emoji: '🌲', max: 3, taux: 1.2, nom: 'Arbres' },
-    roche:   { ressource: 'pierre',     emoji: '🪨', max: 3, taux: 1.1, nom: 'Gisement de pierre' },
-    gibier:  { ressource: 'nourriture', emoji: '🦌', max: 2, taux: 0.9, nom: 'Gibier' },
-    poisson: { ressource: 'nourriture', emoji: '🐟', max: 2, taux: 1.0, nom: 'Zone de pêche' },
+    arbre:   { ressource: 'bois',       emoji: '🌲', max: 3, quantiteInitiale: 40, nom: 'Arbres' },
+    roche:   { ressource: 'pierre',     emoji: '🪨', max: 3, quantiteInitiale: 40, nom: 'Gisement de pierre' },
+    gibier:  { ressource: 'nourriture', emoji: '🦌', max: 2, quantiteInitiale: 40, nom: 'Gibier' },
+    poisson: { ressource: 'nourriture', emoji: '🐟', max: 2, quantiteInitiale: 40, nom: 'Zone de pêche' },
   };
 
   const RESSOURCE_EMOJI = { bois: '🪵', pierre: '🪨', nourriture: '🍖' };
-  const CHARGE_PORTEE_MAX = 5;
+  const GAIN_PAR_VOYAGE = 4; // ressources rapportées à chaque aller-retour complet
+  const DUREE_RECOLTE = 3;   // secondes passées sur la ressource avant de repartir
 
   // Illustrations dessinées à la main pour les ressources et les villageois
   // (remplacent les emoji correspondants une fois chargées).
@@ -259,6 +260,20 @@
       tuiles.push(ligne);
     }
 
+    // Garantit un océan ouvert : le pourtour de la carte n'est pas toujours
+    // sous le seuil d'océan (le rabattement d'altitude vers les bords est
+    // plus faible au milieu des grands côtés), ce qui pouvait produire une
+    // carte entièrement fermée par des terres. La bordure est donc toujours
+    // océan, quel que soit le bruit.
+    for (let col = 0; col < COLONNES; col++) {
+      tuiles[0][col] = 'ocean';
+      tuiles[LIGNES - 1][col] = 'ocean';
+    }
+    for (let row = 0; row < LIGNES; row++) {
+      tuiles[row][0] = 'ocean';
+      tuiles[row][COLONNES - 1] = 'ocean';
+    }
+
     // Lacs : toute étendue « ocean »/« plage » non reliée au bord de la carte
     // par une chaîne de cases océan/plage n'est pas reliée à la véritable mer
     // — c'est un lac. Les cases sont reclassées (lac / plaine-forêt à la
@@ -358,23 +373,32 @@
     const hauteurPetite = LIGNES * SOUS;
     const buffer = new Uint8ClampedArray(largeurPetite * hauteurPetite * 4);
 
+    const rgbOcean = COULEUR_RGB_BIOME.ocean;
     for (let row = 0; row < LIGNES; row++) {
       for (let col = 0; col < COLONNES; col++) {
+        // Bordure de la carte : toujours océan (voir la garantie posée dans
+        // genererCarte), on n'a donc pas besoin de rééchantillonner le bruit.
+        const surBordure = row === 0 || row === LIGNES - 1 || col === 0 || col === COLONNES - 1;
         const zoneLac = estCoteLac[row * COLONNES + col] === 1;
         for (let sr = 0; sr < SOUS; sr++) {
           for (let sc = 0; sc < SOUS; sc++) {
-            const fcol = col + (sc + 0.5) / SOUS;
-            const frow = row + (sr + 0.5) / SOUS;
-            const e = elevation(fcol, frow);
-            const h = humBruit(fcol / 8, frow / 8, 4);
-            const p = pierreBruit(fcol / 6, frow / 6, 3);
-            let biome;
-            if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
-            else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
-            else if (e > 0.65) biome = 'neige';
-            else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
-            else biome = (h > 0.52 ? 'foret' : 'plaine');
-            const rgb = COULEUR_RGB_BIOME[biome];
+            let rgb;
+            if (surBordure) {
+              rgb = rgbOcean;
+            } else {
+              const fcol = col + (sc + 0.5) / SOUS;
+              const frow = row + (sr + 0.5) / SOUS;
+              const e = elevation(fcol, frow);
+              const h = humBruit(fcol / 8, frow / 8, 4);
+              const p = pierreBruit(fcol / 6, frow / 6, 3);
+              let biome;
+              if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
+              else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
+              else if (e > 0.65) biome = 'neige';
+              else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
+              else biome = (h > 0.52 ? 'foret' : 'plaine');
+              rgb = COULEUR_RGB_BIOME[biome];
+            }
             const px = col * SOUS + sc, py = row * SOUS + sr;
             const idx = (py * largeurPetite + px) * 4;
             buffer[idx] = rgb[0];
@@ -445,7 +469,8 @@
         const zoneId = zoneIdCompteur++;
         const combien = Math.round(aleatoire(tailleMin, tailleMax));
         const placees = [[ccol, crow]];
-        noeuds.set(ccol + ',' + crow, { type, col: ccol, row: crow, zoneId });
+        const quantiteInitiale = TYPES_RESSOURCE_NOEUD[type].quantiteInitiale;
+        noeuds.set(ccol + ',' + crow, { type, col: ccol, row: crow, zoneId, quantite: quantiteInitiale });
 
         let tentatives = 0;
         while (placees.length < combien && tentatives < combien * 20) {
@@ -457,7 +482,7 @@
           const cle = col + ',' + row;
           if (noeuds.has(cle)) continue;
           if (!biomesAutorises.includes(etat.tuiles[row][col])) continue;
-          noeuds.set(cle, { type, col, row, zoneId });
+          noeuds.set(cle, { type, col, row, zoneId, quantite: quantiteInitiale });
           placees.push([col, row]);
         }
       }
@@ -509,7 +534,7 @@
           while (pile.length) {
             const [c, r] = pile.pop();
             const cle = c + ',' + r;
-            if (!noeuds.has(cle)) noeuds.set(cle, { type: 'poisson', col: c, row: r, zoneId });
+            if (!noeuds.has(cle)) noeuds.set(cle, { type: 'poisson', col: c, row: r, zoneId, quantite: TYPES_RESSOURCE_NOEUD.poisson.quantiteInitiale });
             for (let dr = -1; dr <= 1; dr++) {
               for (let dc = -1; dc <= 1; dc++) {
                 if (dr === 0 && dc === 0) continue;
@@ -581,7 +606,7 @@
     return { col: Math.round(centreCol), row: Math.round(centreRow) };
   }
 
-  function creerVillageois(col, row) {
+  function creerVillageois(col, row, genre) {
     return {
       id: villageoisIdCompteur++,
       x: col * TAILLE_TUILE + TAILLE_TUILE / 2,
@@ -597,16 +622,24 @@
       travaille: false,
       charge: 0,
       ressourceType: null,
-      genre: Math.random() < 0.5 ? 'h' : 'f',
+      genre: genre || (Math.random() < 0.5 ? 'h' : 'f'),
+      outil: null,
+      tempsRecolte: 0,
     };
   }
 
+  // L'aventure démarre avec un couple : un homme et une femme, déjà équipés
+  // d'une hache et d'une pioche (bonus de récolte bois/pierre respectivement).
   function genererVillageoisInitiaux(n) {
     const cx = COLONNES / 2, cy = LIGNES / 2;
     const liste = [];
+    const genres = n === 2 ? ['h', 'f'] : null;
+    const outils = n === 2 ? ['hache', 'pioche'] : null;
     for (let i = 0; i < n; i++) {
       const { col, row } = trouverTuileMarchable(cx, cy, 3);
-      liste.push(creerVillageois(col, row));
+      const v = creerVillageois(col, row, genres ? genres[i] : undefined);
+      if (outils) v.outil = outils[i];
+      liste.push(v);
     }
     return liste;
   }
@@ -662,6 +695,28 @@
     v.mode = 'attente';
   }
 
+  // Une case de ressource épuisée disparaît ; les villageois qui y étaient
+  // affectés sont reportés sur une autre case libre de la même zone si
+  // possible, sinon renvoyés à l'errance (l'aller-retour en cours, lui, va à
+  // son terme : seule la prochaine affectation change).
+  function epuiserNoeud(cle) {
+    const noeud = etat.noeuds.get(cle);
+    if (!noeud) return;
+    etat.noeuds.delete(cle);
+    const zone = noeudsDeLaZone(noeud.zoneId);
+    const remplacement = zone.find(n => compterTravailleurs(n.col + ',' + n.row) < TYPES_RESSOURCE_NOEUD[n.type].max);
+    for (const v of etat.villageois) {
+      if (v.assigneA !== cle) continue;
+      if (remplacement) {
+        v.assigneA = remplacement.col + ',' + remplacement.row;
+      } else {
+        v.assigneA = null;
+        if (v.mode !== 'rapporte') { v.mode = 'attente'; v.pause = aleatoire(0.2, 1); }
+      }
+    }
+    if (zone.length === 0) notifier('⚠️ Une zone de ressources est épuisée.');
+  }
+
   function mettreAJourVillageois(dt) {
     const parNoeud = new Map();
     for (const v of etat.villageois) {
@@ -700,6 +755,30 @@
           const pas = Math.min(d, v.vitesseBase * 1.6 * dt);
           v.x += (tx - v.x) / d * pas;
           v.y += (ty - v.y) / d * pas;
+          v.tempsRecolte = 0;
+        } else {
+          // Arrivé sur la ressource : récolte pendant DUREE_RECOLTE, puis
+          // repart avec un gain fixe par aller-retour (GAIN_PAR_VOYAGE),
+          // en épuisant d'autant la case récoltée.
+          const noeud = etat.noeuds.get(v.assigneA);
+          if (noeud && etat.zonesDebloquees.has(zoneDeCase(noeud.col, noeud.row))) {
+            v.tempsRecolte += dt;
+            if (v.tempsRecolte >= DUREE_RECOLTE) {
+              v.tempsRecolte = 0;
+              const def = TYPES_RESSOURCE_NOEUD[noeud.type];
+              let gain = GAIN_PAR_VOYAGE;
+              if ((v.outil === 'hache' && def.ressource === 'bois') || (v.outil === 'pioche' && def.ressource === 'pierre')) gain += 1;
+              gain = Math.round(gain * etat.multiplicateurs[def.ressource]);
+              v.charge = gain;
+              v.ressourceType = def.ressource;
+              v.mode = 'rapporte';
+              const depot = trouverDepot(v.x, v.y);
+              v.cibleX = depot.x;
+              v.cibleY = depot.y;
+              noeud.quantite -= GAIN_PAR_VOYAGE;
+              if (noeud.quantite <= 0) epuiserNoeud(v.assigneA);
+            }
+          }
         }
       } else {
         v.travaille = false;
@@ -818,7 +897,7 @@
     etat.tuiles = genererCarte();
     etat.noeuds = genererNoeudsRessources();
     placerCampementDepart();
-    etat.villageois = genererVillageoisInitiaux(6);
+    etat.villageois = genererVillageoisInitiaux(2);
     caseSelectionnee = null;
     modeConstruction = null;
     propositionConstruction = null;
@@ -1527,7 +1606,22 @@
 
     const chantier = etat.chantiers.find(ch => ch.cases.some(c => c.cle === cle));
 
-    let html = `<h3>${BIOMES[biome].nom}</h3><p>Case (${col}, ${row})</p>`;
+    // Une zone de ressources (p. ex. une côte de pêche) peut s'étendre sur
+    // plusieurs biomes : on annonce alors le biome majoritaire de la zone
+    // plutôt que celui de la seule case cliquée.
+    const zoneNoeud = noeud ? noeudsDeLaZone(noeud.zoneId) : null;
+    let biomeAffiche = biome;
+    if (zoneNoeud) {
+      const compte = {};
+      for (const n of zoneNoeud) {
+        const b = etat.tuiles[n.row][n.col];
+        compte[b] = (compte[b] || 0) + 1;
+      }
+      let max = 0;
+      for (const b in compte) if (compte[b] > max) { max = compte[b]; biomeAffiche = b; }
+    }
+
+    let html = `<h3>${BIOMES[biomeAffiche].nom}</h3><p>Case (${col}, ${row})</p>`;
 
     if (batiment) {
       const def = BATIMENTS[batiment];
@@ -1539,12 +1633,13 @@
     } else if (noeud) {
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const emojiNoeud = noeud.emoji || def.emoji;
-      const zone = noeudsDeLaZone(noeud.zoneId);
+      const zone = zoneNoeud;
       const capaciteZone = zone.length * def.max;
       let travailleursZone = 0;
       for (const n of zone) travailleursZone += compterTravailleurs(n.col + ',' + n.row);
+      const quantiteZone = zone.reduce((s, n) => s + Math.max(0, n.quantite || 0), 0);
       const idle = population_libre();
-      html += `<p>${emojiNoeud} <b>${def.nom}</b><br>Zone de ${zone.length} ressource${zone.length > 1 ? 's' : ''}<br>Travailleurs assignés : ${travailleursZone} / ${capaciteZone}</p>`;
+      html += `<p>${emojiNoeud} <b>${def.nom}</b><br>Zone de ${zone.length} ressource${zone.length > 1 ? 's' : ''}<br>Quantité restante : ${Math.round(quantiteZone)}<br>Travailleurs assignés : ${travailleursZone} / ${capaciteZone}</p>`;
       html += `<div class="ligne-action">
         <button id="btnRetirer" ${travailleursZone <= 0 ? 'disabled' : ''}>− Retirer</button>
         <span>👥 ${idle} libres</span>
@@ -1588,25 +1683,9 @@
 
   function tick() {
     const m = etat.multiplicateurs;
-
-    // Récolte : chaque villageois arrivé sur sa ressource accumule une charge
-    // personnelle, puis part la porter à un dépôt (feu de camp / entrepôt) une
-    // fois pleine. Le stock global n'augmente qu'à la livraison.
-    for (const v of etat.villageois) {
-      if (!v.assigneA || v.mode === 'rapporte' || !v.travaille) continue;
-      const noeud = etat.noeuds.get(v.assigneA);
-      if (!noeud) continue;
-      if (!etat.zonesDebloquees.has(zoneDeCase(noeud.col, noeud.row))) continue;
-      const def = TYPES_RESSOURCE_NOEUD[noeud.type];
-      v.charge += def.taux * m[def.ressource];
-      v.ressourceType = def.ressource;
-      if (v.charge >= CHARGE_PORTEE_MAX) {
-        v.mode = 'rapporte';
-        const depot = trouverDepot(v.x, v.y);
-        v.cibleX = depot.x;
-        v.cibleY = depot.y;
-      }
-    }
+    // La récolte (temps passé sur la ressource, départ avec une charge fixe
+    // par aller-retour, épuisement des zones) est gérée image par image dans
+    // mettreAJourVillageois, pas ici — voir DUREE_RECOLTE / GAIN_PAR_VOYAGE.
 
     // Production passive des bâtiments (déjà sur place, pas de transport à simuler)
     let gainPassif = { bois: 0, pierre: 0, nourriture: 0 };
