@@ -451,12 +451,22 @@
     return liste;
   }
 
+  function trouverBase() {
+    for (const [cle, type] of etat.batiments.entries()) {
+      if (type !== 'feu') continue;
+      const [col, row] = cle.split(',').map(Number);
+      return { x: col * TAILLE_TUILE + TAILLE_TUILE / 2, y: row * TAILLE_TUILE + TAILLE_TUILE / 2 };
+    }
+    return { x: Math.round(COLONNES / 2) * TAILLE_TUILE, y: Math.round(LIGNES / 2) * TAILLE_TUILE };
+  }
+
   function choisirNouvelleCibleErrance(v) {
-    const col = Math.round(v.x / TAILLE_TUILE);
-    const row = Math.round(v.y / TAILLE_TUILE);
+    const base = trouverBase();
+    const col = Math.round(base.x / TAILLE_TUILE);
+    const row = Math.round(base.y / TAILLE_TUILE);
     for (let tentative = 0; tentative < 10; tentative++) {
-      const nc = Math.max(0, Math.min(COLONNES - 1, col + Math.round(aleatoire(-2.5, 2.5))));
-      const nr = Math.max(0, Math.min(LIGNES - 1, row + Math.round(aleatoire(-2.5, 2.5))));
+      const nc = Math.max(0, Math.min(COLONNES - 1, col + Math.round(aleatoire(-3.5, 3.5))));
+      const nr = Math.max(0, Math.min(LIGNES - 1, row + Math.round(aleatoire(-3.5, 3.5))));
       if (!tuileMarchable(nc, nr)) continue;
       if (!etat.zonesDebloquees.has(zoneDeCase(nc, nr))) continue;
       v.cibleX = nc * TAILLE_TUILE + TAILLE_TUILE / 2 + aleatoire(-6, 6);
@@ -619,19 +629,26 @@
     if (!feuPos) return;
     etat.batiments.set(feuPos.col + ',' + feuPos.row, 'feu');
 
-    const decalages = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
-    let maisonPos = null;
+    const decalages = [[1, 0], [-2, 0], [0, 1], [0, -2], [1, 1], [1, -2], [-2, 1], [-2, -2]];
+    let maisonCases = null;
     for (const [dc, dr] of decalages) {
-      const col = feuPos.col + dc, row = feuPos.row + dr;
-      if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) continue;
-      const cle = col + ',' + row;
-      if (etat.batiments.has(cle) || etat.noeuds.has(cle)) continue;
-      if (!BATIMENTS.maison.biomes.includes(etat.tuiles[row][col])) continue;
-      maisonPos = { col, row };
-      break;
+      const cases = [];
+      let valide = true;
+      for (let ddr = 0; ddr < 2 && valide; ddr++) {
+        for (let ddc = 0; ddc < 2 && valide; ddc++) {
+          const col = feuPos.col + dc + ddc, row = feuPos.row + dr + ddr;
+          if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) { valide = false; break; }
+          const cle = col + ',' + row;
+          if (etat.batiments.has(cle) || etat.noeuds.has(cle)) { valide = false; break; }
+          if (!BATIMENTS.maison.biomes.includes(etat.tuiles[row][col])) { valide = false; break; }
+          cases.push({ col, row, cle });
+        }
+      }
+      if (valide) { maisonCases = cases; break; }
     }
-    if (maisonPos) {
-      etat.batiments.set(maisonPos.col + ',' + maisonPos.row, 'maison');
+    if (maisonCases) {
+      etat.batiments.set(maisonCases[0].cle, 'maison');
+      for (let i = 1; i < maisonCases.length; i++) etat.batiments.set(maisonCases[i].cle, 'maison_zone');
       etat.capacitePopulation += 4;
     }
   }
@@ -767,6 +784,8 @@
     const rowDebut = Math.max(0, Math.floor(camera.y / TAILLE_TUILE));
     const rowFin = Math.min(LIGNES - 1, Math.ceil((camera.y + vh) / TAILLE_TUILE));
 
+    const grandsBatiments = [];
+
     for (let row = rowDebut; row <= rowFin; row++) {
       for (let col = colDebut; col <= colFin; col++) {
         const x = col * TAILLE_TUILE;
@@ -779,7 +798,12 @@
         const batiment = etat.batiments.get(cle);
         const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
 
-        if (zoneOk && batiment) {
+        if (zoneOk && batiment === 'maison_zone') {
+          // Rien à dessiner : recouvert par l'illustration de la maison voisine (2x2).
+        } else if (zoneOk && batiment === 'maison') {
+          // Dessinée après coup pour ne pas être recouverte par les cases suivantes.
+          grandsBatiments.push({ x, y });
+        } else if (zoneOk && batiment) {
           const emojiBat = batiment === 'enclos' ? emojiEnclos(col, row) : BATIMENTS[batiment].emoji;
           dessinerRessourceOuEmoji(emojiBat, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.88);
         } else if (zoneOk && noeud) {
@@ -802,6 +826,10 @@
           ctx.fillRect(x, y, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
         }
       }
+    }
+
+    for (const gb of grandsBatiments) {
+      dessinerRessourceOuEmoji(BATIMENTS.maison.emoji, gb.x + TAILLE_TUILE, gb.y + TAILLE_TUILE, TAILLE_TUILE * 2 * 0.94);
     }
 
     dessinerVillageois(temps);
@@ -1009,19 +1037,47 @@
     return { bois: Math.round(b.cout.bois * mult), pierre: Math.round(b.cout.pierre * mult) };
   }
 
+  function trouverOrigineMaison(col, row) {
+    for (const [dc, dr] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) {
+      const c = col + dc, r = row + dr;
+      if (etat.batiments.get(c + ',' + r) === 'maison') return { col: c, row: r };
+    }
+    return null;
+  }
+
   function tenterConstruction(col, row) {
     const def = BATIMENTS[modeConstruction];
-    const biome = etat.tuiles[row][col];
-    const cle = col + ',' + row;
+    const estMaison = modeConstruction === 'maison';
+    const taille = estMaison ? 2 : 1;
 
-    if (!def.biomes.includes(biome)) {
-      notifier('❌ Impossible de construire un(e) ' + def.nom.toLowerCase() + ' sur une case de type ' + BIOMES[biome].nom + '.');
-      return;
+    const cases = [];
+    for (let dr = 0; dr < taille; dr++) {
+      for (let dc = 0; dc < taille; dc++) {
+        const c = col + dc, r = row + dr;
+        if (c >= COLONNES || r >= LIGNES) {
+          notifier('❌ Pas assez de place ici pour construire ' + def.nom.toLowerCase() + '.');
+          return;
+        }
+        cases.push({ col: c, row: r, cle: c + ',' + r });
+      }
     }
-    if (etat.batiments.has(cle) || etat.noeuds.has(cle)) {
-      notifier('❌ Cette case est déjà occupée.');
-      return;
+
+    for (const { col: c, row: r, cle } of cases) {
+      const biome = etat.tuiles[r][c];
+      if (!def.biomes.includes(biome)) {
+        notifier('❌ Impossible de construire un(e) ' + def.nom.toLowerCase() + ' sur une case de type ' + BIOMES[biome].nom + '.');
+        return;
+      }
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle)) {
+        notifier('❌ Cette case est déjà occupée.');
+        return;
+      }
+      if (!etat.zonesDebloquees.has(zoneDeCase(c, r))) {
+        notifier('❌ Pas assez de place ici pour construire ' + def.nom.toLowerCase() + '.');
+        return;
+      }
     }
+
     const cout = coutBatiment(def);
     if (etat.ressources.bois < cout.bois || etat.ressources.pierre < cout.pierre) {
       notifier('❌ Ressources insuffisantes pour construire ' + def.nom.toLowerCase() + '.');
@@ -1029,8 +1085,9 @@
     }
     etat.ressources.bois -= cout.bois;
     etat.ressources.pierre -= cout.pierre;
-    etat.batiments.set(cle, modeConstruction);
-    if (def.nom === 'Maison') etat.capacitePopulation += 4;
+    etat.batiments.set(cases[0].cle, modeConstruction);
+    for (let i = 1; i < cases.length; i++) etat.batiments.set(cases[i].cle, 'maison_zone');
+    if (estMaison) etat.capacitePopulation += 4;
     gagnerXp(20);
     notifier('✅ ' + def.nom + ' construit(e) !');
     caseSelectionnee = { col, row, verrouillee: false };
@@ -1056,13 +1113,18 @@
     const biome = etat.tuiles[row][col];
     const cle = col + ',' + row;
     const noeud = etat.noeuds.get(cle);
-    const batiment = etat.batiments.get(cle);
+    let batiment = etat.batiments.get(cle);
+    let batimentCol = col, batimentRow = row;
+    if (batiment === 'maison_zone') {
+      const origine = trouverOrigineMaison(col, row);
+      if (origine) { batiment = 'maison'; batimentCol = origine.col; batimentRow = origine.row; }
+    }
 
     let html = `<h3>${BIOMES[biome].nom}</h3><p>Case (${col}, ${row})</p>`;
 
     if (batiment) {
       const def = BATIMENTS[batiment];
-      const emojiBat = batiment === 'enclos' ? emojiEnclos(col, row) : def.emoji;
+      const emojiBat = batiment === 'enclos' ? emojiEnclos(batimentCol, batimentRow) : def.emoji;
       html += `<p>${emojiBat} <b>${def.nom}</b><br>${def.desc}</p>`;
     } else if (noeud) {
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
