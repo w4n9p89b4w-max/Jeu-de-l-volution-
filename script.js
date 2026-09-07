@@ -802,16 +802,50 @@
   // ============================================================
 
   let glisserPointerId = null;
+  const pointeursActifs = new Map(); // pointerId -> {x, y} en coordonnées écran, pour le pincement à deux doigts
+  let modePincement = null; // {distance, milieuX, milieuY} entre les deux doigts actifs
 
   canvas.addEventListener('pointerdown', (e) => {
-    if (glisserPointerId !== null) return;
-    glisserPointerId = e.pointerId;
-    glisser = true;
-    aBouge = false;
-    glisserOrigine = { x: e.clientX, y: e.clientY, camX: camera.x, camY: camera.y };
-    canvas.setPointerCapture(e.pointerId);
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* pointeur déjà relâché, sans conséquence */ }
+    pointeursActifs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointeursActifs.size === 2) {
+      glisser = false;
+      glisserOrigine = null;
+      glisserPointerId = null;
+      const [p1, p2] = [...pointeursActifs.values()];
+      modePincement = {
+        distance: Math.hypot(p1.x - p2.x, p1.y - p2.y),
+        milieuX: (p1.x + p2.x) / 2,
+        milieuY: (p1.y + p2.y) / 2,
+      };
+    } else if (pointeursActifs.size === 1) {
+      glisserPointerId = e.pointerId;
+      glisser = true;
+      aBouge = false;
+      glisserOrigine = { x: e.clientX, y: e.clientY, camX: camera.x, camY: camera.y };
+    }
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (pointeursActifs.has(e.pointerId)) pointeursActifs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointeursActifs.size === 2 && modePincement) {
+      const [p1, p2] = [...pointeursActifs.values()];
+      const distance = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const milieuX = (p1.x + p2.x) / 2;
+      const milieuY = (p1.y + p2.y) / 2;
+      camera.x -= (milieuX - modePincement.milieuX) / zoom;
+      camera.y -= (milieuY - modePincement.milieuY) / zoom;
+      if (modePincement.distance > 0 && distance > 0) {
+        const rect = canvas.getBoundingClientRect();
+        definirZoom(zoom * (distance / modePincement.distance), milieuX - rect.left, milieuY - rect.top);
+      } else {
+        clamperCamera();
+      }
+      modePincement = { distance, milieuX, milieuY };
+      aBouge = true;
+      return;
+    }
+
     if (!glisser || e.pointerId !== glisserPointerId || !glisserOrigine) return;
     const dx = e.clientX - glisserOrigine.x;
     const dy = e.clientY - glisserOrigine.y;
@@ -828,14 +862,27 @@
     definirZoom(zoom * facteur, mx, my);
   }, { passive: false });
   function terminerGlisser(e) {
-    if (e.pointerId !== glisserPointerId) return;
-    if (glisser && !aBouge) {
-      const rect = canvas.getBoundingClientRect();
-      gererClicCarte(e.clientX - rect.left, e.clientY - rect.top);
+    pointeursActifs.delete(e.pointerId);
+    if (pointeursActifs.size < 2) modePincement = null;
+
+    if (e.pointerId === glisserPointerId) {
+      if (glisser && !aBouge) {
+        const rect = canvas.getBoundingClientRect();
+        gererClicCarte(e.clientX - rect.left, e.clientY - rect.top);
+      }
+      glisser = false;
+      glisserOrigine = null;
+      glisserPointerId = null;
     }
-    glisser = false;
-    glisserOrigine = null;
-    glisserPointerId = null;
+
+    // Un doigt reste après un pincement à deux doigts : reprendre le glissement avec celui-ci
+    if (pointeursActifs.size === 1 && glisserPointerId === null) {
+      const [id, pos] = [...pointeursActifs.entries()][0];
+      glisserPointerId = id;
+      glisser = true;
+      aBouge = true;
+      glisserOrigine = { x: pos.x, y: pos.y, camX: camera.x, camY: camera.y };
+    }
   }
   canvas.addEventListener('pointerup', terminerGlisser);
   canvas.addEventListener('pointercancel', terminerGlisser);
