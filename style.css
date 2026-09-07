@@ -217,23 +217,16 @@ main {
   height: 84px;
   z-index: 6;
   pointer-events: none;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.55));
 }
 
 .confirmation-dpad[hidden] { display: none; }
 
 .confirmation-dpad .dpad-hit {
-  fill: transparent;
   pointer-events: auto;
   cursor: pointer;
 }
 
 .confirmation-dpad .dpad-art {
-  fill: none;
-  stroke: #f4f6f0;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   transition: stroke 0.12s ease;
 }
 
