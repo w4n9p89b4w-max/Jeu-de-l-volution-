@@ -734,6 +734,8 @@
     etat.villageois = genererVillageoisInitiaux(6);
     caseSelectionnee = null;
     modeConstruction = null;
+    propositionConstruction = null;
+    masquerOverlayConstruction();
     mettreAJourPalette();
     afficherSelection();
     centrerCameraSurLeDepart();
@@ -758,6 +760,9 @@
   const ctx = canvas.getContext('2d');
   const minicarte = document.getElementById('minicarte');
   const ctxMini = minicarte.getContext('2d');
+  const scene = document.querySelector('.stage');
+  const boutonsConstruction = document.getElementById('boutonsConstruction');
+  const dpadConstruction = document.getElementById('dpadConstruction');
   let minicarteFond = null;
   let terrainTexture = null;
 
@@ -771,6 +776,7 @@
   let caseSelectionnee = null;
   let modeConstruction = null;
   let caseSurvolee = null;
+  let propositionConstruction = null;
   let enPause = false;
 
   let ratioPixels = window.devicePixelRatio || 1;
@@ -951,8 +957,9 @@
       ctx.fillText('🚧', x + largeur / 2, y + largeur * 0.22);
     }
 
-    if (modeConstruction && caseSurvolee) {
-      const { valide, cases } = verifierEmplacementConstruction(modeConstruction, caseSurvolee.col, caseSurvolee.row);
+    const cibleConstruction = propositionConstruction || caseSurvolee;
+    if (modeConstruction && cibleConstruction) {
+      const { valide, cases } = verifierEmplacementConstruction(modeConstruction, cibleConstruction.col, cibleConstruction.row);
       if (cases.length > 0) {
         ctx.fillStyle = valide ? 'rgba(61, 220, 132, 0.35)' : 'rgba(220, 61, 61, 0.35)';
         ctx.strokeStyle = valide ? '#3ddc84' : '#dc3d3d';
@@ -964,6 +971,7 @@
         }
       }
     }
+    if (propositionConstruction) actualiserOverlayConstruction();
 
     dessinerVillageois(temps);
 
@@ -1033,7 +1041,7 @@
     }
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (modeConstruction) {
+    if (modeConstruction && !propositionConstruction) {
       const rect = canvas.getBoundingClientRect();
       const px = e.clientX - rect.left, py = e.clientY - rect.top;
       const col = Math.floor((px / zoom + camera.x) / TAILLE_TUILE);
@@ -1141,7 +1149,9 @@
     }
 
     if (modeConstruction) {
-      tenterConstruction(col, row);
+      caseSurvolee = null;
+      propositionConstruction = { col, row };
+      actualiserOverlayConstruction();
       return;
     }
 
@@ -1170,6 +1180,8 @@
       btn.innerHTML = `<span>${b.emoji} ${b.nom}<br><small>${b.desc} · ⏱️${b.duree}s</small></span><span>🪵${cout.bois} 🪨${cout.pierre}</span>`;
       btn.addEventListener('click', () => {
         modeConstruction = (modeConstruction === id) ? null : id;
+        propositionConstruction = null;
+        masquerOverlayConstruction();
         mettreAJourPalette();
       });
       palette.appendChild(btn);
@@ -1266,6 +1278,82 @@
     notifier('🚧 Construction de ' + def.nom.toLowerCase() + ' commencée...');
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
+  }
+
+  // Déplace la zone de construction proposée d'une case dans une direction,
+  // en la gardant dans les limites de la carte.
+  function deplacerProposition(direction) {
+    if (!propositionConstruction || !modeConstruction) return;
+    const taille = tailleBatiment(modeConstruction);
+    const delta = { haut: [0, -1], bas: [0, 1], gauche: [-1, 0], droite: [1, 0] }[direction];
+    if (!delta) return;
+    propositionConstruction = {
+      col: Math.max(0, Math.min(COLONNES - taille, propositionConstruction.col + delta[0])),
+      row: Math.max(0, Math.min(LIGNES - taille, propositionConstruction.row + delta[1])),
+    };
+    actualiserOverlayConstruction();
+  }
+
+  function annulerProposition() {
+    propositionConstruction = null;
+    masquerOverlayConstruction();
+  }
+
+  function validerProposition() {
+    if (!propositionConstruction || !modeConstruction) return;
+    const { col, row } = propositionConstruction;
+    const { valide } = verifierEmplacementConstruction(modeConstruction, col, row);
+    if (!valide) {
+      notifier('❌ Emplacement invalide, déplacez la zone avant de valider.');
+      return;
+    }
+    tenterConstruction(col, row);
+    propositionConstruction = null;
+    masquerOverlayConstruction();
+  }
+
+  function masquerOverlayConstruction() {
+    boutonsConstruction.hidden = true;
+    dpadConstruction.hidden = true;
+  }
+
+  // Repositionne les boutons Valider/Refuser (au-dessus) et la croix de
+  // déplacement (en-dessous) au-dessus/en-dessous de la zone de construction
+  // proposée, en coordonnées écran (dépendent de la caméra et du zoom).
+  function actualiserOverlayConstruction() {
+    if (!propositionConstruction || !modeConstruction) { masquerOverlayConstruction(); return; }
+
+    const taille = tailleBatiment(modeConstruction);
+    const xMonde = propositionConstruction.col * TAILLE_TUILE;
+    const yMonde = propositionConstruction.row * TAILLE_TUILE;
+    const tailleMonde = taille * TAILLE_TUILE;
+
+    const sceneRect = scene.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const decalX = canvasRect.left - sceneRect.left;
+    const decalY = canvasRect.top - sceneRect.top;
+
+    const gaucheEcran = decalX + (xMonde - camera.x) * zoom;
+    const hautEcran = decalY + (yMonde - camera.y) * zoom;
+    const centreXEcran = gaucheEcran + (tailleMonde * zoom) / 2;
+    const basEcran = hautEcran + tailleMonde * zoom;
+
+    boutonsConstruction.hidden = false;
+    dpadConstruction.hidden = false;
+
+    const largeurBoutons = boutonsConstruction.offsetWidth || 160;
+    let leftBoutons = centreXEcran - largeurBoutons / 2;
+    leftBoutons = Math.max(4, Math.min(sceneRect.width - largeurBoutons - 4, leftBoutons));
+    let topBoutons = hautEcran - boutonsConstruction.offsetHeight - 10;
+    topBoutons = Math.max(4, topBoutons);
+    boutonsConstruction.style.transform = `translate(${leftBoutons}px, ${topBoutons}px)`;
+
+    const largeurDpad = dpadConstruction.offsetWidth || 90;
+    let leftDpad = centreXEcran - largeurDpad / 2;
+    leftDpad = Math.max(4, Math.min(sceneRect.width - largeurDpad - 4, leftDpad));
+    let topDpad = basEcran + 10;
+    topDpad = Math.min(sceneRect.height - dpadConstruction.offsetHeight - 4, topDpad);
+    dpadConstruction.style.transform = `translate(${leftDpad}px, ${topDpad}px)`;
   }
 
   function mettreAJourChantiers(dt) {
@@ -1592,6 +1680,8 @@
 
   document.getElementById('btnModeExplorer').addEventListener('click', () => {
     modeConstruction = null;
+    propositionConstruction = null;
+    masquerOverlayConstruction();
     document.getElementById('btnModeExplorer').classList.add('mode-actif');
     document.getElementById('btnModeConstruire').classList.remove('mode-actif');
     document.getElementById('paletteConstruction').hidden = true;
@@ -1601,6 +1691,12 @@
     document.getElementById('btnModeExplorer').classList.remove('mode-actif');
     document.getElementById('paletteConstruction').hidden = false;
     mettreAJourPalette();
+  });
+
+  document.getElementById('btnValiderConstruction').addEventListener('click', validerProposition);
+  document.getElementById('btnRefuserConstruction').addEventListener('click', annulerProposition);
+  dpadConstruction.querySelectorAll('.dpad-btn').forEach((btn) => {
+    btn.addEventListener('click', () => deplacerProposition(btn.dataset.dir));
   });
 
   document.getElementById('btnTech').addEventListener('click', ouvrirModalTech);

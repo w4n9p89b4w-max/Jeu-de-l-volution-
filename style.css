@@ -180,6 +180,68 @@ main {
   border-radius: 6px;
 }
 
+.confirmation-boutons {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 0.4rem;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.confirmation-boutons[hidden] { display: none; }
+
+.confirmation-boutons button {
+  pointer-events: auto;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  border: 1px solid var(--bordure);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.confirmation-boutons .btn-valider { background: #3ddc84; color: #08210f; }
+.confirmation-boutons .btn-valider:hover { background: #59e698; }
+.confirmation-boutons .btn-refuser { background: #dc3d3d; color: #2a0808; }
+.confirmation-boutons .btn-refuser:hover { background: #e35d5d; }
+
+.confirmation-dpad {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(3, 28px);
+  gap: 2px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.confirmation-dpad[hidden] { display: none; }
+
+.confirmation-dpad .dpad-btn {
+  pointer-events: auto;
+  background: rgba(10, 14, 24, 0.85);
+  border: 1px solid var(--bordure);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.confirmation-dpad .dpad-btn:hover { background: rgba(61, 220, 132, 0.35); }
+.confirmation-dpad .dpad-haut { grid-column: 2; grid-row: 1; }
+.confirmation-dpad .dpad-gauche { grid-column: 1; grid-row: 2; }
+.confirmation-dpad .dpad-droite { grid-column: 3; grid-row: 2; }
+.confirmation-dpad .dpad-bas { grid-column: 2; grid-row: 3; }
+
 .panneau {
   flex: 0 1 320px;
   min-width: 280px;
