@@ -253,6 +253,37 @@
       tuiles.push(ligne);
     }
 
+    // Lissage : les seuils d'altitude/humidité produisent un semis de petites
+    // taches isolées (« bruit poivre et sel »). Deux passes de vote majoritaire
+    // sur les 8 voisins absorbent ces micro-taches en gardant les grandes
+    // régions intactes, pour des frontières de biomes cohérentes à grande
+    // échelle plutôt qu'un patchwork — la carte gagne ainsi de vraies côtes et
+    // zones, pas seulement des coins arrondis sur du bruit.
+    for (let iteration = 0; iteration < 2; iteration++) {
+      const copie = tuiles.map(l => l.slice());
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          const compte = {};
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const nr = row + dr, nc = col + dc;
+              if (nr < 0 || nc < 0 || nr >= LIGNES || nc >= COLONNES) continue;
+              const b = copie[nr][nc];
+              compte[b] = (compte[b] || 0) + 1;
+            }
+          }
+          let majBiome = null, majNombre = 0;
+          for (const b in compte) {
+            if (compte[b] > majNombre) { majNombre = compte[b]; majBiome = b; }
+          }
+          if (majBiome && majBiome !== copie[row][col] && majNombre >= 5) {
+            tuiles[row][col] = majBiome;
+          }
+        }
+      }
+    }
+
     // Traçage de quelques rivières depuis des sommets vers l'océan
     let tentativesRivieres = 0;
     let riviereCreees = 0;
@@ -757,33 +788,63 @@
   // (les biomes sont peints en aplats à une résolution suréchantillonnée puis
   // floutés avant d'être remis à l'échelle finale) : les arêtes rectangulaires
   // de la grille « fondent » en courbes douces, sans coût de calcul par frame.
+  // Coins d'une tuile : les deux voisins orthogonaux adjacents à ce coin (les
+  // « arêtes ») et le voisin en diagonale. cx/cy repèrent le point de coin
+  // dans le repère de la tuile (0 ou 1) ; a0/a1 balaient le quart de cercle
+  // qui appartient à LA TUILE elle-même à cet endroit (c'est ce quart qui est
+  // repeint avec la couleur du biome en diagonale quand celui-ci est isolé).
+  const COINS_TUILE = [
+    { edge1: [0, -1], edge2: [-1, 0], diag: [-1, -1], cx: 0, cy: 0, a0: 0, a1: Math.PI / 2 },
+    { edge1: [0, -1], edge2: [1, 0], diag: [1, -1], cx: 1, cy: 0, a0: Math.PI / 2, a1: Math.PI },
+    { edge1: [0, 1], edge2: [-1, 0], diag: [-1, 1], cx: 0, cy: 1, a0: -Math.PI / 2, a1: 0 },
+    { edge1: [0, 1], edge2: [1, 0], diag: [1, 1], cx: 1, cy: 1, a0: Math.PI, a1: Math.PI * 1.5 },
+  ];
+
+  // Génère une fois par carte une texture de terrain aux frontières adoucies :
+  // chaque tuile est peinte en aplat, puis tout coin où le biome en diagonale
+  // est isolé (les deux voisins orthogonaux partagent le biome de la tuile)
+  // est repeint d'un quart de cercle de la couleur diagonale. Résultat net,
+  // sans flou : la grille rectangulaire « fond » en courbes nettes, comme une
+  // vraie carte plutôt qu'une grille de blocs — sans coût par frame.
   function genererTextureTerrain() {
-    const SURECHANTILLON = 3;
-    const petit = document.createElement('canvas');
-    petit.width = COLONNES * SURECHANTILLON;
-    petit.height = LIGNES * SURECHANTILLON;
-    const pctx = petit.getContext('2d');
-    for (let row = 0; row < LIGNES; row++) {
-      for (let col = 0; col < COLONNES; col++) {
-        pctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
-        pctx.fillRect(col * SURECHANTILLON, row * SURECHANTILLON, SURECHANTILLON, SURECHANTILLON);
-      }
-    }
-
-    const flou = document.createElement('canvas');
-    flou.width = petit.width;
-    flou.height = petit.height;
-    const fctx = flou.getContext('2d');
-    fctx.filter = 'blur(1.6px)';
-    fctx.drawImage(petit, 0, 0);
-
     const texture = document.createElement('canvas');
     texture.width = LARGEUR_MONDE;
     texture.height = HAUTEUR_MONDE;
     const tctx = texture.getContext('2d');
-    tctx.imageSmoothingEnabled = true;
-    tctx.imageSmoothingQuality = 'high';
-    tctx.drawImage(flou, 0, 0, flou.width, flou.height, 0, 0, texture.width, texture.height);
+
+    function biomeEn(col, row) {
+      if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return null;
+      return etat.tuiles[row][col];
+    }
+
+    for (let row = 0; row < LIGNES; row++) {
+      for (let col = 0; col < COLONNES; col++) {
+        tctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
+        tctx.fillRect(col * TAILLE_TUILE, row * TAILLE_TUILE, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
+      }
+    }
+
+    const RAYON = TAILLE_TUILE * 0.5;
+    for (let row = 0; row < LIGNES; row++) {
+      for (let col = 0; col < COLONNES; col++) {
+        const b = etat.tuiles[row][col];
+        for (const coin of COINS_TUILE) {
+          const e1 = biomeEn(col + coin.edge1[0], row + coin.edge1[1]);
+          const e2 = biomeEn(col + coin.edge2[0], row + coin.edge2[1]);
+          const d = biomeEn(col + coin.diag[0], row + coin.diag[1]);
+          if (e1 !== b || e2 !== b || d === null || d === b) continue;
+          const px = (col + coin.cx) * TAILLE_TUILE;
+          const py = (row + coin.cy) * TAILLE_TUILE;
+          tctx.fillStyle = BIOMES[d].couleur;
+          tctx.beginPath();
+          tctx.moveTo(px, py);
+          tctx.arc(px, py, RAYON, coin.a0, coin.a1);
+          tctx.closePath();
+          tctx.fill();
+        }
+      }
+    }
+
     terrainTexture = texture;
   }
 
