@@ -222,18 +222,23 @@ main {
 
 .confirmation-dpad[hidden] { display: none; }
 
-.confirmation-dpad .dpad-btn {
+.confirmation-dpad .dpad-hit {
+  fill: transparent;
   pointer-events: auto;
   cursor: pointer;
-  fill: #f4f6f0;
-  stroke: #12160f;
-  stroke-width: 3;
-  stroke-linejoin: round;
-  transition: fill 0.12s ease;
 }
 
-.confirmation-dpad .dpad-btn:hover,
-.confirmation-dpad .dpad-btn:active { fill: #3ddc84; }
+.confirmation-dpad .dpad-art {
+  fill: none;
+  stroke: #f4f6f0;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.12s ease;
+}
+
+.confirmation-dpad .dpad-btn:hover .dpad-art,
+.confirmation-dpad .dpad-btn:active .dpad-art { stroke: #3ddc84; }
 
 .panneau {
   flex: 0 1 320px;

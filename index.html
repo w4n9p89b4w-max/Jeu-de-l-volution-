@@ -46,10 +46,26 @@
         <button id="btnRefuserConstruction" class="btn-refuser" title="Annuler la construction">✕ Refuser</button>
       </div>
       <svg id="dpadConstruction" class="confirmation-dpad" viewBox="0 0 100 100" hidden style="display:none">
-        <path class="dpad-btn dpad-haut" data-dir="haut" d="M50,3 L72,30 L59,30 L59,50 L41,50 L41,30 L28,30 Z"><title>Déplacer vers le haut</title></path>
-        <path class="dpad-btn dpad-droite" data-dir="droite" transform="rotate(90 50 50)" d="M50,3 L72,30 L59,30 L59,50 L41,50 L41,30 L28,30 Z"><title>Déplacer vers la droite</title></path>
-        <path class="dpad-btn dpad-bas" data-dir="bas" transform="rotate(180 50 50)" d="M50,3 L72,30 L59,30 L59,50 L41,50 L41,30 L28,30 Z"><title>Déplacer vers le bas</title></path>
-        <path class="dpad-btn dpad-gauche" data-dir="gauche" transform="rotate(270 50 50)" d="M50,3 L72,30 L59,30 L59,50 L41,50 L41,30 L28,30 Z"><title>Déplacer vers la gauche</title></path>
+        <g class="dpad-btn" data-dir="haut">
+          <title>Déplacer vers le haut</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z"></path>
+          <g class="dpad-art"><line x1="50" y1="50" x2="50" y2="14"/><polyline points="38,26 50,12 62,26"/></g>
+        </g>
+        <g class="dpad-btn" data-dir="droite" transform="rotate(90 50 50)">
+          <title>Déplacer vers la droite</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z"></path>
+          <g class="dpad-art"><line x1="50" y1="50" x2="50" y2="14"/><polyline points="38,26 50,12 62,26"/></g>
+        </g>
+        <g class="dpad-btn" data-dir="bas" transform="rotate(180 50 50)">
+          <title>Déplacer vers le bas</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z"></path>
+          <g class="dpad-art"><line x1="50" y1="50" x2="50" y2="14"/><polyline points="38,26 50,12 62,26"/></g>
+        </g>
+        <g class="dpad-btn" data-dir="gauche" transform="rotate(270 50 50)">
+          <title>Déplacer vers la gauche</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z"></path>
+          <g class="dpad-art"><line x1="50" y1="50" x2="50" y2="14"/><polyline points="38,26 50,12 62,26"/></g>
+        </g>
       </svg>
     </div>
 
