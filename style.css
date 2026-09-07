@@ -143,6 +143,32 @@ main {
   touch-action: none;
 }
 
+.controles-zoom {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(10, 14, 24, 0.7);
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  color: var(--texte-att);
+}
+
+.controles-zoom button {
+  padding: 0.15rem 0.55rem;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+#valeurZoom {
+  min-width: 3.2em;
+  text-align: center;
+}
+
 .aide-navigation {
   position: absolute;
   bottom: 8px;

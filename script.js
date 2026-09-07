@@ -6,13 +6,15 @@
   // ============================================================
 
   const TAILLE_TUILE = 28;
-  const COLONNES = 132;
-  const LIGNES = 84;
+  const COLONNES = 192;
+  const LIGNES = 120;
   const LARGEUR_MONDE = TAILLE_TUILE * COLONNES;
   const HAUTEUR_MONDE = TAILLE_TUILE * LIGNES;
   const NB_ZONES_COTE = 3; // grille de zones 3x3
   const TICK_MS = 2000;
-  const VITESSE_PAN = 520; // px/s au clavier
+  const VITESSE_PAN = 620; // px/s au clavier
+  const ZOOM_MIN = 0.4;
+  const ZOOM_MAX = 2.4;
 
   const BIOMES = {
     ocean:    { nom: 'Océan',    couleur: '#1c4f7c' },
@@ -31,6 +33,9 @@
     gibier:  { ressource: 'nourriture', emoji: '🦌', max: 2, taux: 0.9, nom: 'Gibier' },
     poisson: { ressource: 'nourriture', emoji: '🐟', max: 2, taux: 1.0, nom: 'Zone de pêche' },
   };
+
+  const RESSOURCE_EMOJI = { bois: '🪵', pierre: '🪨', nourriture: '🍖' };
+  const CHARGE_PORTEE_MAX = 5;
 
   const BATIMENTS = {
     maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population' },
@@ -158,13 +163,39 @@
     const cx = COLONNES / 2, cy = LIGNES / 2;
     const distMax = Math.hypot(cx, cy);
 
+    // Îles isolées : quelques bosses de relief séparées du continent principal
+    const iles = [];
+    const nbIles = Math.round(aleatoire(5, 9));
+    for (let essai = 0; essai < 300 && iles.length < nbIles; essai++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = aleatoire(0.6, 0.93) * distMax;
+      const icx = cx + Math.cos(angle) * dist;
+      const icy = cy + Math.sin(angle) * dist;
+      if (icx < 4 || icy < 4 || icx > COLONNES - 4 || icy > LIGNES - 4) continue;
+      const rayonIle = aleatoire(3.5, 7.5);
+      if (iles.some(i => Math.hypot(i.cx - icx, i.cy - icy) < (i.rayon + rayonIle) * 1.7)) continue;
+      iles.push({ cx: icx, cy: icy, rayon: rayonIle });
+    }
+
+    function elevation(col, row) {
+      const d = Math.hypot(col - cx, row - cy) / distMax;
+      let e = elevBruit(col / 9, row / 9, 5) * (1 - d * 0.85);
+      for (const ile of iles) {
+        const dIle = Math.hypot(col - ile.cx, row - ile.cy) / ile.rayon;
+        if (dIle < 1) {
+          const bosse = (1 - dIle) * 0.85;
+          const variation = 0.45 + elevBruit(col / 6, row / 6, 4) * 0.55;
+          e = Math.max(e, bosse * variation);
+        }
+      }
+      return Math.max(0, Math.min(1, e));
+    }
+
     const tuiles = [];
     for (let row = 0; row < LIGNES; row++) {
       const ligne = [];
       for (let col = 0; col < COLONNES; col++) {
-        const d = Math.hypot(col - cx, row - cy) / distMax;
-        let e = elevBruit(col / 9, row / 9, 5) * (1 - d * 0.85);
-        e = Math.max(0, Math.min(1, e));
+        const e = elevation(col, row);
         const h = humBruit(col / 8, row / 8, 4);
         const p = pierreBruit(col / 6, row / 6, 3);
 
@@ -183,7 +214,7 @@
     // Traçage de quelques rivières depuis des sommets vers l'océan
     let tentativesRivieres = 0;
     let riviereCreees = 0;
-    while (riviereCreees < 7 && tentativesRivieres < 700) {
+    while (riviereCreees < 9 && tentativesRivieres < 900) {
       tentativesRivieres++;
       const c0 = Math.floor(Math.random() * COLONNES);
       const r0 = Math.floor(Math.random() * LIGNES);
@@ -191,7 +222,7 @@
 
       let col = c0, row = r0, pas = 0;
       const parcours = [];
-      while (pas < 400) {
+      while (pas < 550) {
         pas++;
         parcours.push([col, row]);
         if (tuiles[row][col] === 'ocean') break;
@@ -201,8 +232,7 @@
             if (dr === 0 && dc === 0) continue;
             const nc = col + dc, nr = row + dr;
             if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
-            const d = Math.hypot(nc - cx, nr - cy) / distMax;
-            let ne = elevBruit(nc / 9, nr / 9, 5) * (1 - d * 0.85);
+            const ne = elevation(nc, nr);
             if (ne < meilleurE) { meilleurE = ne; meilleur = [nc, nr]; }
           }
         }
@@ -360,6 +390,8 @@
       phase: Math.random() * Math.PI * 2,
       enMouvement: false,
       travaille: false,
+      charge: 0,
+      ressourceType: null,
     };
   }
 
@@ -389,15 +421,54 @@
     v.cibleY = v.y;
   }
 
+  function trouverDepot(x, y) {
+    let meilleur = null, meilleureDist = Infinity;
+    for (const [cle, type] of etat.batiments.entries()) {
+      if (type !== 'feu' && type !== 'entrepot') continue;
+      const [col, row] = cle.split(',').map(Number);
+      const px = col * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const py = row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const d = (px - x) * (px - x) + (py - y) * (py - y);
+      if (d < meilleureDist) { meilleureDist = d; meilleur = { x: px, y: py }; }
+    }
+    if (meilleur) return meilleur;
+    return { x: Math.round(COLONNES / 2) * TAILLE_TUILE, y: Math.round(LIGNES / 2) * TAILLE_TUILE };
+  }
+
+  function livrerRessource(v) {
+    if (v.ressourceType) {
+      const cap = capaciteStockage();
+      etat.ressources[v.ressourceType] = Math.min(cap, etat.ressources[v.ressourceType] + v.charge);
+      gagnerXp(v.charge * 0.4);
+    }
+    v.charge = 0;
+    v.ressourceType = null;
+    v.mode = 'attente';
+  }
+
   function mettreAJourVillageois(dt) {
     const parNoeud = new Map();
     for (const v of etat.villageois) {
-      if (!v.assigneA) continue;
+      if (!v.assigneA || v.mode === 'rapporte') continue;
       if (!parNoeud.has(v.assigneA)) parNoeud.set(v.assigneA, []);
       parNoeud.get(v.assigneA).push(v);
     }
 
     for (const v of etat.villageois) {
+      if (v.mode === 'rapporte') {
+        const d = Math.hypot(v.cibleX - v.x, v.cibleY - v.y);
+        v.travaille = false;
+        v.enMouvement = d > 2;
+        if (d > 2) {
+          const pas = Math.min(d, v.vitesseBase * 1.8 * dt);
+          v.x += (v.cibleX - v.x) / d * pas;
+          v.y += (v.cibleY - v.y) / d * pas;
+        } else {
+          livrerRessource(v);
+        }
+        continue;
+      }
+
       if (v.assigneA) {
         const [col, row] = v.assigneA.split(',').map(Number);
         const groupe = parNoeud.get(v.assigneA);
@@ -442,10 +513,10 @@
 
   function dessinerVillageois(temps) {
     const t = temps / 1000;
+    const vw = largeurVisible(), vh = hauteurVisible();
     for (const v of etat.villageois) {
-      const x = v.x - camera.x;
-      const y = v.y - camera.y;
-      if (x < -20 || x > canvas.width + 20 || y < -20 || y > canvas.height + 20) continue;
+      const x = v.x, y = v.y;
+      if (x < camera.x - 20 || x > camera.x + vw + 20 || y < camera.y - 20 || y > camera.y + vh + 20) continue;
 
       let offsetY = 0, echelleY = 1;
       if (v.travaille) {
@@ -468,6 +539,10 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('🧑', 0, -4);
+      if (v.mode === 'rapporte' && v.ressourceType) {
+        ctx.font = (TAILLE_TUILE * 0.4) + 'px serif';
+        ctx.fillText(RESSOURCE_EMOJI[v.ressourceType], 8, -15);
+      }
       ctx.restore();
     }
   }
@@ -526,8 +601,10 @@
   }
 
   function centrerCameraSurLeDepart() {
-    camera.x = LARGEUR_MONDE / 2 - canvas.clientWidth / 2;
-    camera.y = HAUTEUR_MONDE / 2 - canvas.clientHeight / 2;
+    zoom = 1;
+    majAffichageZoom();
+    camera.x = LARGEUR_MONDE / 2 - largeurVisible() / 2;
+    camera.y = HAUTEUR_MONDE / 2 - hauteurVisible() / 2;
     clamperCamera();
   }
 
@@ -542,6 +619,7 @@
   let minicarteFond = null;
 
   const camera = { x: 0, y: 0 };
+  let zoom = 1;
   const touches = { haut: false, bas: false, gauche: false, droite: false };
   let glisser = false;
   let glisserOrigine = null;
@@ -550,6 +628,9 @@
   let caseSelectionnee = null;
   let modeConstruction = null;
   let enPause = false;
+
+  function largeurVisible() { return canvas.width / zoom; }
+  function hauteurVisible() { return canvas.height / zoom; }
 
   function redimensionner() {
     const rect = canvas.getBoundingClientRect();
@@ -560,10 +641,28 @@
   window.addEventListener('resize', redimensionner);
 
   function clamperCamera() {
-    camera.x = Math.max(0, Math.min(LARGEUR_MONDE - canvas.width, camera.x));
-    camera.y = Math.max(0, Math.min(HAUTEUR_MONDE - canvas.height, camera.y));
-    if (LARGEUR_MONDE <= canvas.width) camera.x = -(canvas.width - LARGEUR_MONDE) / 2;
-    if (HAUTEUR_MONDE <= canvas.height) camera.y = -(canvas.height - HAUTEUR_MONDE) / 2;
+    const vw = largeurVisible(), vh = hauteurVisible();
+    camera.x = Math.max(0, Math.min(LARGEUR_MONDE - vw, camera.x));
+    camera.y = Math.max(0, Math.min(HAUTEUR_MONDE - vh, camera.y));
+    if (LARGEUR_MONDE <= vw) camera.x = -(vw - LARGEUR_MONDE) / 2;
+    if (HAUTEUR_MONDE <= vh) camera.y = -(vh - HAUTEUR_MONDE) / 2;
+  }
+
+  function definirZoom(nouveauZoom, centreEcranX, centreEcranY) {
+    const cx = centreEcranX ?? canvas.width / 2;
+    const cy = centreEcranY ?? canvas.height / 2;
+    const mondeXAvant = camera.x + cx / zoom;
+    const mondeYAvant = camera.y + cy / zoom;
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nouveauZoom));
+    camera.x = mondeXAvant - cx / zoom;
+    camera.y = mondeYAvant - cy / zoom;
+    clamperCamera();
+    majAffichageZoom();
+  }
+
+  function majAffichageZoom() {
+    const el = document.getElementById('valeurZoom');
+    if (el) el.textContent = Math.round(zoom * 100) + '%';
   }
 
   function dessinerMinicarteFond() {
@@ -600,22 +699,26 @@
     const ratioY = minicarte.height / HAUTEUR_MONDE;
     ctxMini.strokeStyle = '#fff';
     ctxMini.lineWidth = 1.5;
-    ctxMini.strokeRect(camera.x * ratioX, camera.y * ratioY, canvas.width * ratioX, canvas.height * ratioY);
+    ctxMini.strokeRect(camera.x * ratioX, camera.y * ratioY, largeurVisible() * ratioX, hauteurVisible() * ratioY);
   }
 
   function dessinerCarte(temps) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    const vw = largeurVisible(), vh = hauteurVisible();
+    ctx.setTransform(zoom, 0, 0, zoom, -camera.x * zoom, -camera.y * zoom);
+
     const colDebut = Math.max(0, Math.floor(camera.x / TAILLE_TUILE));
-    const colFin = Math.min(COLONNES - 1, Math.ceil((camera.x + canvas.width) / TAILLE_TUILE));
+    const colFin = Math.min(COLONNES - 1, Math.ceil((camera.x + vw) / TAILLE_TUILE));
     const rowDebut = Math.max(0, Math.floor(camera.y / TAILLE_TUILE));
-    const rowFin = Math.min(LIGNES - 1, Math.ceil((camera.y + canvas.height) / TAILLE_TUILE));
+    const rowFin = Math.min(LIGNES - 1, Math.ceil((camera.y + vh) / TAILLE_TUILE));
 
     for (let row = rowDebut; row <= rowFin; row++) {
       for (let col = colDebut; col <= colFin; col++) {
-        const x = col * TAILLE_TUILE - camera.x;
-        const y = row * TAILLE_TUILE - camera.y;
+        const x = col * TAILLE_TUILE;
+        const y = row * TAILLE_TUILE;
         ctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
         ctx.fillRect(x, y, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
 
@@ -663,9 +766,9 @@
       const zc = i % NB_ZONES_COTE, zr = Math.floor(i / NB_ZONES_COTE);
       const centreCol = (zc + 0.5) * (COLONNES / NB_ZONES_COTE);
       const centreRow = (zr + 0.5) * (LIGNES / NB_ZONES_COTE);
-      const x = centreCol * TAILLE_TUILE - camera.x;
-      const y = centreRow * TAILLE_TUILE - camera.y;
-      if (x > -50 && x < canvas.width + 50 && y > -50 && y < canvas.height + 50) {
+      const x = centreCol * TAILLE_TUILE;
+      const y = centreRow * TAILLE_TUILE;
+      if (x > camera.x - 50 && x < camera.x + vw + 50 && y > camera.y - 50 && y < camera.y + vh + 50) {
         ctx.font = '28px serif';
         ctx.textAlign = 'center';
         ctx.fillText('🔒', x, y);
@@ -687,8 +790,8 @@
       ctx.strokeStyle = '#ffd93d';
       ctx.lineWidth = 2;
       for (const t of tuilesAContourer) {
-        const x = t.col * TAILLE_TUILE - camera.x;
-        const y = t.row * TAILLE_TUILE - camera.y;
+        const x = t.col * TAILLE_TUILE;
+        const y = t.row * TAILLE_TUILE;
         ctx.strokeRect(x + 1, y + 1, TAILLE_TUILE - 2, TAILLE_TUILE - 2);
       }
     }
@@ -713,10 +816,17 @@
     const dx = e.clientX - glisserOrigine.x;
     const dy = e.clientY - glisserOrigine.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) aBouge = true;
-    camera.x = glisserOrigine.camX - dx;
-    camera.y = glisserOrigine.camY - dy;
+    camera.x = glisserOrigine.camX - dx / zoom;
+    camera.y = glisserOrigine.camY - dy / zoom;
     clamperCamera();
   });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const facteur = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    definirZoom(zoom * facteur, mx, my);
+  }, { passive: false });
   function terminerGlisser(e) {
     if (e.pointerId !== glisserPointerId) return;
     if (glisser && !aBouge) {
@@ -734,8 +844,8 @@
     const rect = minicarte.getBoundingClientRect();
     const rx = (e.clientX - rect.left) / rect.width;
     const ry = (e.clientY - rect.top) / rect.height;
-    camera.x = rx * LARGEUR_MONDE - canvas.width / 2;
-    camera.y = ry * HAUTEUR_MONDE - canvas.height / 2;
+    camera.x = rx * LARGEUR_MONDE - largeurVisible() / 2;
+    camera.y = ry * HAUTEUR_MONDE - hauteurVisible() / 2;
     clamperCamera();
   });
 
@@ -754,8 +864,8 @@
   });
 
   function gererClicCarte(px, py) {
-    const col = Math.floor((px + camera.x) / TAILLE_TUILE);
-    const row = Math.floor((py + camera.y) / TAILLE_TUILE);
+    const col = Math.floor((px / zoom + camera.x) / TAILLE_TUILE);
+    const row = Math.floor((py / zoom + camera.y) / TAILLE_TUILE);
     if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return;
 
     const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
@@ -913,27 +1023,37 @@
 
   function tick() {
     const m = etat.multiplicateurs;
-    let gain = { bois: 0, pierre: 0, nourriture: 0 };
 
-    for (const noeud of etat.noeuds.values()) {
-      const cle = noeud.col + ',' + noeud.row;
-      const nbTravailleurs = compterTravailleurs(cle);
-      if (nbTravailleurs <= 0) continue;
+    // Récolte : chaque villageois arrivé sur sa ressource accumule une charge
+    // personnelle, puis part la porter à un dépôt (feu de camp / entrepôt) une
+    // fois pleine. Le stock global n'augmente qu'à la livraison.
+    for (const v of etat.villageois) {
+      if (!v.assigneA || v.mode === 'rapporte' || !v.travaille) continue;
+      const noeud = etat.noeuds.get(v.assigneA);
+      if (!noeud) continue;
       if (!etat.zonesDebloquees.has(zoneDeCase(noeud.col, noeud.row))) continue;
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
-      const production = nbTravailleurs * def.taux * m[def.ressource];
-      gain[def.ressource] += production;
+      v.charge += def.taux * m[def.ressource];
+      v.ressourceType = def.ressource;
+      if (v.charge >= CHARGE_PORTEE_MAX) {
+        v.mode = 'rapporte';
+        const depot = trouverDepot(v.x, v.y);
+        v.cibleX = depot.x;
+        v.cibleY = depot.y;
+      }
     }
 
+    // Production passive des bâtiments (déjà sur place, pas de transport à simuler)
+    let gainPassif = { bois: 0, pierre: 0, nourriture: 0 };
     for (const type of etat.batiments.values()) {
-      if (type === 'champ') gain.nourriture += 2 * m.champ;
-      if (type === 'enclos') gain.nourriture += 3 * m.enclos;
+      if (type === 'champ') gainPassif.nourriture += 2 * m.champ;
+      if (type === 'enclos') gainPassif.nourriture += 3 * m.enclos;
     }
 
     const cap = capaciteStockage();
-    etat.ressources.bois = Math.min(cap, etat.ressources.bois + gain.bois);
-    etat.ressources.pierre = Math.min(cap, etat.ressources.pierre + gain.pierre);
-    etat.ressources.nourriture = Math.min(cap, etat.ressources.nourriture + gain.nourriture);
+    etat.ressources.bois = Math.min(cap, etat.ressources.bois + gainPassif.bois);
+    etat.ressources.pierre = Math.min(cap, etat.ressources.pierre + gainPassif.pierre);
+    etat.ressources.nourriture = Math.min(cap, etat.ressources.nourriture + gainPassif.nourriture);
 
     // Reproduction de la population
     if (etat.ressources.nourriture >= 15 && nbPopulation() < etat.capacitePopulation) {
@@ -955,8 +1075,8 @@
       }
     }
 
-    const xpGagne = (gain.bois + gain.pierre + gain.nourriture) * 0.4;
-    if (xpGagne > 0) gagnerXp(xpGagne);
+    const xpPassif = (gainPassif.bois + gainPassif.pierre + gainPassif.nourriture) * 0.4;
+    if (xpPassif > 0) gagnerXp(xpPassif);
   }
 
   function gagnerXp(montant) {
@@ -1135,6 +1255,9 @@
   document.getElementById('modalTech').addEventListener('click', (e) => {
     if (e.target.id === 'modalTech') fermerModalTech();
   });
+
+  document.getElementById('btnZoomPlus').addEventListener('click', () => definirZoom(zoom * 1.3));
+  document.getElementById('btnZoomMoins').addEventListener('click', () => definirZoom(zoom / 1.3));
 
   // ============================================================
   // Démarrage
