@@ -653,6 +653,7 @@
   function nouvellePartie() {
     etat = creerEtatInitial();
     etat.tuiles = genererCarte();
+    genererTextureTerrain();
     etat.noeuds = genererNoeudsRessources();
     placerCampementDepart();
     etat.villageois = genererVillageoisInitiaux(6);
@@ -683,6 +684,7 @@
   const minicarte = document.getElementById('minicarte');
   const ctxMini = minicarte.getContext('2d');
   let minicarteFond = null;
+  let terrainTexture = null;
 
   const camera = { x: 0, y: 0 };
   let zoom = 1;
@@ -751,6 +753,40 @@
     minicarteFond = off;
   }
 
+  // Génère une fois par carte une texture de terrain aux frontières adoucies
+  // (les biomes sont peints en aplats à une résolution suréchantillonnée puis
+  // floutés avant d'être remis à l'échelle finale) : les arêtes rectangulaires
+  // de la grille « fondent » en courbes douces, sans coût de calcul par frame.
+  function genererTextureTerrain() {
+    const SURECHANTILLON = 3;
+    const petit = document.createElement('canvas');
+    petit.width = COLONNES * SURECHANTILLON;
+    petit.height = LIGNES * SURECHANTILLON;
+    const pctx = petit.getContext('2d');
+    for (let row = 0; row < LIGNES; row++) {
+      for (let col = 0; col < COLONNES; col++) {
+        pctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
+        pctx.fillRect(col * SURECHANTILLON, row * SURECHANTILLON, SURECHANTILLON, SURECHANTILLON);
+      }
+    }
+
+    const flou = document.createElement('canvas');
+    flou.width = petit.width;
+    flou.height = petit.height;
+    const fctx = flou.getContext('2d');
+    fctx.filter = 'blur(1.6px)';
+    fctx.drawImage(petit, 0, 0);
+
+    const texture = document.createElement('canvas');
+    texture.width = LARGEUR_MONDE;
+    texture.height = HAUTEUR_MONDE;
+    const tctx = texture.getContext('2d');
+    tctx.imageSmoothingEnabled = true;
+    tctx.imageSmoothingQuality = 'high';
+    tctx.drawImage(flou, 0, 0, flou.width, flou.height, 0, 0, texture.width, texture.height);
+    terrainTexture = texture;
+  }
+
   function dessinerMinicarte() {
     if (!minicarteFond) return;
     ctxMini.imageSmoothingEnabled = false;
@@ -786,6 +822,14 @@
     const rowDebut = Math.max(0, Math.floor(camera.y / TAILLE_TUILE));
     const rowFin = Math.min(LIGNES - 1, Math.ceil((camera.y + vh) / TAILLE_TUILE));
 
+    if (terrainTexture) {
+      const srcX = Math.max(0, camera.x);
+      const srcY = Math.max(0, camera.y);
+      const srcW = Math.min(LARGEUR_MONDE, camera.x + vw) - srcX;
+      const srcH = Math.min(HAUTEUR_MONDE, camera.y + vh) - srcY;
+      if (srcW > 0 && srcH > 0) ctx.drawImage(terrainTexture, srcX, srcY, srcW, srcH, srcX, srcY, srcW, srcH);
+    }
+
     const grandsBatiments = [];
     const grandsChantiers = [];
     const chantierParCle = new Map();
@@ -797,8 +841,10 @@
       for (let col = colDebut; col <= colFin; col++) {
         const x = col * TAILLE_TUILE;
         const y = row * TAILLE_TUILE;
-        ctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
-        ctx.fillRect(x, y, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
+        if (!terrainTexture) {
+          ctx.fillStyle = BIOMES[etat.tuiles[row][col]].couleur;
+          ctx.fillRect(x, y, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
+        }
 
         const cle = col + ',' + row;
         const noeud = etat.noeuds.get(cle);
