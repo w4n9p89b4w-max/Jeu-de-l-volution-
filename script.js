@@ -83,10 +83,10 @@
   }
 
   const BATIMENTS = {
-    maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population' },
-    entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage' },
-    champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick' },
-    enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage' },
+    maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population', duree: 9 },
+    entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage', duree: 7 },
+    champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick', duree: 4 },
+    enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage', duree: 6 },
     feu:     { nom: 'Feu de camp',      emoji: '🔥', cout: { bois: 0, pierre: 0 },   biomes: ['plaine', 'foret', 'plage'], desc: 'Le cœur du campement', nonConstructible: true },
   };
 
@@ -173,6 +173,7 @@
       tuiles: [],      // biome par tuile
       noeuds: new Map(),    // "col,row" -> noeud de ressource
       batiments: new Map(), // "col,row" -> type de bâtiment
+      chantiers: [],        // constructions en cours : { type, cases, tempsRestant, dureeTotale }
       zonesDebloquees: new Set([4]),
       ressources: { bois: 20, pierre: 10, nourriture: 20 },
       villageois: [],
@@ -696,15 +697,19 @@
 
   let caseSelectionnee = null;
   let modeConstruction = null;
+  let caseSurvolee = null;
   let enPause = false;
 
-  function largeurVisible() { return canvas.width / zoom; }
-  function hauteurVisible() { return canvas.height / zoom; }
+  let ratioPixels = window.devicePixelRatio || 1;
+
+  function largeurVisible() { return canvas.width / ratioPixels / zoom; }
+  function hauteurVisible() { return canvas.height / ratioPixels / zoom; }
 
   function redimensionner() {
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    ratioPixels = window.devicePixelRatio || 1;
+    canvas.width = Math.round(rect.width * ratioPixels);
+    canvas.height = Math.round(rect.height * ratioPixels);
     clamperCamera();
   }
   window.addEventListener('resize', redimensionner);
@@ -718,8 +723,8 @@
   }
 
   function definirZoom(nouveauZoom, centreEcranX, centreEcranY) {
-    const cx = centreEcranX ?? canvas.width / 2;
-    const cy = centreEcranY ?? canvas.height / 2;
+    const cx = centreEcranX ?? canvas.width / ratioPixels / 2;
+    const cy = centreEcranY ?? canvas.height / ratioPixels / 2;
     const mondeXAvant = camera.x + cx / zoom;
     const mondeYAvant = camera.y + cy / zoom;
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, nouveauZoom));
@@ -777,7 +782,8 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const vw = largeurVisible(), vh = hauteurVisible();
-    ctx.setTransform(zoom, 0, 0, zoom, -camera.x * zoom, -camera.y * zoom);
+    const echelle = zoom * ratioPixels;
+    ctx.setTransform(echelle, 0, 0, echelle, -camera.x * echelle, -camera.y * echelle);
 
     const colDebut = Math.max(0, Math.floor(camera.x / TAILLE_TUILE));
     const colFin = Math.min(COLONNES - 1, Math.ceil((camera.x + vw) / TAILLE_TUILE));
@@ -785,6 +791,11 @@
     const rowFin = Math.min(LIGNES - 1, Math.ceil((camera.y + vh) / TAILLE_TUILE));
 
     const grandsBatiments = [];
+    const grandsChantiers = [];
+    const chantierParCle = new Map();
+    for (const chantier of etat.chantiers) {
+      for (const c of chantier.cases) chantierParCle.set(c.cle, chantier);
+    }
 
     for (let row = rowDebut; row <= rowFin; row++) {
       for (let col = colDebut; col <= colFin; col++) {
@@ -796,9 +807,12 @@
         const cle = col + ',' + row;
         const noeud = etat.noeuds.get(cle);
         const batiment = etat.batiments.get(cle);
+        const chantier = chantierParCle.get(cle);
         const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
 
-        if (zoneOk && batiment === 'maison_zone') {
+        if (zoneOk && chantier) {
+          if (chantier.cases[0].cle === cle) grandsChantiers.push({ x, y, chantier });
+        } else if (zoneOk && batiment === 'maison_zone') {
           // Rien à dessiner : recouvert par l'illustration de la maison voisine (2x2).
         } else if (zoneOk && batiment === 'maison') {
           // Dessinée après coup pour ne pas être recouverte par les cases suivantes.
@@ -830,6 +844,42 @@
 
     for (const gb of grandsBatiments) {
       dessinerRessourceOuEmoji(BATIMENTS.maison.emoji, gb.x + TAILLE_TUILE, gb.y + TAILLE_TUILE, TAILLE_TUILE * 2 * 0.94);
+    }
+
+    for (const { x, y, chantier } of grandsChantiers) {
+      const taille = tailleBatiment(chantier.type);
+      const largeur = TAILLE_TUILE * taille;
+      const def = BATIMENTS[chantier.type];
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      dessinerRessourceOuEmoji(def.emoji, x + largeur / 2, y + largeur / 2, largeur * (taille > 1 ? 0.7 : 0.8));
+      ctx.restore();
+
+      const progression = 1 - Math.max(0, chantier.tempsRestant) / chantier.dureeTotale;
+      const barH = 5;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(x + 2, y + largeur - barH - 3, largeur - 4, barH);
+      ctx.fillStyle = '#ffb84d';
+      ctx.fillRect(x + 2, y + largeur - barH - 3, (largeur - 4) * progression, barH);
+
+      ctx.font = (TAILLE_TUILE * 0.4) + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🚧', x + largeur / 2, y + largeur * 0.22);
+    }
+
+    if (modeConstruction && caseSurvolee) {
+      const { valide, cases } = verifierEmplacementConstruction(modeConstruction, caseSurvolee.col, caseSurvolee.row);
+      if (cases.length > 0) {
+        ctx.fillStyle = valide ? 'rgba(61, 220, 132, 0.35)' : 'rgba(220, 61, 61, 0.35)';
+        ctx.strokeStyle = valide ? '#3ddc84' : '#dc3d3d';
+        ctx.lineWidth = 2;
+        for (const c of cases) {
+          const x = c.col * TAILLE_TUILE, y = c.row * TAILLE_TUILE;
+          ctx.fillRect(x, y, TAILLE_TUILE, TAILLE_TUILE);
+          ctx.strokeRect(x + 1, y + 1, TAILLE_TUILE - 2, TAILLE_TUILE - 2);
+        }
+      }
     }
 
     dessinerVillageois(temps);
@@ -900,6 +950,16 @@
     }
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (modeConstruction) {
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left, py = e.clientY - rect.top;
+      const col = Math.floor((px / zoom + camera.x) / TAILLE_TUILE);
+      const row = Math.floor((py / zoom + camera.y) / TAILLE_TUILE);
+      caseSurvolee = (col >= 0 && row >= 0 && col < COLONNES && row < LIGNES) ? { col, row } : null;
+    } else if (caseSurvolee) {
+      caseSurvolee = null;
+    }
+
     if (pointeursActifs.has(e.pointerId)) pointeursActifs.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (pointeursActifs.size === 2 && modePincement) {
@@ -960,6 +1020,7 @@
   }
   canvas.addEventListener('pointerup', terminerGlisser);
   canvas.addEventListener('pointercancel', terminerGlisser);
+  canvas.addEventListener('pointerleave', () => { caseSurvolee = null; });
 
   minicarte.addEventListener('click', (e) => {
     const rect = minicarte.getBoundingClientRect();
@@ -1023,7 +1084,7 @@
       const btn = document.createElement('button');
       btn.className = 'carte-batiment' + (modeConstruction === id ? ' selectionne' : '');
       const cout = coutBatiment(b);
-      btn.innerHTML = `<span>${b.emoji} ${b.nom}<br><small>${b.desc}</small></span><span>🪵${cout.bois} 🪨${cout.pierre}</span>`;
+      btn.innerHTML = `<span>${b.emoji} ${b.nom}<br><small>${b.desc} · ⏱️${b.duree}s</small></span><span>🪵${cout.bois} 🪨${cout.pierre}</span>`;
       btn.addEventListener('click', () => {
         modeConstruction = (modeConstruction === id) ? null : id;
         mettreAJourPalette();
@@ -1045,10 +1106,41 @@
     return null;
   }
 
+  function caseEnChantier(cle) {
+    return etat.chantiers.some(ch => ch.cases.some(c => c.cle === cle));
+  }
+
+  function tailleBatiment(type) {
+    return type === 'maison' ? 2 : 1;
+  }
+
+  // Calcule les cases occupées par un bâtiment posé en (col,row) et vérifie si
+  // l'emplacement est constructible (biomes, occupation, chantiers, zone). Sert
+  // à la fois à l'aperçu de survol et à la validation au moment de construire.
+  function verifierEmplacementConstruction(type, col, row) {
+    const def = BATIMENTS[type];
+    const taille = tailleBatiment(type);
+    const cases = [];
+    for (let dr = 0; dr < taille; dr++) {
+      for (let dc = 0; dc < taille; dc++) {
+        const c = col + dc, r = row + dr;
+        if (c < 0 || r < 0 || c >= COLONNES || r >= LIGNES) return { valide: false, cases: [] };
+        cases.push({ col: c, row: r, cle: c + ',' + r });
+      }
+    }
+    let valide = true;
+    for (const { col: c, row: r, cle } of cases) {
+      const biome = etat.tuiles[r][c];
+      if (!def.biomes.includes(biome)) valide = false;
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle) || caseEnChantier(cle)) valide = false;
+      if (!etat.zonesDebloquees.has(zoneDeCase(c, r))) valide = false;
+    }
+    return { valide, cases };
+  }
+
   function tenterConstruction(col, row) {
     const def = BATIMENTS[modeConstruction];
-    const estMaison = modeConstruction === 'maison';
-    const taille = estMaison ? 2 : 1;
+    const taille = tailleBatiment(modeConstruction);
 
     const cases = [];
     for (let dr = 0; dr < taille; dr++) {
@@ -1068,7 +1160,7 @@
         notifier('❌ Impossible de construire un(e) ' + def.nom.toLowerCase() + ' sur une case de type ' + BIOMES[biome].nom + '.');
         return;
       }
-      if (etat.batiments.has(cle) || etat.noeuds.has(cle)) {
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle) || caseEnChantier(cle)) {
         notifier('❌ Cette case est déjà occupée.');
         return;
       }
@@ -1085,13 +1177,29 @@
     }
     etat.ressources.bois -= cout.bois;
     etat.ressources.pierre -= cout.pierre;
-    etat.batiments.set(cases[0].cle, modeConstruction);
-    for (let i = 1; i < cases.length; i++) etat.batiments.set(cases[i].cle, 'maison_zone');
-    if (estMaison) etat.capacitePopulation += 4;
-    gagnerXp(20);
-    notifier('✅ ' + def.nom + ' construit(e) !');
+    etat.chantiers.push({ type: modeConstruction, cases, tempsRestant: def.duree, dureeTotale: def.duree });
+    notifier('🚧 Construction de ' + def.nom.toLowerCase() + ' commencée...');
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
+  }
+
+  function mettreAJourChantiers(dt) {
+    if (etat.chantiers.length === 0) return;
+    const termines = [];
+    for (const chantier of etat.chantiers) {
+      chantier.tempsRestant -= dt;
+      if (chantier.tempsRestant <= 0) termines.push(chantier);
+    }
+    for (const chantier of termines) {
+      etat.chantiers.splice(etat.chantiers.indexOf(chantier), 1);
+      const def = BATIMENTS[chantier.type];
+      etat.batiments.set(chantier.cases[0].cle, chantier.type);
+      for (let i = 1; i < chantier.cases.length; i++) etat.batiments.set(chantier.cases[i].cle, 'maison_zone');
+      if (chantier.type === 'maison') etat.capacitePopulation += 4;
+      gagnerXp(20);
+      notifier('✅ ' + def.nom + ' construit(e) !');
+      if (caseSelectionnee && !caseSelectionnee.verrouillee) afficherSelection();
+    }
   }
 
   // ============================================================
@@ -1120,12 +1228,18 @@
       if (origine) { batiment = 'maison'; batimentCol = origine.col; batimentRow = origine.row; }
     }
 
+    const chantier = etat.chantiers.find(ch => ch.cases.some(c => c.cle === cle));
+
     let html = `<h3>${BIOMES[biome].nom}</h3><p>Case (${col}, ${row})</p>`;
 
     if (batiment) {
       const def = BATIMENTS[batiment];
       const emojiBat = batiment === 'enclos' ? emojiEnclos(batimentCol, batimentRow) : def.emoji;
       html += `<p>${emojiBat} <b>${def.nom}</b><br>${def.desc}</p>`;
+    } else if (chantier) {
+      const def = BATIMENTS[chantier.type];
+      const restant = Math.max(0, Math.ceil(chantier.tempsRestant));
+      html += `<p>🚧 <b>Construction : ${def.nom}</b><br>${restant} s restante${restant > 1 ? 's' : ''}</p>`;
     } else if (noeud) {
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const emojiNoeud = noeud.emoji || def.emoji;
@@ -1369,6 +1483,7 @@
     }
 
     mettreAJourVillageois(dt);
+    if (!enPause) mettreAJourChantiers(dt);
     dessinerCarte(temps);
     dessinerMinicarte();
     requestAnimationFrame(boucleRendu);
