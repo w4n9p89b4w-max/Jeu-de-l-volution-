@@ -1383,6 +1383,22 @@
     if (t) touches[t] = false;
   });
 
+  // Sur mobile, le panneau latéral est replié par défaut (pour laisser toute
+  // la place à la carte) et s'ouvre en tiroir via le bouton ☰, qui devient
+  // alors une croix pour le refermer.
+  function definirPanneauMobileOuvert(ouvert) {
+    const panneau = document.querySelector('.panneau');
+    const bouton = document.getElementById('btnPanneauMobile');
+    if (panneau) panneau.classList.toggle('ouvert', ouvert);
+    if (bouton) bouton.textContent = ouvert ? '✕' : '☰';
+  }
+
+  // L'ouvrir automatiquement dès qu'une sélection a quelque chose à montrer
+  // évite un aller-retour vers le bouton ☰.
+  function ouvrirPanneauMobile() {
+    definirPanneauMobileOuvert(true);
+  }
+
   function gererClicCarte(px, py) {
     const col = Math.floor((px / zoom + camera.x) / TAILLE_TUILE);
     const row = Math.floor((py / zoom + camera.y) / TAILLE_TUILE);
@@ -1393,6 +1409,7 @@
       villageoisSelectionneId = null;
       caseSelectionnee = { col, row, verrouillee: true };
       afficherSelection();
+      ouvrirPanneauMobile();
       return;
     }
 
@@ -1416,12 +1433,14 @@
       villageoisSelectionneId = cible.id;
       caseSelectionnee = null;
       afficherSelection();
+      ouvrirPanneauMobile();
       return;
     }
 
     villageoisSelectionneId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
+    ouvrirPanneauMobile();
   }
 
   // ============================================================
@@ -1459,6 +1478,7 @@
           propositionConstruction = null;
           masquerOverlayConstruction();
           fermerModalConstruction();
+          definirPanneauMobileOuvert(false);
           document.getElementById('btnModeConstruire').classList.add('mode-actif');
           document.getElementById('btnModeExplorer').classList.remove('mode-actif');
         });
@@ -2254,6 +2274,11 @@
 
   document.getElementById('btnZoomPlus').addEventListener('click', () => definirZoom(zoom * 1.3));
   document.getElementById('btnZoomMoins').addEventListener('click', () => definirZoom(zoom / 1.3));
+
+  // Tiroir du panneau latéral sur mobile (masqué par défaut via CSS, voir ouvrirPanneauMobile).
+  document.getElementById('btnPanneauMobile').addEventListener('click', () => {
+    definirPanneauMobileOuvert(!document.querySelector('.panneau').classList.contains('ouvert'));
+  });
 
   // ============================================================
   // Démarrage
