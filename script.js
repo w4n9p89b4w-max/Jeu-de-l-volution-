@@ -37,6 +37,7 @@
     entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage' },
     champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick' },
     enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage' },
+    feu:     { nom: 'Feu de camp',      emoji: '🔥', cout: { bois: 0, pierre: 0 },   biomes: ['plaine', 'foret', 'plage'], desc: 'Le cœur du campement', nonConstructible: true },
   };
 
 
@@ -125,7 +126,7 @@
       zonesDebloquees: new Set([4]),
       ressources: { bois: 20, pierre: 10, nourriture: 20 },
       villageois: [],
-      capacitePopulation: 8,
+      capacitePopulation: 4,
       niveau: 1,
       xp: 0,
       pointsTech: 0,
@@ -475,10 +476,44 @@
   // Initialisation / nouvelle partie
   // ============================================================
 
+  function placerCampementDepart() {
+    const centreCol = Math.round(COLONNES / 2);
+    const centreRow = Math.round(LIGNES / 2);
+
+    let feuPos = null;
+    for (let tentative = 0; tentative < 100 && !feuPos; tentative++) {
+      const col = Math.max(0, Math.min(COLONNES - 1, centreCol + Math.round(aleatoire(-4, 4))));
+      const row = Math.max(0, Math.min(LIGNES - 1, centreRow + Math.round(aleatoire(-4, 4))));
+      const cle = col + ',' + row;
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle)) continue;
+      if (!BATIMENTS.feu.biomes.includes(etat.tuiles[row][col])) continue;
+      feuPos = { col, row };
+    }
+    if (!feuPos) return;
+    etat.batiments.set(feuPos.col + ',' + feuPos.row, 'feu');
+
+    const decalages = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+    let maisonPos = null;
+    for (const [dc, dr] of decalages) {
+      const col = feuPos.col + dc, row = feuPos.row + dr;
+      if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) continue;
+      const cle = col + ',' + row;
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle)) continue;
+      if (!BATIMENTS.maison.biomes.includes(etat.tuiles[row][col])) continue;
+      maisonPos = { col, row };
+      break;
+    }
+    if (maisonPos) {
+      etat.batiments.set(maisonPos.col + ',' + maisonPos.row, 'maison');
+      etat.capacitePopulation += 4;
+    }
+  }
+
   function nouvellePartie() {
     etat = creerEtatInitial();
     etat.tuiles = genererCarte();
     etat.noeuds = genererNoeudsRessources();
+    placerCampementDepart();
     etat.villageois = genererVillageoisInitiaux(6);
     caseSelectionnee = null;
     modeConstruction = null;
@@ -752,6 +787,7 @@
     }
     palette.hidden = false;
     for (const [id, b] of Object.entries(BATIMENTS)) {
+      if (b.nonConstructible) continue;
       if (b.requiert && !etat.techsAcquises.has(b.requiert)) continue;
       const btn = document.createElement('button');
       btn.className = 'carte-batiment' + (modeConstruction === id ? ' selectionne' : '');
