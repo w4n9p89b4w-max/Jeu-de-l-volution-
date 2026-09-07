@@ -22,7 +22,6 @@
     plage:    { nom: 'Plage',    couleur: '#d9c789' },
     plaine:   { nom: 'Plaine',   couleur: '#7fae4e' },
     foret:    { nom: 'Forêt',    couleur: '#2f6b3a' },
-    riviere:  { nom: 'Rivière',  couleur: '#3d7fc4' },
     montagne: { nom: 'Montagne', couleur: '#8b8680' },
     carriere: { nom: 'Carrière', couleur: '#6f6459' },
     neige:    { nom: 'Neige',    couleur: '#eef3f5' },
@@ -83,11 +82,17 @@
     }
   }
 
+  const CATEGORIES_CONSTRUCTION = {
+    logement: 'Logement',
+    stockage: 'Stockage',
+    nourriture: 'Production alimentaire',
+  };
+
   const BATIMENTS = {
-    maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population', duree: 9 },
-    entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage', duree: 7 },
-    champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick', duree: 4 },
-    enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage', duree: 6 },
+    maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population', duree: 9, categorie: 'logement' },
+    entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage', duree: 7, categorie: 'stockage' },
+    champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick', duree: 4, categorie: 'nourriture' },
+    enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage', duree: 6, categorie: 'nourriture' },
     feu:     { nom: 'Feu de camp',      emoji: '🔥', cout: { bois: 0, pierre: 0 },   biomes: ['plaine', 'foret', 'plage'], desc: 'Le cœur du campement', nonConstructible: true },
   };
 
@@ -254,48 +259,6 @@
       tuiles.push(ligne);
     }
 
-    // Traçage de quelques rivières depuis des sommets vers l'océan. Chaque
-    // parcours (liste de cases consécutives) est conservé : la texture s'en
-    // sert pour dessiner un ruban continu (distance à la ligne brisée) plutôt
-    // que de peindre chaque case en aplat, ce qui évite l'effet « succession
-    // de carrés ».
-    const rivieres = [];
-    let tentativesRivieres = 0;
-    let riviereCreees = 0;
-    while (riviereCreees < 9 && tentativesRivieres < 900) {
-      tentativesRivieres++;
-      const c0 = Math.floor(Math.random() * COLONNES);
-      const r0 = Math.floor(Math.random() * LIGNES);
-      if (tuiles[r0][c0] !== 'montagne' && tuiles[r0][c0] !== 'neige') continue;
-
-      let col = c0, row = r0, pas = 0;
-      const parcours = [];
-      while (pas < 550) {
-        pas++;
-        parcours.push([col, row]);
-        if (tuiles[row][col] === 'ocean') break;
-        let meilleur = null, meilleurE = Infinity;
-        for (let dr = -1; dr <= 1; dr++) {
-          for (let dc = -1; dc <= 1; dc++) {
-            if (dr === 0 && dc === 0) continue;
-            const nc = col + dc, nr = row + dr;
-            if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
-            const ne = elevation(nc, nr);
-            if (ne < meilleurE) { meilleurE = ne; meilleur = [nc, nr]; }
-          }
-        }
-        if (!meilleur) break;
-        [col, row] = meilleur;
-      }
-      if (tuiles[row] && tuiles[row][col] === 'ocean' && parcours.length > 6) {
-        for (const [pc, pr] of parcours) {
-          if (tuiles[pr][pc] !== 'ocean') tuiles[pr][pc] = 'riviere';
-        }
-        riviereCreees++;
-        rivieres.push(parcours);
-      }
-    }
-
     // Lacs : toute étendue « ocean »/« plage » non reliée au bord de la carte
     // par une chaîne de cases océan/plage n'est pas reliée à la véritable mer
     // — c'est un lac. Les cases sont reclassées (lac / plaine-forêt à la
@@ -365,7 +328,7 @@
       }
     }
 
-    genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, rivieres, estCoteLac);
+    genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, estCoteLac);
 
     return tuiles;
   }
@@ -382,105 +345,36 @@
     ];
   }
 
-  // Distance d'un point à un segment [x1,y1]-[x2,y2] (coordonnées en cases).
-  function distancePointSegment(px, py, x1, y1, x2, y2) {
-    const dx = x2 - x1, dy = y2 - y1;
-    const lenCarre = dx * dx + dy * dy;
-    let t = lenCarre > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenCarre : 0;
-    t = Math.max(0, Math.min(1, t));
-    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-  }
-
-  // Rassemble, pour chaque case traversée par une rivière, les segments de
-  // son tracé (reliant le centre de chaque case au centre de la suivante).
-  // Un même segment est indexé sous ses deux cases d'extrémité, pour que le
-  // rendu fin d'une case puisse retrouver les segments qui la traversent.
-  function indexerSegmentsRivieres(rivieres) {
-    const parCase = new Map();
-    const ajouter = (col, row, seg) => {
-      const cle = col + ',' + row;
-      let liste = parCase.get(cle);
-      if (!liste) { liste = []; parCase.set(cle, liste); }
-      liste.push(seg);
-    };
-    for (const parcours of rivieres) {
-      for (let i = 0; i < parcours.length - 1; i++) {
-        const [c1, r1] = parcours[i];
-        const [c2, r2] = parcours[i + 1];
-        const seg = [c1 + 0.5, r1 + 0.5, c2 + 0.5, r2 + 0.5];
-        ajouter(c1, r1, seg);
-        ajouter(c2, r2, seg);
-      }
-    }
-    return parCase;
-  }
-
-  const RAYON_RIVIERE = 0.48; // en cases : largeur du ruban de la rivière
-
   // Construit la texture de terrain à partir du bruit continu lui-même plutôt
   // que de la grille de jeu (grossière) : chaque case est sous-échantillonnée
   // en une grille SOUS x SOUS (soit 100 points par case) et chaque point est
   // reclassé avec les mêmes seuils que la génération, donnant des frontières
   // organiques et nettes — sans flou et sans « puzzle » de blocs recollés.
-  // Les rivières sont dessinées comme un ruban continu (distance à la ligne
-  // brisée de leur tracé) plutôt qu'en aplat case par case, pour éviter
-  // l'effet de succession de carrés. La grille de jeu (sélection,
-  // construction, ressources) reste inchangée : seul le rendu visuel utilise
-  // cette résolution plus fine.
-  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, rivieres, estCoteLac) {
+  // La grille de jeu (sélection, construction, ressources) reste inchangée :
+  // seul le rendu visuel utilise cette résolution plus fine.
+  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, estCoteLac) {
     const SOUS = 10;
     const largeurPetite = COLONNES * SOUS;
     const hauteurPetite = LIGNES * SOUS;
     const buffer = new Uint8ClampedArray(largeurPetite * hauteurPetite * 4);
-    const segmentsParCase = indexerSegmentsRivieres(rivieres);
-
-    function classifier(fcol, frow, zoneLac) {
-      const e = elevation(fcol, frow);
-      const h = humBruit(fcol / 8, frow / 8, 4);
-      const p = pierreBruit(fcol / 6, frow / 6, 3);
-      let biome;
-      if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
-      else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
-      else if (e > 0.65) biome = 'neige';
-      else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
-      else biome = (h > 0.52 ? 'foret' : 'plaine');
-      return COULEUR_RGB_BIOME[biome];
-    }
 
     for (let row = 0; row < LIGNES; row++) {
       for (let col = 0; col < COLONNES; col++) {
         const zoneLac = estCoteLac[row * COLONNES + col] === 1;
-
-        // Segments de rivière voisins (case elle-même + 8 voisines) : c'est
-        // ce halo qui permet au ruban de franchir proprement les bords de
-        // case, plutôt que de s'arrêter net sur la case marquée « rivière ».
-        let segmentsProches = null;
-        for (let dr = -1; dr <= 1; dr++) {
-          for (let dc = -1; dc <= 1; dc++) {
-            const nc = col + dc, nr = row + dr;
-            if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
-            const liste = segmentsParCase.get(nc + ',' + nr);
-            if (!liste) continue;
-            if (!segmentsProches) segmentsProches = [];
-            for (const seg of liste) segmentsProches.push(seg);
-          }
-        }
-
         for (let sr = 0; sr < SOUS; sr++) {
           for (let sc = 0; sc < SOUS; sc++) {
             const fcol = col + (sc + 0.5) / SOUS;
             const frow = row + (sr + 0.5) / SOUS;
-            let rgb;
-            if (segmentsProches) {
-              let distMin = Infinity;
-              for (const [x1, y1, x2, y2] of segmentsProches) {
-                const d = distancePointSegment(fcol, frow, x1, y1, x2, y2);
-                if (d < distMin) distMin = d;
-              }
-              rgb = distMin <= RAYON_RIVIERE ? COULEUR_RGB_BIOME.riviere : classifier(fcol, frow, zoneLac);
-            } else {
-              rgb = classifier(fcol, frow, zoneLac);
-            }
+            const e = elevation(fcol, frow);
+            const h = humBruit(fcol / 8, frow / 8, 4);
+            const p = pierreBruit(fcol / 6, frow / 6, 3);
+            let biome;
+            if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
+            else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
+            else if (e > 0.65) biome = 'neige';
+            else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
+            else biome = (h > 0.52 ? 'foret' : 'plaine');
+            const rgb = COULEUR_RGB_BIOME[biome];
             const px = col * SOUS + sc, py = row * SOUS + sr;
             const idx = (py * largeurPetite + px) * 4;
             buffer[idx] = rgb[0];
@@ -510,7 +404,7 @@
   function genererNoeudsRessources() {
     const noeuds = new Map();
 
-    const tuilesParBiome = { foret: [], carriere: [], montagne: [], plaine: [], plage: [], eau: [] };
+    const tuilesParBiome = { foret: [], carriere: [], montagne: [], plaine: [], plage: [] };
     for (let row = 0; row < LIGNES; row++) {
       for (let col = 0; col < COLONNES; col++) {
         const b = etat.tuiles[row][col];
@@ -519,7 +413,6 @@
         else if (b === 'montagne') tuilesParBiome.montagne.push([col, row]);
         else if (b === 'plaine') tuilesParBiome.plaine.push([col, row]);
         else if (b === 'plage') tuilesParBiome.plage.push([col, row]);
-        else if (b === 'riviere' || b === 'ocean' || b === 'lac') tuilesParBiome.eau.push([col, row]);
       }
     }
 
@@ -577,7 +470,62 @@
     placerGroupes(tuilesParBiome.carriere, 'roche', 20, 3, 7, 2, ['carriere']);
     placerGroupes(tuilesParBiome.montagne, 'roche', 70, 3, 7, 2, ['montagne']);
     placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 3, 7, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 3, 7, 2, ['riviere', 'ocean', 'lac']);
+
+    // Zones de pêche : toute case de terre qui touche l'océan ou un lac est
+    // pêchable — pas de grappes éparses de poissons sur l'eau. Les cases
+    // côtières connectées entre elles forment ensemble une seule grande zone
+    // (même mécanique de zone que les forêts/carrières), ce qui fait du
+    // littoral une longue zone de pêche continue plutôt que des points isolés.
+    function placerZonesPeche() {
+      const estEau = (col, row) => {
+        const b = etat.tuiles[row][col];
+        return b === 'ocean' || b === 'lac';
+      };
+      const estCote = new Uint8Array(COLONNES * LIGNES);
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          if (estEau(col, row)) continue;
+          let cote = false;
+          for (let dr = -1; dr <= 1 && !cote; dr++) {
+            for (let dc = -1; dc <= 1 && !cote; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const nc = col + dc, nr = row + dr;
+              if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
+              if (estEau(nc, nr)) cote = true;
+            }
+          }
+          if (cote) estCote[row * COLONNES + col] = 1;
+        }
+      }
+
+      const visite = new Uint8Array(COLONNES * LIGNES);
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          const idx = row * COLONNES + col;
+          if (!estCote[idx] || visite[idx]) continue;
+          const zoneId = zoneIdCompteur++;
+          const pile = [[col, row]];
+          visite[idx] = 1;
+          while (pile.length) {
+            const [c, r] = pile.pop();
+            const cle = c + ',' + r;
+            if (!noeuds.has(cle)) noeuds.set(cle, { type: 'poisson', col: c, row: r, zoneId });
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const nc = c + dc, nr = r + dr;
+                if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
+                const nidx = nr * COLONNES + nc;
+                if (!estCote[nidx] || visite[nidx]) continue;
+                visite[nidx] = 1;
+                pile.push([nc, nr]);
+              }
+            }
+          }
+        }
+      }
+    }
+    placerZonesPeche();
 
     for (const noeud of noeuds.values()) {
       if (noeud.type === 'arbre') noeud.emoji = emojiArbre(noeud.col, noeud.row);
@@ -621,7 +569,7 @@
   function tuileMarchable(col, row) {
     if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return false;
     const b = etat.tuiles[row][col];
-    return b !== 'ocean' && b !== 'riviere' && b !== 'lac';
+    return b !== 'ocean' && b !== 'lac';
   }
 
   function trouverTuileMarchable(centreCol, centreRow, rayon) {
@@ -875,7 +823,6 @@
     modeConstruction = null;
     propositionConstruction = null;
     masquerOverlayConstruction();
-    mettreAJourPalette();
     afficherSelection();
     centrerCameraSurLeDepart();
     dessinerMinicarteFond();
@@ -1048,8 +995,13 @@
         } else if (zoneOk && batiment) {
           dessinerRessourceOuEmoji(BATIMENTS[batiment].emoji, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.88);
         } else if (zoneOk && noeud) {
-          const emojiNoeud = noeud.emoji || TYPES_RESSOURCE_NOEUD[noeud.type].emoji;
-          dessinerRessourceOuEmoji(emojiNoeud, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.92);
+          // Les zones de pêche couvrent tout le littoral (chaque case côtière
+          // est un nœud) : y dessiner une icône par case couvrirait toute la
+          // carte de poissons, donc aucun sprite n'est dessiné pour ce type.
+          if (noeud.type !== 'poisson') {
+            const emojiNoeud = noeud.emoji || TYPES_RESSOURCE_NOEUD[noeud.type].emoji;
+            dessinerRessourceOuEmoji(emojiNoeud, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.92);
+          }
           const nbTravailleurs = compterTravailleurs(cle);
           if (nbTravailleurs > 0) {
             ctx.fillStyle = '#0b1220';
@@ -1302,29 +1254,54 @@
   // Construction
   // ============================================================
 
-  function mettreAJourPalette() {
-    const palette = document.getElementById('paletteConstruction');
-    palette.innerHTML = '';
-    if (!modeConstruction && !document.getElementById('btnModeConstruire').classList.contains('mode-actif')) {
-      palette.hidden = true;
-      return;
-    }
-    palette.hidden = false;
+  // Regroupe les bâtiments constructibles par catégorie d'utilité dans le
+  // livre de construction (modale ouverte par le bouton « Construire »).
+  function remplirLivreConstruction() {
+    const livre = document.getElementById('livreConstruction');
+    livre.innerHTML = '';
+    const parCategorie = {};
     for (const [id, b] of Object.entries(BATIMENTS)) {
       if (b.nonConstructible) continue;
       if (b.requiert && !etat.techsAcquises.has(b.requiert)) continue;
-      const btn = document.createElement('button');
-      btn.className = 'carte-batiment' + (modeConstruction === id ? ' selectionne' : '');
-      const cout = coutBatiment(b);
-      btn.innerHTML = `<span>${b.emoji} ${b.nom}<br><small>${b.desc} · ⏱️${b.duree}s</small></span><span>🪵${cout.bois} 🪨${cout.pierre}</span>`;
-      btn.addEventListener('click', () => {
-        modeConstruction = (modeConstruction === id) ? null : id;
-        propositionConstruction = null;
-        masquerOverlayConstruction();
-        mettreAJourPalette();
-      });
-      palette.appendChild(btn);
+      const cle = b.categorie || 'autre';
+      if (!parCategorie[cle]) parCategorie[cle] = [];
+      parCategorie[cle].push([id, b]);
     }
+    for (const cle in CATEGORIES_CONSTRUCTION) {
+      const liste = parCategorie[cle];
+      if (!liste || liste.length === 0) continue;
+      const section = document.createElement('div');
+      section.className = 'categorie-construction';
+      section.innerHTML = `<h3>${CATEGORIES_CONSTRUCTION[cle]}</h3>`;
+      const palette = document.createElement('div');
+      palette.className = 'palette';
+      for (const [id, b] of liste) {
+        const btn = document.createElement('button');
+        btn.className = 'carte-batiment' + (modeConstruction === id ? ' selectionne' : '');
+        const cout = coutBatiment(b);
+        btn.innerHTML = `<span>${b.emoji} ${b.nom}<br><small>${b.desc} · ⏱️${b.duree}s</small></span><span>🪵${cout.bois} 🪨${cout.pierre}</span>`;
+        btn.addEventListener('click', () => {
+          modeConstruction = id;
+          propositionConstruction = null;
+          masquerOverlayConstruction();
+          fermerModalConstruction();
+          document.getElementById('btnModeConstruire').classList.add('mode-actif');
+          document.getElementById('btnModeExplorer').classList.remove('mode-actif');
+        });
+        palette.appendChild(btn);
+      }
+      section.appendChild(palette);
+      livre.appendChild(section);
+    }
+  }
+
+  function ouvrirModalConstruction() {
+    remplirLivreConstruction();
+    document.getElementById('modalConstruction').hidden = false;
+  }
+
+  function fermerModalConstruction() {
+    document.getElementById('modalConstruction').hidden = true;
   }
 
   function coutBatiment(b) {
@@ -1697,7 +1674,6 @@
     t.effet(etat.multiplicateurs);
     if (typeof t.zone === 'number') etat.zonesDebloquees.add(t.zone);
     notifier('🔬 Technologie acquise : ' + t.nom);
-    mettreAJourPalette();
     afficherModalTech();
   }
 
@@ -1770,16 +1746,6 @@
   // Légende des biomes
   // ============================================================
 
-  function initLegende() {
-    const ul = document.getElementById('legendeBiomes');
-    ul.innerHTML = '';
-    for (const [id, b] of Object.entries(BIOMES)) {
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="pastille" style="background:${b.couleur}"></span>${b.nom}`;
-      ul.appendChild(li);
-    }
-  }
-
   // ============================================================
   // Boucles principales
   // ============================================================
@@ -1832,13 +1798,11 @@
     masquerOverlayConstruction();
     document.getElementById('btnModeExplorer').classList.add('mode-actif');
     document.getElementById('btnModeConstruire').classList.remove('mode-actif');
-    document.getElementById('paletteConstruction').hidden = true;
   });
-  document.getElementById('btnModeConstruire').addEventListener('click', () => {
-    document.getElementById('btnModeConstruire').classList.add('mode-actif');
-    document.getElementById('btnModeExplorer').classList.remove('mode-actif');
-    document.getElementById('paletteConstruction').hidden = false;
-    mettreAJourPalette();
+  document.getElementById('btnModeConstruire').addEventListener('click', ouvrirModalConstruction);
+  document.getElementById('fermerConstruction').addEventListener('click', fermerModalConstruction);
+  document.getElementById('modalConstruction').addEventListener('click', (e) => {
+    if (e.target.id === 'modalConstruction') fermerModalConstruction();
   });
 
   document.getElementById('btnValiderConstruction').addEventListener('click', validerProposition);
@@ -1860,7 +1824,6 @@
   // Démarrage
   // ============================================================
 
-  initLegende();
   redimensionner();
   nouvellePartie();
   majInterface();

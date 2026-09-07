@@ -89,7 +89,6 @@
           <button id="btnModeExplorer" class="mode-actif">🔍 Explorer</button>
           <button id="btnModeConstruire">🏗️ Construire</button>
         </div>
-        <div id="paletteConstruction" class="palette" hidden></div>
       </section>
 
       <section class="bloc">
@@ -98,13 +97,19 @@
           <p class="astuce">Cliquez sur une case de la carte pour l'inspecter.</p>
         </div>
       </section>
-
-      <section class="bloc">
-        <h2>Légende des biomes</h2>
-        <ul class="legende" id="legendeBiomes"></ul>
-      </section>
     </aside>
   </main>
+
+  <div id="modalConstruction" class="modal" hidden>
+    <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>📖 Livre de construction</h2>
+        <button id="fermerConstruction">✕</button>
+      </div>
+      <p class="astuce">Choisissez un bâtiment, puis cliquez sur la carte pour proposer son emplacement.</p>
+      <div id="livreConstruction" class="livre-construction"></div>
+    </div>
+  </div>
 
   <div id="modalTech" class="modal" hidden>
     <div class="modal-contenu">
