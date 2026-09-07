@@ -102,6 +102,12 @@ button.mode-actif {
   transition: width 0.3s ease;
 }
 
+.ambiance {
+  font-size: 0.85rem;
+  color: var(--texte-att);
+  white-space: nowrap;
+}
+
 .vitesse {
   display: flex;
   gap: 0.5rem;

@@ -186,6 +186,9 @@
       pointsTech: 0,
       techsAcquises: new Set(),
       multiplicateurs: { bois: 1, pierre: 1, nourriture: 1, champ: 1, enclos: 1, natalite: 1, coutConstruction: 1, stockageBonus: 0 },
+      tempsJeu: DUREE_JOUR * 0.15, // démarre le matin
+      meteo: 'clair',
+      meteoMinuteur: aleatoire(35, 70),
     };
   }
 
@@ -1180,6 +1183,9 @@
         ctx.strokeRect(x + 1, y + 1, TAILLE_TUILE - 2, TAILLE_TUILE - 2);
       }
     }
+
+    dessinerObscurite();
+    dessinerPluie();
   }
 
   // ============================================================
@@ -1819,11 +1825,136 @@
 
     const requis = xpRequisPour(etat.niveau);
     document.getElementById('barreXpRemplie').style.width = Math.min(100, (etat.xp / requis) * 100) + '%';
+
+    const lum = luminosite();
+    const iconHeure = lum > 0.6 ? '☀️' : lum > 0.25 ? '🌅' : '🌙';
+    const texteHeure = lum > 0.6 ? 'Jour' : lum > 0.25 ? 'Crépuscule' : 'Nuit';
+    const iconMeteo = etat.meteo === 'pluie' ? ' · 🌧️ Pluie' : etat.meteo === 'nuageux' ? ' · ☁️ Nuageux' : '';
+    document.getElementById('stAmbiance').textContent = `${iconHeure} ${texteHeure}${iconMeteo}`;
   }
 
   // ============================================================
-  // Légende des biomes
+  // Ambiance : cycle jour/nuit, météo
   // ============================================================
+
+  const DUREE_JOUR = 300;             // secondes pour un cycle jour/nuit complet
+  const OBSCURITE_MAX = 0.72;         // opacité max de l'obscurité en pleine nuit
+  const RAYON_LUMIERE_FEU = TAILLE_TUILE * 4.5;
+  const METEO_TIRAGE = ['clair', 'clair', 'clair', 'clair', 'nuageux', 'nuageux', 'pluie'];
+
+  // Luminosité 0 (nuit noire) → 1 (plein jour), en douceur sur tout le cycle.
+  function luminosite() {
+    const phase = (etat.tempsJeu % DUREE_JOUR) / DUREE_JOUR;
+    return (1 + Math.cos((phase - 0.25) * Math.PI * 2)) / 2;
+  }
+
+  let gouttesPluie = [];
+
+  function mettreAJourAmbiance(dt) {
+    etat.tempsJeu += dt;
+
+    etat.meteoMinuteur -= dt;
+    if (etat.meteoMinuteur <= 0) {
+      etat.meteoMinuteur = aleatoire(35, 70);
+      const nouvelle = METEO_TIRAGE[Math.floor(Math.random() * METEO_TIRAGE.length)];
+      if (nouvelle !== etat.meteo) {
+        etat.meteo = nouvelle;
+        notifier(nouvelle === 'pluie' ? '🌧️ La pluie commence à tomber.' : nouvelle === 'nuageux' ? '☁️ Le ciel se couvre.' : '☀️ Le ciel se dégage.');
+      }
+    }
+
+    if (etat.meteo === 'pluie') {
+      const vw = canvas.clientWidth, vh = canvas.clientHeight;
+      while (gouttesPluie.length < 140) {
+        gouttesPluie.push({ x: Math.random() * vw, y: Math.random() * vh, vitesse: aleatoire(340, 480), longueur: aleatoire(8, 16) });
+      }
+      for (const g of gouttesPluie) {
+        g.y += g.vitesse * dt;
+        g.x -= g.vitesse * 0.18 * dt;
+        if (g.y > vh) { g.y = -g.longueur; g.x = Math.random() * vw; }
+        if (g.x < 0) g.x = vw;
+      }
+    } else if (gouttesPluie.length) {
+      gouttesPluie.length = 0;
+    }
+  }
+
+  // Calque hors-écran réutilisé pour l'obscurité : on y dessine le voile sombre
+  // puis on y perce des trous (destination-out) qui révèlent SA PROPRE
+  // transparence, avant de le poser tel quel sur la scène principale. Faire le
+  // destination-out directement sur le canvas principal effacerait les pixels
+  // déjà peints (terrain, bâtiments...) et révélerait le fond de la page derrière
+  // le <canvas>, produisant une tache sombre au lieu d'un halo de lumière.
+  let calqueObscurite = null;
+  let ctxCalqueObscurite = null;
+  function obtenirCalqueObscurite() {
+    if (!calqueObscurite || calqueObscurite.width !== canvas.width || calqueObscurite.height !== canvas.height) {
+      calqueObscurite = document.createElement('canvas');
+      calqueObscurite.width = canvas.width;
+      calqueObscurite.height = canvas.height;
+      ctxCalqueObscurite = calqueObscurite.getContext('2d');
+    }
+    return calqueObscurite;
+  }
+
+  // Assombrit la carte visible selon l'heure, en épargnant un halo de lumière
+  // autour de chaque feu de camp (seule source de lumière pour l'instant).
+  function dessinerObscurite() {
+    const obscurite = (1 - luminosite()) * OBSCURITE_MAX;
+    if (obscurite <= 0.01) return;
+
+    const vw = largeurVisible(), vh = hauteurVisible();
+    const calque = obtenirCalqueObscurite();
+    const cctx = ctxCalqueObscurite;
+    cctx.setTransform(1, 0, 0, 1, 0, 0);
+    cctx.clearRect(0, 0, calque.width, calque.height);
+    const echelle = zoom * ratioPixels;
+    cctx.setTransform(echelle, 0, 0, echelle, -camera.x * echelle, -camera.y * echelle);
+
+    cctx.fillStyle = `rgba(6, 10, 20, ${obscurite})`;
+    cctx.fillRect(camera.x, camera.y, vw, vh);
+
+    cctx.globalCompositeOperation = 'destination-out';
+    for (const [cle, type] of etat.batiments.entries()) {
+      if (type !== 'feu') continue;
+      const [col, row] = cle.split(',').map(Number);
+      const cx = col * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const cy = row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      if (cx < camera.x - RAYON_LUMIERE_FEU || cx > camera.x + vw + RAYON_LUMIERE_FEU) continue;
+      if (cy < camera.y - RAYON_LUMIERE_FEU || cy > camera.y + vh + RAYON_LUMIERE_FEU) continue;
+      const degrade = cctx.createRadialGradient(cx, cy, 0, cx, cy, RAYON_LUMIERE_FEU);
+      degrade.addColorStop(0, 'rgba(0,0,0,1)');
+      degrade.addColorStop(0.6, 'rgba(0,0,0,0.85)');
+      degrade.addColorStop(1, 'rgba(0,0,0,0)');
+      cctx.fillStyle = degrade;
+      cctx.beginPath();
+      cctx.arc(cx, cy, RAYON_LUMIERE_FEU, 0, Math.PI * 2);
+      cctx.fill();
+    }
+    cctx.globalCompositeOperation = 'source-over';
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(calque, 0, 0);
+    ctx.restore();
+  }
+
+  // Pluie en espace écran (indépendante du zoom/panoramique), dessinée
+  // au-dessus de tout le reste une fois le repère du monde réinitialisé.
+  function dessinerPluie() {
+    if (etat.meteo !== 'pluie' || gouttesPluie.length === 0) return;
+    ctx.save();
+    ctx.setTransform(ratioPixels, 0, 0, ratioPixels, 0, 0);
+    ctx.strokeStyle = 'rgba(190, 210, 235, 0.45)';
+    ctx.lineWidth = 1;
+    for (const g of gouttesPluie) {
+      ctx.beginPath();
+      ctx.moveTo(g.x, g.y);
+      ctx.lineTo(g.x - g.longueur * 0.18, g.y - g.longueur);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   // ============================================================
   // Boucles principales
@@ -1848,6 +1979,7 @@
 
     mettreAJourVillageois(dt);
     if (!enPause) mettreAJourChantiers(dt);
+    if (!enPause) mettreAJourAmbiance(dt);
     dessinerCarte(temps);
     dessinerMinicarte();
     requestAnimationFrame(boucleRendu);
