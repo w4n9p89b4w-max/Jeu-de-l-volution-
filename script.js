@@ -18,6 +18,7 @@
 
   const BIOMES = {
     ocean:    { nom: 'Océan',    couleur: '#1c4f7c' },
+    lac:      { nom: 'Lac',      couleur: '#2e7ea6' },
     plage:    { nom: 'Plage',    couleur: '#d9c789' },
     plaine:   { nom: 'Plaine',   couleur: '#7fae4e' },
     foret:    { nom: 'Forêt',    couleur: '#2f6b3a' },
@@ -253,7 +254,12 @@
       tuiles.push(ligne);
     }
 
-    // Traçage de quelques rivières depuis des sommets vers l'océan
+    // Traçage de quelques rivières depuis des sommets vers l'océan. Chaque
+    // parcours (liste de cases consécutives) est conservé : la texture s'en
+    // sert pour dessiner un ruban continu (distance à la ligne brisée) plutôt
+    // que de peindre chaque case en aplat, ce qui évite l'effet « succession
+    // de carrés ».
+    const rivieres = [];
     let tentativesRivieres = 0;
     let riviereCreees = 0;
     while (riviereCreees < 9 && tentativesRivieres < 900) {
@@ -286,10 +292,80 @@
           if (tuiles[pr][pc] !== 'ocean') tuiles[pr][pc] = 'riviere';
         }
         riviereCreees++;
+        rivieres.push(parcours);
       }
     }
 
-    genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit);
+    // Lacs : toute étendue « ocean »/« plage » non reliée au bord de la carte
+    // par une chaîne de cases océan/plage n'est pas reliée à la véritable mer
+    // — c'est un lac. Les cases sont reclassées (lac / plaine-forêt à la
+    // place du sable) et un halo d'une case autour de chaque lac est marqué
+    // pour que le rendu fin sache lisser ces bords sans sable, lui aussi.
+    const estCoteLac = new Uint8Array(COLONNES * LIGNES);
+    {
+      const estEauOuPlage = (col, row) => {
+        const b = tuiles[row][col];
+        return b === 'ocean' || b === 'plage';
+      };
+      const relieAuBord = new Uint8Array(COLONNES * LIGNES);
+      const pile = [];
+      const empiler = (col, row) => {
+        const idx = row * COLONNES + col;
+        if (relieAuBord[idx] || !estEauOuPlage(col, row)) return;
+        relieAuBord[idx] = 1;
+        pile.push(col, row);
+      };
+      for (let col = 0; col < COLONNES; col++) { empiler(col, 0); empiler(col, LIGNES - 1); }
+      for (let row = 0; row < LIGNES; row++) { empiler(0, row); empiler(COLONNES - 1, row); }
+      while (pile.length) {
+        const row = pile.pop(), col = pile.pop();
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nc = col + dc, nr = row + dr;
+            if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
+            empiler(nc, nr);
+          }
+        }
+      }
+
+      const estLac = new Uint8Array(COLONNES * LIGNES);
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          if (estEauOuPlage(col, row) && !relieAuBord[row * COLONNES + col]) {
+            estLac[row * COLONNES + col] = 1;
+          }
+        }
+      }
+
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          if (!estLac[row * COLONNES + col]) continue;
+          const b = tuiles[row][col];
+          if (b === 'ocean') tuiles[row][col] = 'lac';
+          else if (b === 'plage') {
+            const h = humBruit(col / 8, row / 8, 4);
+            tuiles[row][col] = h > 0.52 ? 'foret' : 'plaine';
+          }
+        }
+      }
+
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          let proche = false;
+          for (let dr = -1; dr <= 1 && !proche; dr++) {
+            for (let dc = -1; dc <= 1 && !proche; dc++) {
+              const nc = col + dc, nr = row + dr;
+              if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
+              if (estLac[nr * COLONNES + nc]) proche = true;
+            }
+          }
+          if (proche) estCoteLac[row * COLONNES + col] = 1;
+        }
+      }
+    }
+
+    genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, rivieres, estCoteLac);
 
     return tuiles;
   }
@@ -306,41 +382,104 @@
     ];
   }
 
+  // Distance d'un point à un segment [x1,y1]-[x2,y2] (coordonnées en cases).
+  function distancePointSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const lenCarre = dx * dx + dy * dy;
+    let t = lenCarre > 0 ? ((px - x1) * dx + (py - y1) * dy) / lenCarre : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  // Rassemble, pour chaque case traversée par une rivière, les segments de
+  // son tracé (reliant le centre de chaque case au centre de la suivante).
+  // Un même segment est indexé sous ses deux cases d'extrémité, pour que le
+  // rendu fin d'une case puisse retrouver les segments qui la traversent.
+  function indexerSegmentsRivieres(rivieres) {
+    const parCase = new Map();
+    const ajouter = (col, row, seg) => {
+      const cle = col + ',' + row;
+      let liste = parCase.get(cle);
+      if (!liste) { liste = []; parCase.set(cle, liste); }
+      liste.push(seg);
+    };
+    for (const parcours of rivieres) {
+      for (let i = 0; i < parcours.length - 1; i++) {
+        const [c1, r1] = parcours[i];
+        const [c2, r2] = parcours[i + 1];
+        const seg = [c1 + 0.5, r1 + 0.5, c2 + 0.5, r2 + 0.5];
+        ajouter(c1, r1, seg);
+        ajouter(c2, r2, seg);
+      }
+    }
+    return parCase;
+  }
+
+  const RAYON_RIVIERE = 0.48; // en cases : largeur du ruban de la rivière
+
   // Construit la texture de terrain à partir du bruit continu lui-même plutôt
   // que de la grille de jeu (grossière) : chaque case est sous-échantillonnée
   // en une grille SOUS x SOUS (soit 100 points par case) et chaque point est
   // reclassé avec les mêmes seuils que la génération, donnant des frontières
   // organiques et nettes — sans flou et sans « puzzle » de blocs recollés.
-  // La grille de jeu (sélection, construction, ressources) reste inchangée :
-  // seul le rendu visuel utilise cette résolution plus fine.
-  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit) {
+  // Les rivières sont dessinées comme un ruban continu (distance à la ligne
+  // brisée de leur tracé) plutôt qu'en aplat case par case, pour éviter
+  // l'effet de succession de carrés. La grille de jeu (sélection,
+  // construction, ressources) reste inchangée : seul le rendu visuel utilise
+  // cette résolution plus fine.
+  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, rivieres, estCoteLac) {
     const SOUS = 10;
     const largeurPetite = COLONNES * SOUS;
     const hauteurPetite = LIGNES * SOUS;
     const buffer = new Uint8ClampedArray(largeurPetite * hauteurPetite * 4);
+    const segmentsParCase = indexerSegmentsRivieres(rivieres);
+
+    function classifier(fcol, frow, zoneLac) {
+      const e = elevation(fcol, frow);
+      const h = humBruit(fcol / 8, frow / 8, 4);
+      const p = pierreBruit(fcol / 6, frow / 6, 3);
+      let biome;
+      if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
+      else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
+      else if (e > 0.65) biome = 'neige';
+      else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
+      else biome = (h > 0.52 ? 'foret' : 'plaine');
+      return COULEUR_RGB_BIOME[biome];
+    }
 
     for (let row = 0; row < LIGNES; row++) {
       for (let col = 0; col < COLONNES; col++) {
-        const estRiviere = tuiles[row][col] === 'riviere';
-        const coulRiviere = estRiviere ? COULEUR_RGB_BIOME.riviere : null;
+        const zoneLac = estCoteLac[row * COLONNES + col] === 1;
+
+        // Segments de rivière voisins (case elle-même + 8 voisines) : c'est
+        // ce halo qui permet au ruban de franchir proprement les bords de
+        // case, plutôt que de s'arrêter net sur la case marquée « rivière ».
+        let segmentsProches = null;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nc = col + dc, nr = row + dr;
+            if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
+            const liste = segmentsParCase.get(nc + ',' + nr);
+            if (!liste) continue;
+            if (!segmentsProches) segmentsProches = [];
+            for (const seg of liste) segmentsProches.push(seg);
+          }
+        }
+
         for (let sr = 0; sr < SOUS; sr++) {
           for (let sc = 0; sc < SOUS; sc++) {
+            const fcol = col + (sc + 0.5) / SOUS;
+            const frow = row + (sr + 0.5) / SOUS;
             let rgb;
-            if (estRiviere) {
-              rgb = coulRiviere;
+            if (segmentsProches) {
+              let distMin = Infinity;
+              for (const [x1, y1, x2, y2] of segmentsProches) {
+                const d = distancePointSegment(fcol, frow, x1, y1, x2, y2);
+                if (d < distMin) distMin = d;
+              }
+              rgb = distMin <= RAYON_RIVIERE ? COULEUR_RGB_BIOME.riviere : classifier(fcol, frow, zoneLac);
             } else {
-              const fcol = col + (sc + 0.5) / SOUS;
-              const frow = row + (sr + 0.5) / SOUS;
-              const e = elevation(fcol, frow);
-              const h = humBruit(fcol / 8, frow / 8, 4);
-              const p = pierreBruit(fcol / 6, frow / 6, 3);
-              let biome;
-              if (e < 0.30) biome = 'ocean';
-              else if (e < 0.35) biome = 'plage';
-              else if (e > 0.65) biome = 'neige';
-              else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
-              else biome = (h > 0.52 ? 'foret' : 'plaine');
-              rgb = COULEUR_RGB_BIOME[biome];
+              rgb = classifier(fcol, frow, zoneLac);
             }
             const px = col * SOUS + sc, py = row * SOUS + sr;
             const idx = (py * largeurPetite + px) * 4;
@@ -380,7 +519,7 @@
         else if (b === 'montagne') tuilesParBiome.montagne.push([col, row]);
         else if (b === 'plaine') tuilesParBiome.plaine.push([col, row]);
         else if (b === 'plage') tuilesParBiome.plage.push([col, row]);
-        else if (b === 'riviere' || b === 'ocean') tuilesParBiome.eau.push([col, row]);
+        else if (b === 'riviere' || b === 'ocean' || b === 'lac') tuilesParBiome.eau.push([col, row]);
       }
     }
 
@@ -438,7 +577,7 @@
     placerGroupes(tuilesParBiome.carriere, 'roche', 20, 3, 7, 2, ['carriere']);
     placerGroupes(tuilesParBiome.montagne, 'roche', 70, 3, 7, 2, ['montagne']);
     placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 3, 7, 2, ['plaine']);
-    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 3, 7, 2, ['riviere', 'ocean']);
+    placerGroupes(tuilesParBiome.eau, 'poisson', 42, 3, 7, 2, ['riviere', 'ocean', 'lac']);
 
     for (const noeud of noeuds.values()) {
       if (noeud.type === 'arbre') noeud.emoji = emojiArbre(noeud.col, noeud.row);
@@ -482,7 +621,7 @@
   function tuileMarchable(col, row) {
     if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return false;
     const b = etat.tuiles[row][col];
-    return b !== 'ocean' && b !== 'riviere';
+    return b !== 'ocean' && b !== 'riviere' && b !== 'lac';
   }
 
   function trouverTuileMarchable(centreCol, centreRow, rayon) {
