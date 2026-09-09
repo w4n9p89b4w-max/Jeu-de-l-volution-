@@ -39,6 +39,19 @@
   const DUREE_RECOLTE = 3;   // secondes passées sur la ressource avant de repartir
   const DUREE_ENFANCE = 60;  // secondes avant qu'un enfant devienne adulte et puisse travailler
   const DUREE_GESTATION_JOURS = 30; // jours de grossesse avant la naissance (voir DUREE_JOUR)
+  const DUREE_EXPLORATION_GROTTE = 5; // secondes passées à explorer une grotte
+  const PV_VILLAGEOIS = 100;
+
+  // Créatures hostiles : rôdent, poursuivent et attaquent les villageois.
+  // Un villageois équipé d'une épée (métier Garde) riposte automatiquement.
+  const TYPES_CREATURES = {
+    chauve_souris: { nom: 'Chauve-souris', emoji: '🦇', pv: 15, degats: 4,  vitesse: [55, 75], detection: 110, portee: 18, xp: 5 },
+    loup:          { nom: 'Loup',          emoji: '🐺', pv: 40, degats: 9,  vitesse: [38, 52], detection: 150, portee: 22, xp: 15 },
+    ours:          { nom: 'Ours',          emoji: '🐻', pv: 90, degats: 18, vitesse: [22, 32], detection: 130, portee: 26, xp: 30 },
+  };
+  const DUREE_ATTAQUE_CREATURE = 1.2; // secondes entre deux coups
+  const DEGATS_GARDE = 8;             // dégâts infligés en retour par un villageois armé d'une épée
+  const MAX_CREATURES = 6;
 
   // Outils assignables : chacun donne un métier et, pour la plupart, un bonus
   // de récolte sur le type de ressource correspondant.
@@ -218,6 +231,9 @@
       tuiles: [],      // biome par tuile
       noeuds: new Map(),    // "col,row" -> noeud de ressource
       batiments: new Map(), // "col,row" -> type de bâtiment
+      grottes: new Map(),   // "col,row" -> { col, row, exploree }
+      creatures: [],         // créatures hostiles en vadrouille
+      creatureMinuteur: aleatoire(30, 55),
       chantiers: [],        // constructions en cours : { type, cases, tempsRestant, dureeTotale }
       zonesDebloquees: new Set([4]),
       ressources: { bois: 20, pierre: 10, nourriture: 20 },
@@ -606,6 +622,31 @@
     return noeuds;
   }
 
+  // Grottes : points d'intérêt fixes sur les tuiles de montagne/carrière,
+  // explorables une fois par un villageois (voir explorerGrotte).
+  function genererGrottes() {
+    const grottes = new Map();
+    const candidats = [];
+    for (let row = 0; row < LIGNES; row++) {
+      for (let col = 0; col < COLONNES; col++) {
+        const b = etat.tuiles[row][col];
+        if (b === 'montagne' || b === 'carriere') candidats.push([col, row]);
+      }
+    }
+    if (candidats.length === 0) return grottes;
+    const nbGrottes = Math.round(aleatoire(6, 10));
+    const placees = [];
+    for (let essai = 0; essai < 400 && placees.length < nbGrottes; essai++) {
+      const [col, row] = candidats[Math.floor(Math.random() * candidats.length)];
+      const cle = col + ',' + row;
+      if (grottes.has(cle) || etat.noeuds.has(cle)) continue;
+      if (placees.some(([pc, pr]) => Math.hypot(pc - col, pr - row) < 10)) continue;
+      grottes.set(cle, { col, row, exploree: false });
+      placees.push([col, row]);
+    }
+    return grottes;
+  }
+
   // ============================================================
   // Villageois : entités animées (tâches assignées + errance au repos)
   // ============================================================
@@ -632,9 +673,15 @@
     return liste;
   }
 
+  // Un villageois est « libre » s'il n'a ni tâche, ni enfance, ni grotte en
+  // cours d'exploration, et n'est pas en train de fuir une créature.
+  function estVillageoisLibre(v) {
+    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.enFuite;
+  }
+
   function population_libre() {
     let n = 0;
-    for (const v of etat.villageois) if (v.assigneA === null && !v.estEnfant) n++;
+    for (const v of etat.villageois) if (estVillageoisLibre(v)) n++;
     return n;
   }
 
@@ -682,6 +729,11 @@
       enceinte: false,
       grossesseRestante: 0,
       pereId: null,
+      pv: PV_VILLAGEOIS,
+      pvMax: PV_VILLAGEOIS,
+      grotteAssignee: null,
+      tempsExploration: 0,
+      enFuite: false,
     };
   }
 
@@ -813,6 +865,48 @@
     }
 
     for (const v of etat.villageois) {
+      // Un villageois qui fuit une créature abandonne tout le reste et
+      // court vers le campement, plus vite que d'habitude.
+      if (v.enFuite) {
+        const base = trouverBase();
+        const d = Math.hypot(base.x - v.x, base.y - v.y);
+        v.travaille = false;
+        v.enMouvement = d > 4;
+        if (d > 4) {
+          const pas = Math.min(d, v.vitesseBase * 2.2 * dt);
+          v.x += (base.x - v.x) / d * pas;
+          v.y += (base.y - v.y) / d * pas;
+        } else {
+          v.enFuite = false;
+          v.mode = 'attente';
+          v.pause = aleatoire(1, 3);
+        }
+        continue;
+      }
+
+      // Exploration d'une grotte : marche jusqu'à l'entrée, puis reste sur
+      // place DUREE_EXPLORATION_GROTTE secondes avant de résoudre l'issue.
+      if (v.grotteAssignee) {
+        const grotte = etat.grottes.get(v.grotteAssignee);
+        if (!grotte) { v.grotteAssignee = null; v.mode = 'attente'; continue; }
+        const gx = grotte.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+        const gy = grotte.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+        const d = Math.hypot(gx - v.x, gy - v.y);
+        v.enMouvement = d > 2;
+        v.travaille = !v.enMouvement;
+        if (v.enMouvement) {
+          const pas = Math.min(d, v.vitesseBase * dt);
+          v.x += (gx - v.x) / d * pas;
+          v.y += (gy - v.y) / d * pas;
+        } else {
+          v.tempsExploration += dt;
+          if (v.tempsExploration >= DUREE_EXPLORATION_GROTTE) {
+            resoudreExplorationGrotte(v, grotte);
+          }
+        }
+        continue;
+      }
+
       if (v.mode === 'rapporte') {
         const d = Math.hypot(v.cibleX - v.x, v.cibleY - v.y);
         v.travaille = false;
@@ -893,6 +987,215 @@
     }
   }
 
+  // ============================================================
+  // Grottes : exploration à risque
+  // ============================================================
+
+  // Envoie un villageois libre explorer une grotte non explorée.
+  function explorerGrotte(grotte) {
+    if (grotte.exploree) return;
+    const libre = etat.villageois.find(estVillageoisLibre);
+    if (!libre) { notifier('❌ Aucun villageois disponible pour explorer.'); return; }
+    libre.grotteAssignee = grotte.col + ',' + grotte.row;
+    libre.tempsExploration = 0;
+    libre.mode = 'grotte';
+    notifier('🕯️ ' + libre.prenom + ' part explorer la grotte...');
+    afficherSelection();
+  }
+
+  // 60% de chances de trouver un trésor, 40% de réveiller des chauves-souris.
+  function resoudreExplorationGrotte(v, grotte) {
+    grotte.exploree = true;
+    v.grotteAssignee = null;
+    v.tempsExploration = 0;
+    v.mode = 'attente';
+    v.pause = aleatoire(0.5, 1.5);
+
+    if (Math.random() < 0.6) {
+      const cap = capaciteStockage();
+      const gains = { bois: Math.round(aleatoire(10, 25)), pierre: Math.round(aleatoire(10, 25)), nourriture: Math.round(aleatoire(10, 25)) };
+      for (const r in gains) etat.ressources[r] = Math.min(cap, etat.ressources[r] + gains[r]);
+      gagnerXp(15);
+      notifier('💎 ' + v.prenom + ' a trouvé un trésor dans la grotte ! (+' + gains.bois + '🪵 +' + gains.pierre + '🪨 +' + gains.nourriture + '🍖)');
+    } else {
+      const nb = Math.random() < 0.5 ? 1 : 2;
+      let creees = 0;
+      for (let i = 0; i < nb && etat.creatures.length < MAX_CREATURES; i++) {
+        creerCreature('chauve_souris', grotte.col, grotte.row);
+        creees++;
+      }
+      if (creees > 0) notifier('🦇 ' + v.prenom + ' a réveillé des chauves-souris dans la grotte !');
+      else notifier('🕳️ ' + v.prenom + ' ressort de la grotte les mains vides.');
+    }
+    afficherSelection();
+  }
+
+  // ============================================================
+  // Créatures hostiles : errance, poursuite, attaque
+  // ============================================================
+
+  let creatureIdCompteur = 0;
+
+  function creerCreature(type, col, row) {
+    const def = TYPES_CREATURES[type];
+    etat.creatures.push({
+      id: creatureIdCompteur++,
+      type,
+      x: col * TAILLE_TUILE + TAILLE_TUILE / 2,
+      y: row * TAILLE_TUILE + TAILLE_TUILE / 2,
+      pv: def.pv,
+      pvMax: def.pv,
+      cibleId: null,
+      mode: 'errance',
+      vitesseBase: aleatoire(def.vitesse[0], def.vitesse[1]),
+      pause: aleatoire(0, 2),
+      phase: Math.random() * Math.PI * 2,
+      tempsAttaque: 0,
+      cibleX: undefined,
+      cibleY: undefined,
+    });
+  }
+
+  // Fait apparaître une créature aléatoire dans un biome adapté à son type,
+  // avec un biais nocturne pour les loups et les ours.
+  function genererCreatureAleatoire() {
+    if (etat.creatures.length >= MAX_CREATURES) return;
+    const nuit = luminosite() < 0.4;
+    const tirage = Math.random();
+    let type;
+    if (tirage < (nuit ? 0.5 : 0.25)) type = 'loup';
+    else if (tirage < (nuit ? 0.65 : 0.35)) type = 'ours';
+    else type = 'chauve_souris';
+
+    const biomesValides = type === 'ours' ? ['montagne', 'foret']
+      : type === 'loup' ? ['foret', 'plaine']
+      : ['montagne', 'carriere', 'foret'];
+
+    for (let essai = 0; essai < 40; essai++) {
+      const col = Math.floor(Math.random() * COLONNES);
+      const row = Math.floor(Math.random() * LIGNES);
+      if (!etat.zonesDebloquees.has(zoneDeCase(col, row))) continue;
+      if (!biomesValides.includes(etat.tuiles[row][col])) continue;
+      creerCreature(type, col, row);
+      notifier(TYPES_CREATURES[type].emoji + ' Un(e) ' + TYPES_CREATURES[type].nom.toLowerCase() + ' rôde près du village...');
+      return;
+    }
+  }
+
+  // Un villageois attaqué perd des PV ; s'il meurt, il est retiré du
+  // village. S'il est encore en vie, sans épée et affaibli, il prend la fuite.
+  function infligerDegatsVillageois(v, degats, creature) {
+    v.pv -= degats;
+    if (v.pv <= 0) {
+      tuerVillageois(v, creature);
+      return;
+    }
+    if (v.outil !== 'epee' && v.pv < v.pvMax * 0.4 && !v.enFuite) {
+      v.enFuite = true;
+      v.assigneA = null;
+      v.grotteAssignee = null;
+      notifier('🏃 ' + v.prenom + ' fuit un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + ' !');
+    }
+  }
+
+  function tuerVillageois(v, creature) {
+    notifier('💀 ' + v.prenom + ' a été tué(e) par un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + '...');
+    if (v.partenaireId) {
+      const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
+      if (partenaire) partenaire.partenaireId = null;
+    }
+    etat.villageois = etat.villageois.filter(x => x.id !== v.id);
+    if (villageoisSelectionneId === v.id) {
+      villageoisSelectionneId = null;
+      afficherSelection();
+    }
+  }
+
+  function tuerCreature(c, tueur) {
+    const def = TYPES_CREATURES[c.type];
+    c.pv = 0;
+    notifier('⚔️ ' + tueur.prenom + ' a repoussé un(e) ' + def.nom.toLowerCase() + ' !');
+    gagnerXp(def.xp);
+    if (creatureSelectionneeId === c.id) {
+      creatureSelectionneeId = null;
+      afficherSelection();
+    }
+  }
+
+  function mettreAJourCreatures(dt) {
+    etat.creatureMinuteur -= dt;
+    if (etat.creatureMinuteur <= 0) {
+      etat.creatureMinuteur = aleatoire(30, 55);
+      genererCreatureAleatoire();
+    }
+
+    for (const c of etat.creatures) {
+      if (c.pv <= 0) continue;
+      const def = TYPES_CREATURES[c.type];
+
+      let cible = c.cibleId ? etat.villageois.find(v => v.id === c.cibleId && !v.estEnfant) : null;
+      if (cible && Math.hypot(cible.x - c.x, cible.y - c.y) > def.detection * 1.6) cible = null;
+      if (!cible) {
+        let meilleure = null, meilleureDist = def.detection;
+        for (const v of etat.villageois) {
+          if (v.estEnfant) continue;
+          const d = Math.hypot(v.x - c.x, v.y - c.y);
+          if (d < meilleureDist) { meilleureDist = d; meilleure = v; }
+        }
+        cible = meilleure;
+        c.cibleId = cible ? cible.id : null;
+      }
+
+      if (cible) {
+        const d = Math.hypot(cible.x - c.x, cible.y - c.y);
+        if (d <= def.portee) {
+          c.mode = 'attaque';
+          c.tempsAttaque += dt;
+          if (c.tempsAttaque >= DUREE_ATTAQUE_CREATURE) {
+            c.tempsAttaque = 0;
+            infligerDegatsVillageois(cible, def.degats, c);
+            if (cible.outil === 'epee' && c.pv > 0) {
+              c.pv -= DEGATS_GARDE;
+              if (c.pv <= 0) tuerCreature(c, cible);
+            }
+          }
+        } else {
+          c.mode = 'poursuite';
+          const pas = Math.min(d, c.vitesseBase * dt);
+          c.x += (cible.x - c.x) / d * pas;
+          c.y += (cible.y - c.y) / d * pas;
+        }
+        continue;
+      }
+
+      // Errance : petites promenades locales, seulement sur terrain marchable.
+      c.mode = 'errance';
+      if (c.cibleX === undefined) { c.cibleX = c.x; c.cibleY = c.y; }
+      const dErrance = Math.hypot(c.cibleX - c.x, c.cibleY - c.y);
+      if (dErrance < 2) {
+        c.pause -= dt;
+        if (c.pause <= 0) {
+          for (let essai = 0; essai < 6; essai++) {
+            const nx = c.x + aleatoire(-100, 100);
+            const ny = c.y + aleatoire(-100, 100);
+            const ncol = Math.round(nx / TAILLE_TUILE), nrow = Math.round(ny / TAILLE_TUILE);
+            if (!tuileMarchable(ncol, nrow)) continue;
+            c.cibleX = nx;
+            c.cibleY = ny;
+            break;
+          }
+          c.pause = aleatoire(2, 5);
+        }
+      } else {
+        const pas = Math.min(dErrance, c.vitesseBase * 0.6 * dt);
+        c.x += (c.cibleX - c.x) / dErrance * pas;
+        c.y += (c.cibleY - c.y) / dErrance * pas;
+      }
+    }
+
+    etat.creatures = etat.creatures.filter(c => c.pv > 0);
+  }
+
   function dessinerVillageois(temps) {
     const t = temps / 1000;
     const vw = largeurVisible(), vh = hauteurVisible();
@@ -943,7 +1246,63 @@
         ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
         ctx.fillText(OUTILS[v.outil].emoji, 8, -18);
       }
+      if (v.enFuite) {
+        ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
+        ctx.fillText('💨', -8, -18);
+      }
       ctx.restore();
+
+      if (v.pv < v.pvMax) {
+        const largeurBarre = 18;
+        const bx = x - largeurBarre / 2, by = y - TAILLE_TUILE * 0.62;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(bx, by, largeurBarre, 3);
+        ctx.fillStyle = v.pv < v.pvMax * 0.4 ? '#dc3d3d' : '#ffb84d';
+        ctx.fillRect(bx, by, largeurBarre * Math.max(0, v.pv / v.pvMax), 3);
+      }
+    }
+  }
+
+  function dessinerCreatures(temps) {
+    const t = temps / 1000;
+    const vw = largeurVisible(), vh = hauteurVisible();
+    for (const c of etat.creatures) {
+      const x = c.x, y = c.y;
+      if (x < camera.x - 20 || x > camera.x + vw + 20 || y < camera.y - 20 || y > camera.y + vh + 20) continue;
+      const def = TYPES_CREATURES[c.type];
+
+      const offsetY = c.mode === 'attaque'
+        ? Math.sin(t * 10 + c.phase) * 2
+        : Math.abs(Math.sin(t * 6 + c.phase)) * -1.5;
+
+      ctx.save();
+      ctx.translate(x, y + 3);
+      if (c.id === creatureSelectionneeId) {
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 10, 4, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = '#dc3d3d';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 6, 2.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+      ctx.translate(0, offsetY);
+      ctx.font = (TAILLE_TUILE * 0.62) + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.emoji, 0, -6);
+      ctx.restore();
+
+      if (c.pv < c.pvMax) {
+        const largeurBarre = 20;
+        const bx = x - largeurBarre / 2, by = y - TAILLE_TUILE * 0.6;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(bx, by, largeurBarre, 3);
+        ctx.fillStyle = '#dc3d3d';
+        ctx.fillRect(bx, by, largeurBarre * Math.max(0, c.pv / c.pvMax), 3);
+      }
     }
   }
 
@@ -995,10 +1354,12 @@
     etat = creerEtatInitial();
     etat.tuiles = genererCarte();
     etat.noeuds = genererNoeudsRessources();
+    etat.grottes = genererGrottes();
     placerCampementDepart();
     etat.villageois = genererVillageoisInitiaux(2);
     caseSelectionnee = null;
     villageoisSelectionneId = null;
+    creatureSelectionneeId = null;
     modeConstruction = null;
     propositionConstruction = null;
     masquerOverlayConstruction();
@@ -1045,6 +1406,7 @@
 
   let caseSelectionnee = null;
   let villageoisSelectionneId = null;
+  let creatureSelectionneeId = null;
   let modeConstruction = null;
   let caseSurvolee = null;
   let propositionConstruction = null;
@@ -1168,6 +1530,7 @@
         const noeud = etat.noeuds.get(cle);
         const batiment = etat.batiments.get(cle);
         const chantier = chantierParCle.get(cle);
+        const grotte = etat.grottes.get(cle);
         const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
 
         if (zoneOk && chantier) {
@@ -1197,6 +1560,11 @@
             ctx.font = 'bold 9px sans-serif';
             ctx.fillText(String(nbTravailleurs), x + TAILLE_TUILE - 6, y + 7);
           }
+        } else if (zoneOk && grotte) {
+          ctx.save();
+          if (grotte.exploree) ctx.globalAlpha = 0.45;
+          dessinerRessourceOuEmoji('🕳️', x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.85);
+          ctx.restore();
         }
 
         if (!zoneOk) {
@@ -1250,6 +1618,7 @@
     if (propositionConstruction) actualiserOverlayConstruction();
 
     dessinerVillageois(temps);
+    dessinerCreatures(temps);
 
     // Étiquette + cadenas au centre des zones verrouillées visibles
     for (let i = 0; i < 9; i++) {
@@ -1439,6 +1808,7 @@
     const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
     if (!zoneOk) {
       villageoisSelectionneId = null;
+      creatureSelectionneeId = null;
       caseSelectionnee = { col, row, verrouillee: true };
       afficherSelection();
       ouvrirPanneauMobile();
@@ -1452,8 +1822,8 @@
       return;
     }
 
-    // En mode exploration, un clic proche d'un villageois le sélectionne
-    // (outils / métier / famille) plutôt que la case sous-jacente.
+    // En mode exploration, un clic proche d'un villageois ou d'une créature
+    // le/la sélectionne plutôt que la case sous-jacente.
     const wx = px / zoom + camera.x;
     const wy = py / zoom + camera.y;
     let cible = null, meilleureDist = TAILLE_TUILE * 0.55;
@@ -1463,6 +1833,22 @@
     }
     if (cible) {
       villageoisSelectionneId = cible.id;
+      creatureSelectionneeId = null;
+      caseSelectionnee = null;
+      afficherSelection();
+      ouvrirPanneauMobile();
+      return;
+    }
+
+    let cibleCreature = null;
+    meilleureDist = TAILLE_TUILE * 0.55;
+    for (const c of etat.creatures) {
+      const d = Math.hypot(c.x - wx, c.y - wy);
+      if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
+    }
+    if (cibleCreature) {
+      creatureSelectionneeId = cibleCreature.id;
+      villageoisSelectionneId = null;
       caseSelectionnee = null;
       afficherSelection();
       ouvrirPanneauMobile();
@@ -1470,6 +1856,7 @@
     }
 
     villageoisSelectionneId = null;
+    creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
     ouvrirPanneauMobile();
@@ -1602,7 +1989,10 @@
     const metier = v.estEnfant ? 'Enfant' : (v.outil ? OUTILS[v.outil].metier : 'Sans métier');
     let statut;
     if (v.estEnfant) statut = 'Grandit encore ' + Math.max(0, Math.ceil(DUREE_ENFANCE - v.age)) + ' s';
+    else if (v.enFuite) statut = '🏃 En fuite';
+    else if (v.pv < v.pvMax * 0.5) statut = '🩸 Blessé(e)';
     else if (v.enceinte) statut = '🤰 Enceinte';
+    else if (v.grotteAssignee) statut = '🕯️ Explore une grotte';
     else if (v.assigneA) statut = 'Au travail';
     else statut = 'Libre';
     return `<button class="carte-villageois" data-id="${v.id}">
@@ -1737,7 +2127,7 @@
     for (const { col: c, row: r, cle } of cases) {
       const biome = etat.tuiles[r][c];
       if (!def.biomes.includes(biome)) valide = false;
-      if (etat.batiments.has(cle) || etat.noeuds.has(cle) || caseEnChantier(cle)) valide = false;
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle) || etat.grottes.has(cle) || caseEnChantier(cle)) valide = false;
       if (!etat.zonesDebloquees.has(zoneDeCase(c, r))) valide = false;
     }
     return { valide, cases };
@@ -1765,7 +2155,7 @@
         notifier('❌ Impossible de construire un(e) ' + def.nom.toLowerCase() + ' sur une case de type ' + BIOMES[biome].nom + '.');
         return;
       }
-      if (etat.batiments.has(cle) || etat.noeuds.has(cle) || caseEnChantier(cle)) {
+      if (etat.batiments.has(cle) || etat.noeuds.has(cle) || etat.grottes.has(cle) || caseEnChantier(cle)) {
         notifier('❌ Cette case est déjà occupée.');
         return;
       }
@@ -1911,6 +2301,9 @@
     const genreTxt = v.genre === 'f' ? 'Femme' : 'Homme';
     const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
     let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${v.estEnfant ? ' · Enfant' : ''}<br>Métier : <b>${metier}</b></p>`;
+    if (v.pv < v.pvMax) html += `<p>❤️ PV : ${Math.max(0, Math.round(v.pv))} / ${v.pvMax}</p>`;
+    if (v.enFuite) html += '<p>🏃 En fuite — court se réfugier au campement.</p>';
+    if (v.grotteAssignee) html += '<p>🕯️ En train d\'explorer une grotte...</p>';
 
     if (v.estEnfant) {
       const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
@@ -1958,10 +2351,30 @@
     }
   }
 
+  // Panneau de sélection d'une créature hostile : type, PV, état, et un
+  // rappel que seul un villageois armé d'une épée se défend automatiquement.
+  function afficherSelectionCreature(conteneur) {
+    const c = etat.creatures.find(x => x.id === creatureSelectionneeId);
+    if (!c) {
+      creatureSelectionneeId = null;
+      afficherSelection();
+      return;
+    }
+    const def = TYPES_CREATURES[c.type];
+    const etatTxt = c.mode === 'attaque' ? '⚔️ Attaque' : c.mode === 'poursuite' ? '🏃 Poursuite' : '🚶 Errance';
+    conteneur.innerHTML = `<h3>${def.emoji} ${def.nom}</h3>
+      <p>PV : ${Math.max(0, Math.round(c.pv))} / ${c.pvMax}<br>État : ${etatTxt}</p>
+      <p class="astuce">Équipez un villageois d'une épée (métier Garde) pour qu'il se défende automatiquement quand il est attaqué.</p>`;
+  }
+
   function afficherSelection() {
     const conteneur = document.getElementById('contenuSelection');
     if (villageoisSelectionneId !== null) {
       afficherSelectionVillageois(conteneur);
+      return;
+    }
+    if (creatureSelectionneeId !== null) {
+      afficherSelectionCreature(conteneur);
       return;
     }
     if (!caseSelectionnee) {
@@ -1977,6 +2390,7 @@
     const biome = etat.tuiles[row][col];
     const cle = col + ',' + row;
     const noeud = etat.noeuds.get(cle);
+    const grotte = etat.grottes.get(cle);
     let batiment = etat.batiments.get(cle);
     let batimentCol = col, batimentRow = row;
     if (batiment === 'zone_secondaire') {
@@ -2032,6 +2446,17 @@
         <span>👥 ${idle} libres</span>
         <button id="btnAssigner" ${(idle <= 0 || travailleursZone >= capaciteZone) ? 'disabled' : ''}>+ Assigner</button>
       </div>`;
+    } else if (grotte) {
+      if (grotte.exploree) {
+        html += '<p>🕳️ <b>Grotte</b><br>Déjà explorée.</p>';
+      } else {
+        const idle = population_libre();
+        html += '<p>🕳️ <b>Grotte inexplorée</b><br>Envoyez un villageois l\'explorer : trésor ou danger...</p>';
+        html += `<div class="ligne-action">
+          <button id="btnExplorerGrotte" ${idle <= 0 ? 'disabled' : ''}>🕯️ Explorer</button>
+          <span>👥 ${idle} libres</span>
+        </div>`;
+      }
     } else {
       html += '<p class="astuce">Case libre. Passez en mode Construire pour y bâtir quelque chose.</p>';
     }
@@ -2041,13 +2466,16 @@
     const btnD = document.getElementById('btnDemolir');
     if (btnD) btnD.addEventListener('click', () => demolirBatiment(batimentCol, batimentRow, batiment));
 
+    const btnExplorer = document.getElementById('btnExplorerGrotte');
+    if (btnExplorer) btnExplorer.addEventListener('click', () => explorerGrotte(grotte));
+
     const btnA = document.getElementById('btnAssigner');
     const btnR = document.getElementById('btnRetirer');
     if (btnA) btnA.addEventListener('click', () => {
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const zone = noeudsDeLaZone(noeud.zoneId);
       const cibleNoeud = zone.find(n => compterTravailleurs(n.col + ',' + n.row) < def.max);
-      const libre = etat.villageois.find(v => v.assigneA === null && !v.estEnfant);
+      const libre = etat.villageois.find(estVillageoisLibre);
       if (cibleNoeud && libre) libre.assigneA = cibleNoeud.col + ',' + cibleNoeud.row;
       afficherSelection();
     });
@@ -2507,6 +2935,7 @@
     mettreAJourVillageois(dt);
     if (!enPause) mettreAJourChantiers(dt);
     if (!enPause) mettreAJourAmbiance(dt);
+    if (!enPause) mettreAJourCreatures(dt);
     dessinerCarte(temps);
     dessinerMinicarte();
     requestAnimationFrame(boucleRendu);
@@ -2516,7 +2945,7 @@
     setInterval(() => {
       if (!enPause) tick();
       majInterface();
-      if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionneId !== null) afficherSelection();
+      if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionneId !== null || creatureSelectionneeId !== null) afficherSelection();
       if (!document.getElementById('modalVillage').hidden) afficherModalVillage();
     }, TICK_MS);
   }
