@@ -202,9 +202,16 @@
   // ============================================================
 
   function creerGenerateurBruit(graine) {
+    // Hachage entier (mélange par multiplications/décalages, façon xxhash)
+    // plutôt qu'un hachage à base de Math.sin : nettement plus rapide sans
+    // rien perdre en qualité de bruit, ce qui accélère toute la génération
+    // de carte (des millions d'échantillons sont tirés pour la texture fine).
+    const grainInt = Math.floor(graine * 100003) | 0;
     function hachage(ix, iy) {
-      const s = Math.sin(ix * 127.1 + iy * 311.7 + graine * 74.7) * 43758.5453123;
-      return s - Math.floor(s);
+      let h = Math.imul(ix | 0, 374761393) ^ Math.imul(iy | 0, 668265263) ^ grainInt;
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
     }
     function bruit(x, y) {
       const x0 = Math.floor(x), y0 = Math.floor(y);
@@ -377,27 +384,85 @@
         }
       }
 
-      const estLac = new Uint8Array(COLONNES * LIGNES);
+      const estEauInterieure = new Uint8Array(COLONNES * LIGNES);
       for (let row = 0; row < LIGNES; row++) {
         for (let col = 0; col < COLONNES; col++) {
           if (estEauOuPlage(col, row) && !relieAuBord[row * COLONNES + col]) {
-            estLac[row * COLONNES + col] = 1;
+            estEauInterieure[row * COLONNES + col] = 1;
+          }
+        }
+      }
+
+      // Cases qui deviendraient un lac : uniquement les cases « ocean »
+      // d'origine à l'intérieur (les cases « plage » du groupe redeviennent
+      // toujours de la terre, qu'elles fassent partie d'un lac gardé ou non).
+      // Un même groupe eau+plage peut receler plusieurs poches d'« ocean »
+      // séparées par de la plage qui, elle, redeviendra terre : c'est donc
+      // sur CETTE forme finale qu'il faut mesurer chaque poche, pas sur le
+      // groupe entier avant retrait de sa plage, sans quoi une poche trop
+      // petite peut se cacher dans un groupe globalement assez grand.
+      const estLacBrut = new Uint8Array(COLONNES * LIGNES);
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          const idx = row * COLONNES + col;
+          if (estEauInterieure[idx] && tuiles[row][col] === 'ocean') estLacBrut[idx] = 1;
+        }
+      }
+
+      // Filtre les petites flaques : toute poche d'« ocean » intérieur dont
+      // la boîte englobante est plus petite que TAILLE_MIN_LAC cases dans un
+      // sens ou l'autre est comblée plutôt que conservée comme lac — on ne
+      // garde que de vraies étendues d'eau.
+      const TAILLE_MIN_LAC = 5;
+      const estLac = new Uint8Array(estLacBrut);
+      const visiteComposante = new Uint8Array(COLONNES * LIGNES);
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          const idx0 = row * COLONNES + col;
+          if (!estLacBrut[idx0] || visiteComposante[idx0]) continue;
+          const composante = [];
+          let minC = col, maxC = col, minR = row, maxR = row;
+          const pileC = [col, row];
+          visiteComposante[idx0] = 1;
+          while (pileC.length) {
+            const r = pileC.pop(), c = pileC.pop();
+            composante.push(c, r);
+            if (c < minC) minC = c; if (c > maxC) maxC = c;
+            if (r < minR) minR = r; if (r > maxR) maxR = r;
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const nc = c + dc, nr = r + dr;
+                if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
+                const nidx = nr * COLONNES + nc;
+                if (!estLacBrut[nidx] || visiteComposante[nidx]) continue;
+                visiteComposante[nidx] = 1;
+                pileC.push(nc, nr);
+              }
+            }
+          }
+          if (maxC - minC + 1 < TAILLE_MIN_LAC || maxR - minR + 1 < TAILLE_MIN_LAC) {
+            for (let i = 0; i < composante.length; i += 2) estLac[composante[i + 1] * COLONNES + composante[i]] = 0;
           }
         }
       }
 
       for (let row = 0; row < LIGNES; row++) {
         for (let col = 0; col < COLONNES; col++) {
-          if (!estLac[row * COLONNES + col]) continue;
+          const idx = row * COLONNES + col;
+          if (!estEauInterieure[idx]) continue;
           const b = tuiles[row][col];
-          if (b === 'ocean') tuiles[row][col] = 'lac';
-          else if (b === 'plage') {
+          if (estLac[idx]) {
+            tuiles[row][col] = 'lac';
+          } else if (b === 'plage' || b === 'ocean') {
             const h = humBruit(col / 8, row / 8, 4);
             tuiles[row][col] = h > 0.52 ? 'foret' : 'plaine';
           }
         }
       }
 
+      // Halo d'une case autour de chaque vrai lac conservé, pour que le
+      // rendu fin sache y lisser la plage en terre au lieu de sable.
       for (let row = 0; row < LIGNES; row++) {
         for (let col = 0; col < COLONNES; col++) {
           let proche = false;
@@ -411,9 +476,21 @@
           if (proche) estCoteLac[row * COLONNES + col] = 1;
         }
       }
-    }
 
-    genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, estCoteLac);
+      // Cases à rendre systématiquement en terre à l'affichage fin, même là
+      // où le bruit brut plongerait sous le seuil d'océan : toute case d'eau
+      // intérieure comblée (trop petite pour former un lac) qui n'est pas
+      // dans le halo d'un vrai lac voisin conservé.
+      const estComble = new Uint8Array(COLONNES * LIGNES);
+      for (let row = 0; row < LIGNES; row++) {
+        for (let col = 0; col < COLONNES; col++) {
+          const idx = row * COLONNES + col;
+          if (estEauInterieure[idx] && !estLac[idx] && !estCoteLac[idx]) estComble[idx] = 1;
+        }
+      }
+
+      genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, estCoteLac, estComble);
+    }
 
     return tuiles;
   }
@@ -437,8 +514,8 @@
   // organiques et nettes — sans flou et sans « puzzle » de blocs recollés.
   // La grille de jeu (sélection, construction, ressources) reste inchangée :
   // seul le rendu visuel utilise cette résolution plus fine.
-  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, estCoteLac) {
-    const SOUS = 10;
+  function genererTextureTerrain(tuiles, elevation, humBruit, pierreBruit, estCoteLac, estComble) {
+    const SOUS = 6; // sous-échantillonnage réduit (était 10) : carte bien plus rapide à générer, lissée pareil à l'affichage
     const largeurPetite = COLONNES * SOUS;
     const hauteurPetite = LIGNES * SOUS;
     const buffer = new Uint8ClampedArray(largeurPetite * hauteurPetite * 4);
@@ -450,6 +527,7 @@
         // genererCarte), on n'a donc pas besoin de rééchantillonner le bruit.
         const surBordure = row === 0 || row === LIGNES - 1 || col === 0 || col === COLONNES - 1;
         const zoneLac = estCoteLac[row * COLONNES + col] === 1;
+        const comble = estComble[row * COLONNES + col] === 1;
         for (let sr = 0; sr < SOUS; sr++) {
           for (let sc = 0; sc < SOUS; sc++) {
             let rgb;
@@ -458,15 +536,21 @@
             } else {
               const fcol = col + (sc + 0.5) / SOUS;
               const frow = row + (sr + 0.5) / SOUS;
-              const e = elevation(fcol, frow);
               const h = humBruit(fcol / 8, frow / 8, 4);
-              const p = pierreBruit(fcol / 6, frow / 6, 3);
               let biome;
-              if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
-              else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
-              else if (e > 0.65) biome = 'neige';
-              else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
-              else biome = (h > 0.52 ? 'foret' : 'plaine');
+              if (comble) {
+                // Petite flaque comblée en terre : jamais rendue comme eau,
+                // même là où le bruit brut serait sous le seuil d'océan.
+                biome = h > 0.52 ? 'foret' : 'plaine';
+              } else {
+                const e = elevation(fcol, frow);
+                const p = pierreBruit(fcol / 6, frow / 6, 3);
+                if (e < 0.30) biome = zoneLac ? 'lac' : 'ocean';
+                else if (e < 0.35) biome = zoneLac ? (h > 0.52 ? 'foret' : 'plaine') : 'plage';
+                else if (e > 0.65) biome = 'neige';
+                else if (e > 0.60) biome = (p > 0.55 ? 'carriere' : 'montagne');
+                else biome = (h > 0.52 ? 'foret' : 'plaine');
+              }
               rgb = COULEUR_RGB_BIOME[biome];
             }
             const px = col * SOUS + sc, py = row * SOUS + sr;
@@ -566,11 +650,13 @@
     placerGroupes(tuilesParBiome.montagne, 'roche', 70, 3, 7, 2, ['montagne']);
     placerGroupes(tuilesParBiome.plaine, 'gibier', 90, 3, 7, 2, ['plaine']);
 
-    // Zones de pêche : toute case de terre qui touche l'océan ou un lac est
-    // pêchable — pas de grappes éparses de poissons sur l'eau. Les cases
-    // côtières connectées entre elles forment ensemble une seule grande zone
-    // (même mécanique de zone que les forêts/carrières), ce qui fait du
-    // littoral une longue zone de pêche continue plutôt que des points isolés.
+    // Zones de pêche : toute case d'eau (océan ou lac) qui touche la terre
+    // est pêchable — les nœuds sont posés sur l'eau elle-même (le villageois
+    // se poste sur la berge la plus proche pour y travailler, voir
+    // pointApprochePourNoeud). Les cases d'eau côtières connectées entre
+    // elles forment ensemble une seule grande zone (même mécanique de zone
+    // que les forêts/carrières), ce qui fait du littoral une longue zone de
+    // pêche continue plutôt que des points isolés.
     function placerZonesPeche() {
       const estEau = (col, row) => {
         const b = etat.tuiles[row][col];
@@ -579,14 +665,14 @@
       const estCote = new Uint8Array(COLONNES * LIGNES);
       for (let row = 0; row < LIGNES; row++) {
         for (let col = 0; col < COLONNES; col++) {
-          if (estEau(col, row)) continue;
+          if (!estEau(col, row)) continue;
           let cote = false;
           for (let dr = -1; dr <= 1 && !cote; dr++) {
             for (let dc = -1; dc <= 1 && !cote; dc++) {
               if (dr === 0 && dc === 0) continue;
               const nc = col + dc, nr = row + dr;
               if (nc < 0 || nr < 0 || nc >= COLONNES || nr >= LIGNES) continue;
-              if (estEau(nc, nr)) cote = true;
+              if (!estEau(nc, nr)) cote = true;
             }
           }
           if (cote) estCote[row * COLONNES + col] = 1;
@@ -765,6 +851,15 @@
     return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.dansGrotte && !v.enFuite;
   }
 
+  // Un outil spécialisé (hache, pioche, arc, canne) ne peut travailler que le
+  // type de nœud qui lui correspond ; sans outil ou avec un outil non lié à
+  // une ressource (torche, épée), n'importe quel type de nœud convient.
+  function outilCompatibleAvecNoeud(outilId, typeNoeud) {
+    if (!outilId) return true;
+    const cible = OUTILS[outilId].noeudCible;
+    return !cible || cible === typeNoeud;
+  }
+
   function population_libre() {
     let n = 0;
     for (const v of etat.villageois) if (estVillageoisLibre(v)) n++;
@@ -786,6 +881,129 @@
     return { col: Math.round(centreCol), row: Math.round(centreRow) };
   }
 
+  // ------------------------------------------------------------
+  // Déplacement des villageois : chemins évitant l'eau (les villageois ne
+  // savent pas nager, contrairement à l'ancien déplacement en ligne droite).
+  // ------------------------------------------------------------
+
+  const VOISINS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+  // Chemin le plus court (BFS 8 directions, sans couper les coins d'eau)
+  // entre deux cases praticables, cherché dans une boîte englobante marginée
+  // pour rester rapide dans le cas courant. Si aucun chemin n'y est trouvé
+  // (un grand lac fait un détour plus large que prévu), la marge est élargie
+  // par paliers jusqu'à couvrir la carte entière au besoin.
+  function trouverChemin(colA, rowA, colB, rowB) {
+    if (colA === colB && rowA === rowB) return [];
+    if (!tuileMarchable(colB, rowB)) return null;
+    for (const marge of [8, 25, Math.max(COLONNES, LIGNES)]) {
+      const chemin = trouverCheminAvecMarge(colA, rowA, colB, rowB, marge);
+      if (chemin) return chemin;
+    }
+    return null;
+  }
+
+  function trouverCheminAvecMarge(colA, rowA, colB, rowB, marge) {
+    const minCol = Math.max(0, Math.min(colA, colB) - marge);
+    const maxCol = Math.min(COLONNES - 1, Math.max(colA, colB) + marge);
+    const minRow = Math.max(0, Math.min(rowA, rowB) - marge);
+    const maxRow = Math.min(LIGNES - 1, Math.max(rowA, rowB) + marge);
+
+    const depart = colA + ',' + rowA;
+    const arrivee = colB + ',' + rowB;
+    const visite = new Set([depart]);
+    const precedent = new Map();
+    const file = [[colA, rowA]];
+    let qi = 0, trouve = false;
+    while (qi < file.length && !trouve) {
+      const [c, r] = file[qi++];
+      for (const [dc, dr] of VOISINS8) {
+        const nc = c + dc, nr = r + dr;
+        if (nc < minCol || nc > maxCol || nr < minRow || nr > maxRow) continue;
+        if (!tuileMarchable(nc, nr)) continue;
+        // Interdit de couper en diagonale le coin d'une case d'eau.
+        if (dc !== 0 && dr !== 0 && (!tuileMarchable(c + dc, r) || !tuileMarchable(c, r + dr))) continue;
+        const cle = nc + ',' + nr;
+        if (visite.has(cle)) continue;
+        visite.add(cle);
+        precedent.set(cle, c + ',' + r);
+        file.push([nc, nr]);
+        if (nc === colB && nr === rowB) { trouve = true; break; }
+      }
+    }
+    if (!trouve) return null;
+
+    const chemin = [];
+    let cle = arrivee;
+    while (cle !== depart) {
+      const [c, r] = cle.split(',').map(Number);
+      chemin.push({ col: c, row: r });
+      const prec = precedent.get(cle);
+      if (!prec) return null;
+      cle = prec;
+    }
+    chemin.reverse();
+    return chemin;
+  }
+
+  // Fait avancer un villageois vers (cibleX, cibleY) en suivant un chemin
+  // évitant l'eau (calculé une fois par destination puis mis en cache sur le
+  // villageois, recalculé seulement si la destination change de case), à la
+  // vitesse donnée. Retourne true dès que la destination finale est atteinte.
+  function avancerVersCible(v, cibleX, cibleY, vitesse, dt, seuil = 2) {
+    // Math.floor, pas Math.round : un pixel de centre de case (col*T + T/2)
+    // vaut toujours col+0.5 case, et Math.round arrondit un .5 vers le haut,
+    // ce qui décale silencieusement la case visée d'une case (potentiellement
+    // vers l'eau). Math.floor retrouve toujours la bonne case, y compris
+    // pour les cibles décalées (léger jitter d'errance, poste de travail).
+    const finalCol = Math.floor(cibleX / TAILLE_TUILE);
+    const finalRow = Math.floor(cibleY / TAILLE_TUILE);
+    if (!v.chemin || v.cheminCol !== finalCol || v.cheminRow !== finalRow) {
+      const col = Math.floor(v.x / TAILLE_TUILE), row = Math.floor(v.y / TAILLE_TUILE);
+      v.chemin = trouverChemin(col, row, finalCol, finalRow) || [];
+      v.cheminCol = finalCol;
+      v.cheminRow = finalRow;
+    }
+
+    let tx = cibleX, ty = cibleY;
+    if (v.chemin.length > 0) {
+      const etape = v.chemin[0];
+      tx = etape.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+      ty = etape.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+    }
+
+    const d = Math.hypot(tx - v.x, ty - v.y);
+    const seuilEtape = v.chemin.length > 0 ? 3 : seuil;
+    if (d < seuilEtape) {
+      if (v.chemin.length > 0) {
+        v.chemin.shift();
+        return false;
+      }
+      return true;
+    }
+    const pas = Math.min(d, vitesse * dt);
+    v.x += (tx - v.x) / d * pas;
+    v.y += (ty - v.y) / d * pas;
+    return false;
+  }
+
+  // Point où un villageois se poste pour travailler un nœud : la case du
+  // nœud elle-même si elle est praticable, sinon la berge praticable la plus
+  // proche (cas des zones de pêche, posées sur l'eau elle-même).
+  function pointApprochePourNoeud(noeud) {
+    if (tuileMarchable(noeud.col, noeud.row)) return { col: noeud.col, row: noeud.row };
+    for (let rayon = 1; rayon <= 4; rayon++) {
+      for (let dr = -rayon; dr <= rayon; dr++) {
+        for (let dc = -rayon; dc <= rayon; dc++) {
+          if (Math.max(Math.abs(dc), Math.abs(dr)) !== rayon) continue;
+          const nc = noeud.col + dc, nr = noeud.row + dr;
+          if (tuileMarchable(nc, nr)) return { col: nc, row: nr };
+        }
+      }
+    }
+    return { col: noeud.col, row: noeud.row };
+  }
+
   function creerVillageois(col, row, genre) {
     const genreFinal = genre || (Math.random() < 0.5 ? 'h' : 'f');
     return {
@@ -796,6 +1014,9 @@
       assigneA: null,
       cibleX: undefined,
       cibleY: undefined,
+      chemin: null,
+      cheminCol: null,
+      cheminRow: null,
       mode: 'attente',
       pause: aleatoire(0, 2),
       vitesseBase: aleatoire(22, 32),
@@ -965,14 +1186,10 @@
       // court vers le campement, plus vite que d'habitude.
       if (v.enFuite) {
         const base = trouverBase();
-        const d = Math.hypot(base.x - v.x, base.y - v.y);
+        const arrive = avancerVersCible(v, base.x, base.y, v.vitesseBase * 2.2, dt, 4);
         v.travaille = false;
-        v.enMouvement = d > 4;
-        if (d > 4) {
-          const pas = Math.min(d, v.vitesseBase * 2.2 * dt);
-          v.x += (base.x - v.x) / d * pas;
-          v.y += (base.y - v.y) / d * pas;
-        } else {
+        v.enMouvement = !arrive;
+        if (arrive) {
           v.enFuite = false;
           v.mode = 'attente';
           v.pause = aleatoire(1, 3);
@@ -987,14 +1204,10 @@
         if (!grotte) { v.grotteAssignee = null; v.mode = 'attente'; continue; }
         const gx = grotte.col * TAILLE_TUILE + TAILLE_TUILE / 2;
         const gy = grotte.row * TAILLE_TUILE + TAILLE_TUILE / 2;
-        const d = Math.hypot(gx - v.x, gy - v.y);
-        v.enMouvement = d > 2;
-        v.travaille = !v.enMouvement;
-        if (v.enMouvement) {
-          const pas = Math.min(d, v.vitesseBase * dt);
-          v.x += (gx - v.x) / d * pas;
-          v.y += (gy - v.y) / d * pas;
-        } else {
+        const arrive = avancerVersCible(v, gx, gy, v.vitesseBase, dt);
+        v.enMouvement = !arrive;
+        v.travaille = arrive;
+        if (arrive) {
           v.grotteAssignee = null;
           if (!grotte.interieur) grotte.interieur = genererInterieurGrotte();
           v.dansGrotte = grotte.col + ',' + grotte.row;
@@ -1008,47 +1221,39 @@
       }
 
       if (v.mode === 'rapporte') {
-        const d = Math.hypot(v.cibleX - v.x, v.cibleY - v.y);
+        const arrive = avancerVersCible(v, v.cibleX, v.cibleY, v.vitesseBase * 1.8, dt);
         v.travaille = false;
-        v.enMouvement = d > 2;
-        if (d > 2) {
-          const pas = Math.min(d, v.vitesseBase * 1.8 * dt);
-          v.x += (v.cibleX - v.x) / d * pas;
-          v.y += (v.cibleY - v.y) / d * pas;
-        } else {
-          livrerRessource(v);
-        }
+        v.enMouvement = !arrive;
+        if (arrive) livrerRessource(v);
         continue;
       }
 
       if (v.assigneA) {
-        const [col, row] = v.assigneA.split(',').map(Number);
+        const noeudAssigne = etat.noeuds.get(v.assigneA);
+        if (!noeudAssigne) { v.assigneA = null; continue; }
+        const approche = pointApprochePourNoeud(noeudAssigne);
         const groupe = parNoeud.get(v.assigneA);
         const idx = groupe.indexOf(v);
         const angleOffset = (idx / Math.max(1, groupe.length)) * Math.PI * 2;
         const rayon = groupe.length > 1 ? TAILLE_TUILE * 0.38 : 0;
-        const tx = col * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.cos(angleOffset) * rayon;
-        const ty = row * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.sin(angleOffset) * rayon;
-        const d = Math.hypot(tx - v.x, ty - v.y);
-        v.enMouvement = d > 2;
-        v.travaille = !v.enMouvement;
-        if (v.enMouvement) {
-          const pas = Math.min(d, v.vitesseBase * 1.6 * dt);
-          v.x += (tx - v.x) / d * pas;
-          v.y += (ty - v.y) / d * pas;
+        const tx = approche.col * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.cos(angleOffset) * rayon;
+        const ty = approche.row * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.sin(angleOffset) * rayon;
+        const arrive = avancerVersCible(v, tx, ty, v.vitesseBase * 1.6, dt);
+        v.enMouvement = !arrive;
+        v.travaille = arrive;
+        if (!arrive) {
           v.tempsRecolte = 0;
         } else {
           // Arrivé sur la ressource : récolte pendant DUREE_RECOLTE, puis
           // repart avec un gain fixe par aller-retour (GAIN_PAR_VOYAGE),
           // en épuisant d'autant la case récoltée.
-          const noeud = etat.noeuds.get(v.assigneA);
-          if (noeud && etat.zonesDebloquees.has(zoneDeCase(noeud.col, noeud.row))) {
+          if (etat.zonesDebloquees.has(zoneDeCase(noeudAssigne.col, noeudAssigne.row))) {
             v.tempsRecolte += dt;
             if (v.tempsRecolte >= DUREE_RECOLTE) {
               v.tempsRecolte = 0;
-              const def = TYPES_RESSOURCE_NOEUD[noeud.type];
+              const def = TYPES_RESSOURCE_NOEUD[noeudAssigne.type];
               let gain = GAIN_PAR_VOYAGE;
-              if (v.outil && OUTILS[v.outil].noeudCible === noeud.type) gain += Math.round(1 * etat.multiplicateurs.bonusMetier);
+              if (v.outil && OUTILS[v.outil].noeudCible === noeudAssigne.type) gain += Math.round(1 * etat.multiplicateurs.bonusMetier);
               gain = Math.round(gain * etat.multiplicateurs[def.ressource]);
               v.charge = gain;
               v.ressourceType = def.ressource;
@@ -1056,8 +1261,8 @@
               const depot = trouverDepot(v.x, v.y);
               v.cibleX = depot.x;
               v.cibleY = depot.y;
-              noeud.quantite -= GAIN_PAR_VOYAGE;
-              if (noeud.quantite <= 0) epuiserNoeud(v.assigneA);
+              noeudAssigne.quantite -= GAIN_PAR_VOYAGE;
+              if (noeudAssigne.quantite <= 0) epuiserNoeud(v.assigneA);
             }
           }
         }
@@ -1071,16 +1276,11 @@
             v.mode = 'marche';
           }
         } else {
-          const d = Math.hypot(v.cibleX - v.x, v.cibleY - v.y);
-          if (d < 2) {
+          const arrive = avancerVersCible(v, v.cibleX, v.cibleY, v.vitesseBase, dt);
+          v.enMouvement = !arrive;
+          if (arrive) {
             v.mode = 'attente';
             v.pause = aleatoire(1, 3);
-            v.enMouvement = false;
-          } else {
-            const pas = Math.min(d, v.vitesseBase * dt);
-            v.x += (v.cibleX - v.x) / d * pas;
-            v.y += (v.cibleY - v.y) / d * pas;
-            v.enMouvement = true;
           }
         }
       }
@@ -1890,9 +2090,10 @@
         } else if (zoneOk && batiment) {
           dessinerRessourceOuEmoji(BATIMENTS[batiment].emoji, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.88);
         } else if (zoneOk && noeud) {
-          // Les zones de pêche couvrent tout le littoral (chaque case côtière
-          // est un nœud) : y dessiner une icône par case couvrirait toute la
-          // carte de poissons, donc aucun sprite n'est dessiné pour ce type.
+          // Les zones de pêche couvrent toute l'eau côtière (chaque case
+          // d'eau touchant la terre est un nœud) : y dessiner une icône par
+          // case couvrirait tout le littoral de poissons, donc aucun sprite
+          // n'est dessiné pour ce type (le contour de sélection suffit).
           if (noeud.type !== 'poisson') {
             const emojiNoeud = noeud.emoji || TYPES_RESSOURCE_NOEUD[noeud.type].emoji;
             dessinerRessourceOuEmoji(emojiNoeud, x + TAILLE_TUILE / 2, y + TAILLE_TUILE / 2, TAILLE_TUILE * 0.92);
@@ -1994,13 +2195,21 @@
         const noeudSel = etat.noeuds.get(caseSelectionnee.col + ',' + caseSelectionnee.row);
         tuilesAContourer = noeudSel ? noeudsDeLaZone(noeudSel.zoneId) : [caseSelectionnee];
       }
+      // Un seul contour fusionné autour de toute la zone plutôt qu'un
+      // quadrillage de petits carrés : on ne trace que les arêtes de bord,
+      // là où la case voisine ne fait pas partie de la même zone.
+      const zoneSet = new Set(tuilesAContourer.map(t => t.col + ',' + t.row));
       ctx.strokeStyle = '#ffd93d';
       ctx.lineWidth = 2;
+      ctx.beginPath();
       for (const t of tuilesAContourer) {
-        const x = t.col * TAILLE_TUILE;
-        const y = t.row * TAILLE_TUILE;
-        ctx.strokeRect(x + 1, y + 1, TAILLE_TUILE - 2, TAILLE_TUILE - 2);
+        const x = t.col * TAILLE_TUILE, y = t.row * TAILLE_TUILE;
+        if (!zoneSet.has(t.col + ',' + (t.row - 1))) { ctx.moveTo(x, y); ctx.lineTo(x + TAILLE_TUILE, y); }
+        if (!zoneSet.has(t.col + ',' + (t.row + 1))) { ctx.moveTo(x, y + TAILLE_TUILE); ctx.lineTo(x + TAILLE_TUILE, y + TAILLE_TUILE); }
+        if (!zoneSet.has((t.col - 1) + ',' + t.row)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TAILLE_TUILE); }
+        if (!zoneSet.has((t.col + 1) + ',' + t.row)) { ctx.moveTo(x + TAILLE_TUILE, y); ctx.lineTo(x + TAILLE_TUILE, y + TAILLE_TUILE); }
       }
+      ctx.stroke();
     }
 
     dessinerObscurite();
@@ -2470,6 +2679,62 @@
     enfants: '👶 Enfants',
   };
 
+  // Types de nœud proposés en assignation rapide, avec l'emoji du bouton et
+  // le libellé de la ressource correspondante (voir TYPES_RESSOURCE_NOEUD).
+  const TYPES_ASSIGNATION_RAPIDE = [
+    ['arbre', '🪓', 'Bois'],
+    ['roche', '⛏️', 'Pierre'],
+    ['gibier', '🏹', 'Gibier'],
+    ['poisson', '🎣', 'Poisson'],
+  ];
+
+  // Le nœud disponible (sous le plafond de travailleurs) le plus proche
+  // d'un villageois, pour un type de ressource donné, dans une zone débloquée.
+  function noeudLibrePlusProche(v, type) {
+    const def = TYPES_RESSOURCE_NOEUD[type];
+    let meilleur = null, meilleureDist = Infinity;
+    for (const n of etat.noeuds.values()) {
+      if (n.type !== type) continue;
+      if (!etat.zonesDebloquees.has(zoneDeCase(n.col, n.row))) continue;
+      if (compterTravailleurs(n.col + ',' + n.row) >= def.max) continue;
+      const nx = n.col * TAILLE_TUILE + TAILLE_TUILE / 2, ny = n.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const d = Math.hypot(nx - v.x, ny - v.y);
+      if (d < meilleureDist) { meilleureDist = d; meilleur = n; }
+    }
+    return meilleur;
+  }
+
+  // Assigne directement un villageois libre à la zone la plus proche d'un
+  // type de ressource donné, sans passer par un clic sur la carte.
+  function assignerVillageoisZonePlusProche(id, type) {
+    const v = etat.villageois.find(x => x.id === id);
+    if (!v || !estVillageoisLibre(v) || !outilCompatibleAvecNoeud(v.outil, type)) return;
+    const noeud = noeudLibrePlusProche(v, type);
+    if (!noeud) { notifier('❌ Aucune zone disponible pour cette ressource.'); return; }
+    v.assigneA = noeud.col + ',' + noeud.row;
+    notifier('✅ ' + v.prenom + ' est assigné(e) à la zone la plus proche.');
+    afficherModalVillage();
+  }
+
+  // Carte d'un villageois libre dans l'onglet Assignations : un bouton par
+  // ressource compatible avec son outil, pour l'assigner à la zone la plus
+  // proche sans quitter la page.
+  function carteVillageoisAssignationHtml(v) {
+    const icone = v.genre === 'f' ? '👩' : '🧑';
+    const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+    const boutons = TYPES_ASSIGNATION_RAPIDE
+      .filter(([typeNoeud]) => outilCompatibleAvecNoeud(v.outil, typeNoeud))
+      .map(([typeNoeud, emoji, nom]) => `<button class="btn-assign-rapide" data-id="${v.id}" data-type="${typeNoeud}" title="Assigner à la zone de ${nom.toLowerCase()} la plus proche">${emoji}</button>`)
+      .join('');
+    return `<div class="carte-villageois-assign">
+      <button class="carte-villageois" data-id="${v.id}">
+        <span>${icone} <b>${v.prenom}</b><br><small>${metier} · Libre</small></span>
+        <span>›</span>
+      </button>
+      <div class="assign-rapide-boutons">${boutons}</div>
+    </div>`;
+  }
+
   function afficherOngletAssignations() {
     const conteneur = document.getElementById('contenuVillage');
     const groupes = { bois: [], pierre: [], gibier: [], poisson: [], libres: [], enfants: [] };
@@ -2485,12 +2750,18 @@
       const liste = groupes[cle];
       if (!liste.length) continue;
       html += `<div class="groupe-assignation"><h3>${GROUPES_ASSIGNATION[cle]} (${liste.length})</h3>`;
-      html += liste.map(carteVillageoisHtml).join('');
+      html += liste.map(v => (cle === 'libres' && estVillageoisLibre(v)) ? carteVillageoisAssignationHtml(v) : carteVillageoisHtml(v)).join('');
       html += '</div>';
     }
     conteneur.innerHTML = html || '<p class="astuce">Aucun villageois.</p>';
     conteneur.querySelectorAll('.carte-villageois').forEach(btn => {
       btn.addEventListener('click', () => selectionnerVillageoisDepuisListe(Number(btn.dataset.id)));
+    });
+    conteneur.querySelectorAll('.btn-assign-rapide').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        assignerVillageoisZonePlusProche(Number(btn.dataset.id), btn.dataset.type);
+      });
     });
   }
 
@@ -2891,12 +3162,16 @@
       for (const n of zone) travailleursZone += compterTravailleurs(n.col + ',' + n.row);
       const quantiteZone = zone.reduce((s, n) => s + Math.max(0, n.quantite || 0), 0);
       const idle = population_libre();
+      const idleEligibles = etat.villageois.filter(v => estVillageoisLibre(v) && outilCompatibleAvecNoeud(v.outil, noeud.type)).length;
       html += `<p>${emojiNoeud} <b>${def.nom}</b><br>Zone de ${zone.length} ressource${zone.length > 1 ? 's' : ''}<br>Quantité restante : ${Math.round(quantiteZone)}<br>Travailleurs assignés : ${travailleursZone} / ${capaciteZone}</p>`;
       html += `<div class="ligne-action">
         <button id="btnRetirer" ${travailleursZone <= 0 ? 'disabled' : ''}>− Retirer</button>
-        <span>👥 ${idle} libres</span>
-        <button id="btnAssigner" ${(idle <= 0 || travailleursZone >= capaciteZone) ? 'disabled' : ''}>+ Assigner</button>
+        <span>👥 ${idleEligibles} libres</span>
+        <button id="btnAssigner" ${(idleEligibles <= 0 || travailleursZone >= capaciteZone) ? 'disabled' : ''}>+ Assigner</button>
       </div>`;
+      if (idleEligibles === 0 && idle > 0) {
+        html += '<p class="astuce">Aucun villageois libre n\'a l\'outil adapté à cette ressource.</p>';
+      }
     } else {
       html += '<p class="astuce">Case libre. Passez en mode Construire pour y bâtir quelque chose.</p>';
     }
@@ -2912,7 +3187,7 @@
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const zone = noeudsDeLaZone(noeud.zoneId);
       const cibleNoeud = zone.find(n => compterTravailleurs(n.col + ',' + n.row) < def.max);
-      const libre = etat.villageois.find(estVillageoisLibre);
+      const libre = etat.villageois.find(v => estVillageoisLibre(v) && outilCompatibleAvecNoeud(v.outil, noeud.type));
       if (cibleNoeud && libre) libre.assigneA = cibleNoeud.col + ',' + cibleNoeud.row;
       afficherSelection();
     });
@@ -3369,7 +3644,7 @@
       clamperCamera();
     }
 
-    mettreAJourVillageois(dt);
+    if (!enPause) mettreAJourVillageois(dt);
     if (!enPause) mettreAJourChantiers(dt);
     if (!enPause) mettreAJourAmbiance(dt);
     if (!enPause) mettreAJourCreatures(dt);

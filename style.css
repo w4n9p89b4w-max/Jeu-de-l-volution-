@@ -457,6 +457,27 @@ main {
   font-weight: 400;
 }
 
+.carte-villageois-assign {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.carte-villageois-assign .carte-villageois {
+  flex: 1 1 auto;
+}
+
+.assign-rapide-boutons {
+  display: flex;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.btn-assign-rapide {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.95rem;
+}
+
 /* ---------- Modale technologies ---------- */
 
 .modal {
