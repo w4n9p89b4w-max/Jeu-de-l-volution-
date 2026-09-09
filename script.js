@@ -48,6 +48,16 @@
   const DUREE_MINAGE_GROTTE = 3;  // secondes par extraction sur un gisement
   const GAIN_MINAGE_GROTTE = 6;   // valeur extraite par cycle de minage
 
+  // Déblocage des zones (branche « Exploration ») : au lieu de dépenser des
+  // points de technologie, il faut envoyer un villageois en expédition. Les
+  // points de technologie restent utiles en accélérateur d'une expédition en
+  // cours. Un incident est possible au retour (blessure, rarement la mort).
+  const DUREE_EXPEDITION_ZONE = { 1: 25, 2: 45 }; // secondes, selon le palier de la zone
+  const ACCEL_EXPEDITION_PAR_POINT = 8; // secondes gagnées par point de technologie dépensé
+  const RISQUE_MORT_EXPEDITION = 0.05;
+  const RISQUE_BLESSURE_EXPEDITION = 0.25; // en plus du risque de mort
+  const DEGATS_BLESSURE_EXPEDITION = [15, 30];
+
   // Créatures hostiles : rôdent, poursuivent et attaquent les villageois.
   // Un villageois équipé d'une épée (métier Garde) riposte automatiquement.
   const TYPES_CREATURES = {
@@ -848,7 +858,7 @@
   // Un villageois est « libre » s'il n'a ni tâche, ni enfance, ni expédition
   // de grotte en cours (en chemin ou déjà à l'intérieur), et ne fuit pas.
   function estVillageoisLibre(v) {
-    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.dansGrotte && !v.enFuite;
+    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.dansGrotte && !v.enFuite && v.expeditionZone === null;
   }
 
   // Un outil spécialisé (hache, pioche, arc, canne) ne peut travailler que le
@@ -1043,6 +1053,8 @@
       cibleNoeudGrotte: null,
       tempsMinage: 0,
       enFuite: false,
+      expeditionZone: null,
+      expeditionTempsRestant: 0,
     };
   }
 
@@ -1174,6 +1186,14 @@
     }
 
     for (const v of etat.villageois) {
+      // Villageois parti en expédition explorer une zone : absent de la
+      // carte le temps du compte à rebours, indépendant de sa position.
+      if (v.expeditionZone !== null) {
+        v.expeditionTempsRestant -= dt;
+        if (v.expeditionTempsRestant <= 0) resoudreExpeditionZone(v);
+        continue;
+      }
+
       // Villageois actuellement à l'intérieur d'une grotte : logique dédiée
       // (minage des gisements, errance locale, fuite vers la sortie), sans
       // rapport avec les coordonnées ou l'état du monde extérieur.
@@ -1727,6 +1747,7 @@
     const t = temps / 1000;
     const vw = largeurVisible(), vh = hauteurVisible();
     for (const v of etat.villageois) {
+      if (v.expeditionZone !== null) continue;
       if ((v.dansGrotte || null) !== (etat.grotteActive || null)) continue;
       const x = v.x, y = v.y;
       if (x < camera.x - 20 || x > camera.x + vw + 20 || y < camera.y - 20 || y > camera.y + vh + 20) continue;
@@ -1898,6 +1919,7 @@
     document.getElementById('btnModeConstruire').disabled = false;
     minicarte.style.display = '';
     fermerModalGrotte();
+    fermerModalExpedition();
     afficherSelection();
     centrerCameraSurLeDepart();
     dessinerMinicarteFond();
@@ -2651,6 +2673,7 @@
     else if (v.enFuite) statut = '🏃 En fuite';
     else if (v.pv < v.pvMax * 0.5) statut = '🩸 Blessé(e)';
     else if (v.enceinte) statut = '🤰 Enceinte';
+    else if (v.expeditionZone !== null) statut = '🧭 En expédition';
     else if (v.grotteAssignee) statut = '🕯️ En route vers une grotte';
     else if (v.dansGrotte) statut = '🕳️ Dans une grotte';
     else if (v.assigneA) statut = 'Au travail';
@@ -3027,6 +3050,7 @@
     if (v.enFuite) html += v.dansGrotte ? '<p>🏃 En fuite — court vers la sortie de la grotte.</p>' : '<p>🏃 En fuite — court se réfugier au campement.</p>';
     if (v.grotteAssignee) html += '<p>🕯️ En route vers une grotte...</p>';
     if (v.dansGrotte) html += '<p>🕳️ Explore l\'intérieur d\'une grotte.</p>';
+    if (v.expeditionZone !== null) html += '<p>🧭 En expédition — retour dans ' + Math.max(0, Math.ceil(v.expeditionTempsRestant)) + ' s.</p>';
 
     if (v.estEnfant) {
       const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
@@ -3334,6 +3358,124 @@
     afficherModalTech();
   }
 
+  // ------------------------------------------------------------
+  // Expéditions : déblocage des zones (branche « Exploration ») en envoyant
+  // un villageois plutôt qu'en dépensant des points de technologie. Les
+  // points de technologie restent utiles pour accélérer une expédition en
+  // cours (voir ouvrirPopupExpedition). Un incident est possible au retour.
+  // ------------------------------------------------------------
+
+  let expeditionEnPopup = null;
+
+  function villageoisEnExpeditionPour(zoneId) {
+    return etat.villageois.find(v => v.expeditionZone === zoneId);
+  }
+
+  function ouvrirPopupExpedition(t) {
+    expeditionEnPopup = t;
+    const zoneId = t.zone;
+    const info = document.getElementById('expeditionInfo');
+    const liste = document.getElementById('expeditionVillageoisListe');
+    const enCours = villageoisEnExpeditionPour(zoneId);
+
+    if (enCours) {
+      const restant = Math.max(0, Math.ceil(enCours.expeditionTempsRestant));
+      info.textContent = enCours.prenom + ' explore « ' + NOMS_ZONES[zoneId] + ' » — retour dans ' + restant + ' s.';
+      liste.innerHTML = `<div class="ligne-action">
+        <span>🔬 ${etat.pointsTech} pt(s) disponible(s)</span>
+        <button id="btnAccelererExpedition" ${etat.pointsTech < 1 ? 'disabled' : ''}>⏩ Accélérer (−${ACCEL_EXPEDITION_PAR_POINT} s / pt)</button>
+      </div>`;
+      const btnAccel = document.getElementById('btnAccelererExpedition');
+      if (btnAccel) btnAccel.addEventListener('click', () => {
+        if (etat.pointsTech < 1) return;
+        etat.pointsTech--;
+        enCours.expeditionTempsRestant = Math.max(0, enCours.expeditionTempsRestant - ACCEL_EXPEDITION_PAR_POINT);
+        notifier('⏩ Expédition accélérée.');
+        ouvrirPopupExpedition(t);
+      });
+    } else {
+      const libres = etat.villageois.filter(estVillageoisLibre);
+      const duree = DUREE_EXPEDITION_ZONE[t.palier || 1] || 30;
+      info.textContent = `Envoyez un villageois explorer « ${NOMS_ZONES[zoneId]} ». Durée : ${duree} s. Un incident est possible en chemin.`;
+      liste.innerHTML = libres.length
+        ? libres.map(v => {
+          const icone = v.genre === 'f' ? '👩' : '🧑';
+          const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+          return `<button class="grotte-villageois-item" data-id="${v.id}">
+            <span>${icone} <b>${v.prenom}</b><br><small>${metier}</small></span>
+          </button>`;
+        }).join('')
+        : '<p class="astuce">Aucun villageois disponible en ce moment.</p>';
+      liste.querySelectorAll('.grotte-villageois-item').forEach(btn => {
+        btn.addEventListener('click', () => envoyerExpeditionZone(Number(btn.dataset.id), t));
+      });
+    }
+    document.getElementById('modalExpedition').hidden = false;
+  }
+
+  function fermerModalExpedition() {
+    document.getElementById('modalExpedition').hidden = true;
+    expeditionEnPopup = null;
+  }
+
+  function envoyerExpeditionZone(id, t) {
+    const v = etat.villageois.find(x => x.id === id);
+    if (!v || !estVillageoisLibre(v)) return;
+    v.expeditionZone = t.zone;
+    v.expeditionTempsRestant = DUREE_EXPEDITION_ZONE[t.palier || 1] || 30;
+    notifier('🧭 ' + v.prenom + ' part explorer « ' + NOMS_ZONES[t.zone] + ' »...');
+    fermerModalExpedition();
+    if (!document.getElementById('modalTech').hidden) afficherModalTech();
+  }
+
+  // Résout une expédition à son retour : petite chance de mort (l'expédition
+  // échoue, la zone reste verrouillée), sinon la zone est débloquée, avec une
+  // chance supplémentaire de revenir blessé(e).
+  function resoudreExpeditionZone(v) {
+    const zoneId = v.expeditionZone;
+    const t = TECHS.find(x => x.zone === zoneId);
+    v.expeditionZone = null;
+    v.expeditionTempsRestant = 0;
+
+    const tirage = Math.random();
+    if (tirage < RISQUE_MORT_EXPEDITION) {
+      notifier('💀 ' + v.prenom + ' n\'est jamais revenu(e) de son expédition vers « ' + (NOMS_ZONES[zoneId] || '?') + ' »...');
+      if (v.partenaireId) {
+        const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
+        if (partenaire) partenaire.partenaireId = null;
+      }
+      etat.villageois = etat.villageois.filter(x => x.id !== v.id);
+      if (villageoisSelectionneId === v.id) { villageoisSelectionneId = null; afficherSelection(); }
+      if (!document.getElementById('modalTech').hidden) afficherModalTech();
+      return;
+    }
+
+    const base = trouverBase();
+    v.x = base.x;
+    v.y = base.y;
+    v.mode = 'attente';
+    v.pause = aleatoire(0.3, 1);
+
+    if (!t || etat.techsAcquises.has(t.id)) {
+      if (!document.getElementById('modalTech').hidden) afficherModalTech();
+      return;
+    }
+    etat.techsAcquises.add(t.id);
+    t.effet(etat.multiplicateurs);
+    etat.zonesDebloquees.add(zoneId);
+
+    if (tirage < RISQUE_MORT_EXPEDITION + RISQUE_BLESSURE_EXPEDITION) {
+      const degats = Math.round(aleatoire(DEGATS_BLESSURE_EXPEDITION[0], DEGATS_BLESSURE_EXPEDITION[1]));
+      v.pv = Math.max(1, v.pv - degats);
+      notifier('⚠️ ' + v.prenom + ' revient blessé(e), mais rapporte la carte de « ' + NOMS_ZONES[zoneId] + ' » !');
+    } else {
+      notifier('🗺️ ' + v.prenom + ' revient de son expédition : la zone « ' + NOMS_ZONES[zoneId] + ' » est explorée !');
+      gagnerXp(10);
+    }
+    notifier('🔬 Technologie acquise : ' + t.nom);
+    if (!document.getElementById('modalTech').hidden) afficherModalTech();
+  }
+
   // Dessine l'arbre technologique comme un vrai arbre : une colonne par
   // branche, le palier 1 en bas (le tronc) et les paliers suivants qui
   // poussent vers le haut, reliés par des traits vers ce dont ils dépendent
@@ -3383,17 +3525,29 @@
         for (const t of parPalier[palier]) {
           const acquise = etat.techsAcquises.has(t.id);
           const dispo = techDisponible(t);
+          const estExploration = t.branche === 'exploration';
+          const enExpedition = estExploration ? villageoisEnExpeditionPour(t.zone) : null;
           const div = document.createElement('div');
           div.className = 'noeud-tech' + (acquise ? ' acquise' : (!dispo ? ' verrouillee' : ''));
           div.dataset.techId = t.id;
+          let sousTitre;
+          if (acquise) sousTitre = 'Acquise';
+          else if (!estExploration) sousTitre = 'Coût : ' + t.cout + ' pt(s)';
+          else if (enExpedition) sousTitre = '🧭 En expédition — ' + Math.max(0, Math.ceil(enExpedition.expeditionTempsRestant)) + ' s';
+          else sousTitre = 'Envoi d\'un aventurier';
           div.innerHTML = `<h3>${acquise ? '✅' : (dispo ? '🔓' : '🔒')} ${t.nom}</h3>
             <p>${t.desc}</p>
-            <span class="cout">${acquise ? 'Acquise' : 'Coût : ' + t.cout + ' pt(s)'}</span>`;
+            <span class="cout">${sousTitre}</span>`;
           if (!acquise && dispo) {
             const btn = document.createElement('button');
-            btn.textContent = 'Débloquer';
-            btn.disabled = etat.pointsTech < t.cout;
-            btn.addEventListener('click', () => acquerirTech(t));
+            if (estExploration) {
+              btn.textContent = enExpedition ? 'Voir' : '🧭 Envoyer';
+              btn.addEventListener('click', () => ouvrirPopupExpedition(t));
+            } else {
+              btn.textContent = 'Débloquer';
+              btn.disabled = etat.pointsTech < t.cout;
+              btn.addEventListener('click', () => acquerirTech(t));
+            }
             div.appendChild(btn);
           }
           groupe.appendChild(div);
@@ -3659,6 +3813,8 @@
       majInterface();
       if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionneId !== null || creatureSelectionneeId !== null) afficherSelection();
       if (!document.getElementById('modalVillage').hidden) afficherModalVillage();
+      if (!document.getElementById('modalTech').hidden) afficherModalTech();
+      if (!document.getElementById('modalExpedition').hidden && expeditionEnPopup) ouvrirPopupExpedition(expeditionEnPopup);
     }, TICK_MS);
   }
 
@@ -3729,6 +3885,11 @@
   });
   document.getElementById('btnEntrerGrotte').addEventListener('click', lancerExpeditionGrotte);
   document.getElementById('btnSortirGrotte').addEventListener('click', sortirDeGrotte);
+
+  document.getElementById('fermerExpedition').addEventListener('click', fermerModalExpedition);
+  document.getElementById('modalExpedition').addEventListener('click', (e) => {
+    if (e.target.id === 'modalExpedition') fermerModalExpedition();
+  });
 
   document.getElementById('btnZoomPlus').addEventListener('click', () => definirZoom(zoom * 1.3));
   document.getElementById('btnZoomMoins').addEventListener('click', () => definirZoom(zoom / 1.3));
