@@ -888,13 +888,44 @@
       && !v.enFuite && v.expeditionZone === null && !v.recupereAuFeu && v.combatCibleId === null;
   }
 
-  // Un outil spécialisé (hache, pioche, arc, canne) ne peut travailler que le
-  // type de nœud qui lui correspond ; sans outil ou avec un outil non lié à
-  // une ressource (torche, épée), n'importe quel type de nœud convient.
-  function outilCompatibleAvecNoeud(outilId, typeNoeud) {
-    if (!outilId) return true;
-    const cible = OUTILS[outilId].noeudCible;
-    return !cible || cible === typeNoeud;
+  // Un villageois peut désormais porter plusieurs outils à la fois (par
+  // exemple une torche et une épée). Les outils « de métier » (hache,
+  // pioche, arc, canne) sont ceux liés à un type de nœud (noeudCible) ;
+  // torche et épée n'en portent pas et n'ont donc pas d'impact sur le
+  // travail assigné.
+  function outilsTravailDe(v) {
+    return [...v.outils].filter(id => OUTILS[id].noeudCible);
+  }
+
+  // Sans outil de métier, n'importe quel type de nœud convient ; avec au
+  // moins un outil de métier équipé, il faut qu'il corresponde au nœud visé.
+  function outilCompatibleAvecNoeud(v, typeNoeud) {
+    const outilsTravail = outilsTravailDe(v);
+    if (outilsTravail.length === 0) return true;
+    return outilsTravail.some(id => OUTILS[id].noeudCible === typeNoeud);
+  }
+
+  // Libellé du/des métier(s) d'un villageois, dérivé(s) de ses outils
+  // équipés (torche = Éclaireur, épée = Garde, etc.).
+  function metierTexte(v) {
+    if (!v.outils || v.outils.size === 0) return 'Sans métier';
+    return [...v.outils].map(id => OUTILS[id].metier).join(' + ');
+  }
+
+  // Icône affichée au-dessus d'un villageois sur la carte : priorité à
+  // l'outil de métier (identité de travail la plus lisible en un coup
+  // d'œil), sinon la torche, sinon l'épée ou l'arc.
+  const PRIORITE_BADGE_OUTIL = ['hache', 'pioche', 'arc', 'canne', 'torche', 'epee'];
+  function outilBadge(v) {
+    for (const id of PRIORITE_BADGE_OUTIL) if (v.outils.has(id)) return id;
+    return null;
+  }
+
+  // Une expédition d'exploration de zone exige d'être équipé d'une torche
+  // (pour s'éclairer / repérer) et d'une arme (épée ou arc) pour se
+  // défendre en chemin.
+  function peutPartirExpedition(v) {
+    return v.outils.has('torche') && (v.outils.has('epee') || v.outils.has('arc'));
   }
 
   function population_libre() {
@@ -1063,7 +1094,7 @@
       charge: 0,
       ressourceType: null,
       genre: genreFinal,
-      outil: null,
+      outils: new Set(),
       tempsRecolte: 0,
       partenaireId: null,
       estEnfant: false,
@@ -1101,7 +1132,7 @@
     for (let i = 0; i < n; i++) {
       const { col, row } = trouverTuileMarchable(cx, cy, 3);
       const v = creerVillageois(col, row, genres ? genres[i] : undefined);
-      if (outils) v.outil = outils[i];
+      if (outils) v.outils.add(outils[i]);
       liste.push(v);
     }
     if (n === 2) {
@@ -1273,7 +1304,7 @@
             v.tempsAttaqueVillageois += dt;
             if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
               v.tempsAttaqueVillageois = 0;
-              cible.pv -= (v.outil === 'epee' ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
+              cible.pv -= (v.outils.has('epee') ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
               cible.cibleId = v.id;
               if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
             }
@@ -1381,7 +1412,7 @@
               v.tempsRecolte = 0;
               const def = TYPES_RESSOURCE_NOEUD[noeudAssigne.type];
               let gain = GAIN_PAR_VOYAGE;
-              if (v.outil && OUTILS[v.outil].noeudCible === noeudAssigne.type) gain += Math.round(1 * etat.multiplicateurs.bonusMetier);
+              if (outilsTravailDe(v).some(id => OUTILS[id].noeudCible === noeudAssigne.type)) gain += Math.round(1 * etat.multiplicateurs.bonusMetier);
               gain = Math.round(gain * etat.multiplicateurs[def.ressource]);
               v.charge = gain;
               v.ressourceType = def.ressource;
@@ -1463,7 +1494,7 @@
           v.tempsAttaqueVillageois += dt;
           if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
             v.tempsAttaqueVillageois = 0;
-            cible.pv -= (v.outil === 'epee' ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
+            cible.pv -= (v.outils.has('epee') ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
             cible.cibleId = v.id;
             if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
           }
@@ -1723,7 +1754,7 @@
     liste.innerHTML = libres.length
       ? libres.map(v => {
         const icone = v.genre === 'f' ? '👩' : '🧑';
-        const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+        const metier = metierTexte(v);
         return `<label class="grotte-villageois-item">
           <input type="checkbox" data-id="${v.id}">
           <span>${icone} <b>${v.prenom}</b><br><small>${metier}</small></span>
@@ -1833,7 +1864,7 @@
       tuerVillageois(v, creature);
       return;
     }
-    if (v.outil !== 'epee' && v.pv < v.pvMax * 0.4 && !v.enFuite) {
+    if (!v.outils.has('epee') && v.pv < v.pvMax * 0.4 && !v.enFuite) {
       v.enFuite = true;
       v.assigneA = null;
       v.grotteAssignee = null;
@@ -1907,7 +1938,7 @@
           if (c.tempsAttaque >= DUREE_ATTAQUE_CREATURE) {
             c.tempsAttaque = 0;
             infligerDegatsVillageois(cible, def.degats, c);
-            if (cible.outil === 'epee' && c.pv > 0) {
+            if (cible.outils.has('epee') && c.pv > 0) {
               c.pv -= DEGATS_GARDE;
               if (c.pv <= 0) tuerCreature(c, cible);
             }
@@ -2002,9 +2033,12 @@
       if (v.mode === 'rapporte' && v.ressourceType) {
         ctx.font = (TAILLE_TUILE * 0.4) + 'px serif';
         ctx.fillText(RESSOURCE_EMOJI[v.ressourceType], 8, -15);
-      } else if (v.outil) {
-        ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
-        ctx.fillText(OUTILS[v.outil].emoji, 8, -18);
+      } else {
+        const badge = outilBadge(v);
+        if (badge) {
+          ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
+          ctx.fillText(OUTILS[badge].emoji, 8, -18);
+        }
       }
       if (v.enFuite) {
         ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
@@ -2974,7 +3008,7 @@
 
   function carteVillageoisHtml(v) {
     const icone = v.genre === 'f' ? '👩' : '🧑';
-    const metier = v.estEnfant ? 'Enfant' : (v.outil ? OUTILS[v.outil].metier : 'Sans métier');
+    const metier = v.estEnfant ? 'Enfant' : metierTexte(v);
     let statut;
     if (v.estEnfant) statut = 'Grandit encore ' + Math.max(0, Math.ceil(DUREE_ENFANCE - v.age)) + ' s';
     else if (v.enFuite) statut = '🏃 En fuite';
@@ -3042,7 +3076,7 @@
   // type de ressource donné, sans passer par un clic sur la carte.
   function assignerVillageoisZonePlusProche(id, type) {
     const v = etat.villageois.find(x => x.id === id);
-    if (!v || !estVillageoisLibre(v) || !outilCompatibleAvecNoeud(v.outil, type)) return;
+    if (!v || !estVillageoisLibre(v) || !outilCompatibleAvecNoeud(v, type)) return;
     const noeud = noeudLibrePlusProche(v, type);
     if (!noeud) { notifier('❌ Aucune zone disponible pour cette ressource.'); return; }
     v.assigneA = noeud.col + ',' + noeud.row;
@@ -3055,9 +3089,9 @@
   // proche sans quitter la page.
   function carteVillageoisAssignationHtml(v) {
     const icone = v.genre === 'f' ? '👩' : '🧑';
-    const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+    const metier = metierTexte(v);
     const boutons = TYPES_ASSIGNATION_RAPIDE
-      .filter(([typeNoeud]) => outilCompatibleAvecNoeud(v.outil, typeNoeud))
+      .filter(([typeNoeud]) => outilCompatibleAvecNoeud(v, typeNoeud))
       .map(([typeNoeud, emoji, nom]) => `<button class="btn-assign-rapide" data-id="${v.id}" data-type="${typeNoeud}" title="Assigner à la zone de ${nom.toLowerCase()} la plus proche">${emoji}</button>`)
       .join('');
     return `<div class="carte-villageois-assign">
@@ -3356,7 +3390,7 @@
 
     const icone = v.genre === 'f' ? '👩' : '🧑';
     const genreTxt = v.genre === 'f' ? 'Femme' : 'Homme';
-    const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+    const metier = metierTexte(v);
     let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${v.estEnfant ? ' · Enfant' : ''}<br>Métier : <b>${metier}</b></p>`;
     if (v.pv < v.pvMax) html += `<p>❤️ PV : ${Math.max(0, Math.round(v.pv))} / ${v.pvMax}</p>`;
     if (v.enFuite) html += v.dansGrotte ? '<p>🏃 En fuite — court vers la sortie de la grotte.</p>' : '<p>🏃 En fuite — court se réfugier au campement.</p>';
@@ -3385,16 +3419,19 @@
       const enfants = etat.villageois.filter(e => e.parentA === v.id || e.parentB === v.id);
       if (enfants.length) html += `<p>👶 Enfant${enfants.length > 1 ? 's' : ''} : ${enfants.map(e => e.prenom).join(', ')}</p>`;
 
-      html += `<p>${v.outil ? OUTILS[v.outil].emoji + ' ' + OUTILS[v.outil].nom + ' équipé(e)' : 'Aucun outil équipé.'}</p>`;
+      html += `<p>${v.outils.size ? [...v.outils].map(id => OUTILS[id].emoji + ' ' + OUTILS[id].nom).join(', ') + ' équipé(e)' : 'Aucun outil équipé.'}</p>`;
       html += '<div class="outils-liste">';
       for (const id in OUTILS) {
         const def = OUTILS[id];
-        const possede = v.outil === id;
+        const possede = v.outils.has(id);
         const stock = etat.outilsStock[id] || 0;
-        html += `<button class="btn-outil${possede ? ' selectionne' : ''}" data-outil="${id}" ${(possede || stock <= 0) ? 'disabled' : ''} title="${def.metier} · en stock : ${stock}">${def.emoji} ${def.nom} (${stock})</button>`;
+        html += `<button class="btn-outil${possede ? ' selectionne' : ''}" data-outil="${id}" ${(!possede && stock <= 0) ? 'disabled' : ''} title="${def.metier} · en stock : ${stock}">${def.emoji} ${def.nom} (${stock})</button>`;
       }
       html += '</div>';
-      html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement.</p>';
+      html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement. Un villageois peut porter plusieurs outils à la fois ; cliquez sur un outil déjà équipé pour le ranger.</p>';
+      if (!peutPartirExpedition(v)) {
+        html += '<p class="astuce">🧭 Pour partir en expédition, il faut une torche et une épée ou un arc, tous deux équipés en même temps.</p>';
+      }
       if (!v.enFuite && v.expeditionZone === null && !v.grotteAssignee && !v.attenteGrotte) {
         html += '<p class="astuce">🖐️ Cliquez sur la carte pour le/la faire marcher jusque-là, ou sur une créature hostile pour l\'attaquer.</p>';
       }
@@ -3406,11 +3443,16 @@
       conteneur.querySelectorAll('.btn-outil').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.outil;
-          if ((etat.outilsStock[id] || 0) <= 0) return;
-          etat.outilsStock[id]--;
-          if (v.outil) etat.outilsStock[v.outil] = (etat.outilsStock[v.outil] || 0) + 1;
-          v.outil = id;
-          notifier(OUTILS[id].emoji + ' ' + v.prenom + ' devient ' + OUTILS[id].metier.toLowerCase() + '.');
+          if (v.outils.has(id)) {
+            v.outils.delete(id);
+            etat.outilsStock[id] = (etat.outilsStock[id] || 0) + 1;
+            notifier(OUTILS[id].emoji + ' ' + v.prenom + ' range ' + OUTILS[id].nom.toLowerCase() + '.');
+          } else {
+            if ((etat.outilsStock[id] || 0) <= 0) return;
+            etat.outilsStock[id]--;
+            v.outils.add(id);
+            notifier(OUTILS[id].emoji + ' ' + v.prenom + ' s\'équipe de ' + OUTILS[id].nom.toLowerCase() + '.');
+          }
           afficherSelection();
         });
       });
@@ -3546,7 +3588,7 @@
       for (const n of zone) travailleursZone += compterTravailleurs(n.col + ',' + n.row);
       const quantiteZone = zone.reduce((s, n) => s + Math.max(0, n.quantite || 0), 0);
       const idle = population_libre();
-      const idleEligibles = etat.villageois.filter(v => estVillageoisLibre(v) && outilCompatibleAvecNoeud(v.outil, noeud.type)).length;
+      const idleEligibles = etat.villageois.filter(v => estVillageoisLibre(v) && outilCompatibleAvecNoeud(v, noeud.type)).length;
       html += `<p>${emojiNoeud} <b>${def.nom}</b><br>Zone de ${zone.length} ressource${zone.length > 1 ? 's' : ''}<br>Quantité restante : ${Math.round(quantiteZone)}<br>Travailleurs assignés : ${travailleursZone} / ${capaciteZone}</p>`;
       html += `<div class="ligne-action">
         <button id="btnRetirer" ${travailleursZone <= 0 ? 'disabled' : ''}>− Retirer</button>
@@ -3571,7 +3613,7 @@
       const def = TYPES_RESSOURCE_NOEUD[noeud.type];
       const zone = noeudsDeLaZone(noeud.zoneId);
       const cibleNoeud = zone.find(n => compterTravailleurs(n.col + ',' + n.row) < def.max);
-      const libre = etat.villageois.find(v => estVillageoisLibre(v) && outilCompatibleAvecNoeud(v.outil, noeud.type));
+      const libre = etat.villageois.find(v => estVillageoisLibre(v) && outilCompatibleAvecNoeud(v, noeud.type));
       if (cibleNoeud && libre) libre.assigneA = cibleNoeud.col + ',' + cibleNoeud.row;
       afficherSelection();
     });
@@ -3756,12 +3798,13 @@
     } else {
       const libres = etat.villageois.filter(estVillageoisLibre);
       const duree = DUREE_EXPEDITION_ZONE[t.palier || 1] || 30;
-      info.textContent = `Envoyez un villageois explorer « ${NOMS_ZONES[zoneId]} ». Durée : ${duree} s. Un incident est possible en chemin.`;
+      info.textContent = `Envoyez un villageois explorer « ${NOMS_ZONES[zoneId]} ». Durée : ${duree} s. Il doit être équipé d'une torche et d'une épée ou d'un arc. Un incident est possible en chemin.`;
       liste.innerHTML = libres.length
         ? libres.map(v => {
           const icone = v.genre === 'f' ? '👩' : '🧑';
-          const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
-          return `<button class="grotte-villageois-item" data-id="${v.id}">
+          const metier = metierTexte(v);
+          const eligible = peutPartirExpedition(v);
+          return `<button class="grotte-villageois-item" data-id="${v.id}" ${eligible ? '' : 'disabled'} title="${eligible ? '' : 'Nécessite une torche et une épée ou un arc, équipés en même temps.'}">
             <span>${icone} <b>${v.prenom}</b><br><small>${metier}</small></span>
           </button>`;
         }).join('')
@@ -3780,7 +3823,7 @@
 
   function envoyerExpeditionZone(id, t) {
     const v = etat.villageois.find(x => x.id === id);
-    if (!v || !estVillageoisLibre(v)) return;
+    if (!v || !estVillageoisLibre(v) || !peutPartirExpedition(v)) return;
     v.expeditionZone = t.zone;
     v.expeditionTempsRestant = DUREE_EXPEDITION_ZONE[t.palier || 1] || 30;
     notifier('🧭 ' + v.prenom + ' part explorer « ' + NOMS_ZONES[t.zone] + ' »...');
@@ -4112,7 +4155,7 @@
     }
     // Les villageois porteurs d'une torche repoussent l'obscurité autour d'eux.
     for (const v of etat.villageois) {
-      if (v.outil !== 'torche') continue;
+      if (!v.outils.has('torche')) continue;
       poinconnerLumiere(v.x, v.y, RAYON_LUMIERE_TORCHE);
     }
     cctx.globalCompositeOperation = 'source-over';
