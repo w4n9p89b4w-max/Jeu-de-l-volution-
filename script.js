@@ -2774,28 +2774,10 @@
       return;
     }
 
-    // Les villageois sélectionnés, disponibles pour être dirigés, reçoivent
-    // un ordre de déplacement vers la case cliquée plutôt que de simplement
-    // afficher les informations de la case (léger éparpillement en cercle
-    // pour ne pas tous se superposer en groupe).
-    if (villageoisSelectionnes.size > 0 && tuileMarchable(col, row)) {
-      const controlables = [...villageoisSelectionnes]
-        .map(id => etat.villageois.find(x => x.id === id))
-        .filter(v => v && !v.dansGrotte && !v.enFuite && v.expeditionZone === null && !v.grotteAssignee && !v.attenteGrotte);
-      if (controlables.length > 0) {
-        const cx = col * TAILLE_TUILE + TAILLE_TUILE / 2, cy = row * TAILLE_TUILE + TAILLE_TUILE / 2;
-        const rayon = controlables.length > 1 ? TAILLE_TUILE * 0.45 : 0;
-        controlables.forEach((v, i) => {
-          const angle = (i / controlables.length) * Math.PI * 2;
-          v.commandeManuelle = { x: cx + Math.cos(angle) * rayon, y: cy + Math.sin(angle) * rayon };
-          v.combatCibleId = null;
-        });
-        afficherSelection();
-        ouvrirPanneauMobile();
-        return;
-      }
-    }
-
+    // Pas de déplacement manuel dirigé sur la carte extérieure : cliquer
+    // une case y désélectionne simplement pour en afficher les infos (voir
+    // plus bas). Cet ordre de déplacement au clic reste réservé à
+    // l'intérieur des grottes (voir gererClicInterieur).
     villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
