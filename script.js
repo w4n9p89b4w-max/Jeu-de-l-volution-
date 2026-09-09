@@ -110,11 +110,11 @@
   };
 
   const BATIMENTS = {
-    maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population', duree: 9, categorie: 'logement' },
-    entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage', duree: 7, categorie: 'stockage' },
-    champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick', duree: 4, categorie: 'nourriture' },
-    enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage', duree: 6, categorie: 'nourriture' },
-    feu:     { nom: 'Feu de camp',      emoji: '🔥', cout: { bois: 0, pierre: 0 },   biomes: ['plaine', 'foret', 'plage'], desc: 'Le cœur du campement', nonConstructible: true },
+    maison:  { nom: 'Maison',           emoji: '🏠', cout: { bois: 20, pierre: 5 },  biomes: ['plaine', 'foret', 'plage'], desc: '+4 capacité de population', duree: 9, categorie: 'logement', taille: 2 },
+    entrepot:{ nom: 'Entrepôt',         emoji: '📦', cout: { bois: 35, pierre: 20 }, biomes: ['plaine', 'foret', 'plage', 'carriere', 'montagne'], desc: '+60 capacité de stockage', duree: 7, categorie: 'stockage', taille: 3 },
+    champ:   { nom: 'Champ',            emoji: '🌾', cout: { bois: 10, pierre: 0 },  biomes: ['plaine'], desc: '+2 nourriture / tick', duree: 4, categorie: 'nourriture', taille: 4 },
+    enclos:  { nom: 'Enclos à animaux', emoji: '🐖', cout: { bois: 20, pierre: 10 }, biomes: ['plaine', 'foret'], desc: '+3 nourriture / tick', requiert: 'elevage', duree: 6, categorie: 'nourriture', taille: 4 },
+    feu:     { nom: 'Feu de camp',      emoji: '🔥', cout: { bois: 0, pierre: 0 },   biomes: ['plaine', 'foret', 'plage'], desc: 'Le cœur du campement', nonConstructible: true, taille: 1 },
   };
 
 
@@ -232,6 +232,7 @@
       meteo: 'clair',
       meteoMinuteur: aleatoire(35, 70),
       naissancesBloquees: false,
+      outilsStock: Object.fromEntries(Object.keys(OUTILS).map(id => [id, 0])),
     };
   }
 
@@ -1005,6 +1006,8 @@
     centrerCameraSurLeDepart();
     dessinerMinicarteFond();
     fermerModalTech();
+    fermerModalAtelier();
+    fermerModalVillage();
     document.getElementById('notifications').innerHTML = '';
     const btnNaissances = document.getElementById('btnNaissances');
     btnNaissances.textContent = '👶 Naissances';
@@ -1527,16 +1530,183 @@
     document.getElementById('modalConstruction').hidden = true;
   }
 
+  // ============================================================
+  // Atelier : fabrication d'outils à l'avance, stockés puis équipés
+  // gratuitement depuis la fiche d'un villageois.
+  // ============================================================
+
+  function fabriquerOutil(id) {
+    const def = OUTILS[id];
+    const cout = {};
+    for (const r in def.cout) cout[r] = Math.ceil(def.cout[r] * etat.multiplicateurs.coutOutils);
+    for (const r in cout) {
+      if ((etat.ressources[r] || 0) < cout[r]) {
+        notifier('❌ Ressources insuffisantes pour fabriquer : ' + def.nom);
+        return;
+      }
+    }
+    for (const r in cout) etat.ressources[r] -= cout[r];
+    etat.outilsStock[id] = (etat.outilsStock[id] || 0) + 1;
+    notifier(def.emoji + ' ' + def.nom + ' fabriqué(e). En stock : ' + etat.outilsStock[id]);
+    afficherModalAtelier();
+    if (villageoisSelectionneId !== null) afficherSelection();
+  }
+
+  function afficherModalAtelier() {
+    const conteneur = document.getElementById('atelierListe');
+    conteneur.innerHTML = '';
+    for (const id in OUTILS) {
+      const def = OUTILS[id];
+      const cout = Object.entries(def.cout).map(([r, q]) => Math.ceil(q * etat.multiplicateurs.coutOutils) + ' ' + RESSOURCE_EMOJI[r]).join(' ');
+      const stock = etat.outilsStock[id] || 0;
+      const div = document.createElement('div');
+      div.className = 'carte-outil';
+      div.innerHTML = `<span>${def.emoji} <b>${def.nom}</b><br><small>${def.metier} · ${cout}</small></span><span class="stock">Stock : ${stock}</span>`;
+      const btn = document.createElement('button');
+      btn.textContent = 'Fabriquer';
+      btn.addEventListener('click', () => fabriquerOutil(id));
+      div.appendChild(btn);
+      conteneur.appendChild(div);
+    }
+  }
+
+  function ouvrirModalAtelier() {
+    afficherModalAtelier();
+    document.getElementById('modalAtelier').hidden = false;
+  }
+  function fermerModalAtelier() {
+    document.getElementById('modalAtelier').hidden = true;
+  }
+
+  // ============================================================
+  // Village : liste des habitants et de leurs affectations
+  // ============================================================
+
+  let ongletVillageActif = 'habitants';
+
+  function selectionnerVillageoisDepuisListe(id) {
+    villageoisSelectionneId = id;
+    caseSelectionnee = null;
+    fermerModalVillage();
+    const v = etat.villageois.find(x => x.id === id);
+    if (v) {
+      camera.x = v.x - largeurVisible() / 2;
+      camera.y = v.y - hauteurVisible() / 2;
+      clamperCamera();
+    }
+    afficherSelection();
+  }
+
+  function carteVillageoisHtml(v) {
+    const icone = v.genre === 'f' ? '👩' : '🧑';
+    const metier = v.estEnfant ? 'Enfant' : (v.outil ? OUTILS[v.outil].metier : 'Sans métier');
+    let statut;
+    if (v.estEnfant) statut = 'Grandit encore ' + Math.max(0, Math.ceil(DUREE_ENFANCE - v.age)) + ' s';
+    else if (v.enceinte) statut = '🤰 Enceinte';
+    else if (v.assigneA) statut = 'Au travail';
+    else statut = 'Libre';
+    return `<button class="carte-villageois" data-id="${v.id}">
+      <span>${icone} <b>${v.prenom}</b><br><small>${metier} · ${statut}</small></span>
+      <span>›</span>
+    </button>`;
+  }
+
+  function afficherOngletHabitants() {
+    const conteneur = document.getElementById('contenuVillage');
+    const tri = [...etat.villageois].sort((a, b) => a.prenom.localeCompare(b.prenom));
+    conteneur.innerHTML = tri.map(carteVillageoisHtml).join('') || '<p class="astuce">Aucun villageois.</p>';
+    conteneur.querySelectorAll('.carte-villageois').forEach(btn => {
+      btn.addEventListener('click', () => selectionnerVillageoisDepuisListe(Number(btn.dataset.id)));
+    });
+  }
+
+  const GROUPES_ASSIGNATION = {
+    bois: '🪓 Bûcherons',
+    pierre: '⛏️ Mineurs',
+    gibier: '🏹 Chasseurs',
+    poisson: '🎣 Pêcheurs',
+    libres: '🚶 Sans affectation',
+    enfants: '👶 Enfants',
+  };
+
+  function afficherOngletAssignations() {
+    const conteneur = document.getElementById('contenuVillage');
+    const groupes = { bois: [], pierre: [], gibier: [], poisson: [], libres: [], enfants: [] };
+    for (const v of etat.villageois) {
+      if (v.estEnfant) { groupes.enfants.push(v); continue; }
+      const noeud = v.assigneA ? etat.noeuds.get(v.assigneA) : null;
+      if (!noeud) { groupes.libres.push(v); continue; }
+      const cleRessource = noeud.type === 'arbre' ? 'bois' : noeud.type === 'roche' ? 'pierre' : noeud.type;
+      (groupes[cleRessource] || groupes.libres).push(v);
+    }
+    let html = '';
+    for (const cle in GROUPES_ASSIGNATION) {
+      const liste = groupes[cle];
+      if (!liste.length) continue;
+      html += `<div class="groupe-assignation"><h3>${GROUPES_ASSIGNATION[cle]} (${liste.length})</h3>`;
+      html += liste.map(carteVillageoisHtml).join('');
+      html += '</div>';
+    }
+    conteneur.innerHTML = html || '<p class="astuce">Aucun villageois.</p>';
+    conteneur.querySelectorAll('.carte-villageois').forEach(btn => {
+      btn.addEventListener('click', () => selectionnerVillageoisDepuisListe(Number(btn.dataset.id)));
+    });
+  }
+
+  function afficherModalVillage() {
+    document.getElementById('ongletHabitants').classList.toggle('onglet-actif', ongletVillageActif === 'habitants');
+    document.getElementById('ongletAssignations').classList.toggle('onglet-actif', ongletVillageActif === 'assignations');
+    if (ongletVillageActif === 'habitants') afficherOngletHabitants();
+    else afficherOngletAssignations();
+  }
+
+  function ouvrirModalVillage() {
+    afficherModalVillage();
+    document.getElementById('modalVillage').hidden = false;
+  }
+  function fermerModalVillage() {
+    document.getElementById('modalVillage').hidden = true;
+  }
+
   function coutBatiment(b) {
     const mult = etat.multiplicateurs.coutConstruction;
     return { bois: Math.round(b.cout.bois * mult), pierre: Math.round(b.cout.pierre * mult) };
   }
 
+  // Démolit un bâtiment et rembourse intégralement son coût de construction
+  // (au tarif courant). Le feu de camp n'est pas démolissable.
+  function demolirBatiment(origineCol, origineRow, type) {
+    const def = BATIMENTS[type];
+    if (!def || def.nonConstructible) return;
+    const taille = tailleBatiment(type);
+    const remb = coutBatiment(def);
+    const cap = capaciteStockage();
+    etat.ressources.bois = Math.min(cap, etat.ressources.bois + remb.bois);
+    etat.ressources.pierre = Math.min(cap, etat.ressources.pierre + remb.pierre);
+    for (let dr = 0; dr < taille; dr++) {
+      for (let dc = 0; dc < taille; dc++) {
+        etat.batiments.delete((origineCol + dc) + ',' + (origineRow + dr));
+      }
+    }
+    if (type === 'maison') etat.capacitePopulation -= 4;
+    notifier('🔨 ' + def.nom + ' démoli(e). Ressources récupérées.');
+    caseSelectionnee = { col: origineCol, row: origineRow, verrouillee: false };
+    afficherSelection();
+  }
+
+  // Cherche, autour de (col,row), un bâtiment dont l'empreinte (selon sa
+  // propre taille) couvre bien cette case — les bâtiments peuvent désormais
+  // faire jusqu'à 4x4, donc l'origine peut être plusieurs cases plus loin.
   function trouverOrigineBatiment(col, row) {
-    for (const [dc, dr] of [[0, 0], [-1, 0], [0, -1], [-1, -1]]) {
-      const c = col + dc, r = row + dr;
-      const type = etat.batiments.get(c + ',' + r);
-      if (type && type !== 'zone_secondaire') return { col: c, row: r, type };
+    const tailleMax = Math.max(...Object.values(BATIMENTS).map(b => b.taille || 1));
+    for (let dr = 0; dr > -tailleMax; dr--) {
+      for (let dc = 0; dc > -tailleMax; dc--) {
+        const c = col + dc, r = row + dr;
+        const type = etat.batiments.get(c + ',' + r);
+        if (!type || type === 'zone_secondaire') continue;
+        const taille = tailleBatiment(type);
+        if (col < c + taille && row < r + taille) return { col: c, row: r, type };
+      }
     }
     return null;
   }
@@ -1545,9 +1715,8 @@
     return etat.chantiers.some(ch => ch.cases.some(c => c.cle === cle));
   }
 
-  const BATIMENTS_2X2 = new Set(['maison', 'champ', 'enclos']);
   function tailleBatiment(type) {
-    return BATIMENTS_2X2.has(type) ? 2 : 1;
+    return (BATIMENTS[type] && BATIMENTS[type].taille) || 1;
   }
 
   // Calcule les cases occupées par un bâtiment posé en (col,row) et vérifie si
@@ -1765,10 +1934,11 @@
       for (const id in OUTILS) {
         const def = OUTILS[id];
         const possede = v.outil === id;
-        const cout = Object.entries(def.cout).map(([r, q]) => Math.ceil(q * etat.multiplicateurs.coutOutils) + ' ' + RESSOURCE_EMOJI[r]).join(' ');
-        html += `<button class="btn-outil${possede ? ' selectionne' : ''}" data-outil="${id}" ${possede ? 'disabled' : ''} title="${def.metier} · ${cout}">${def.emoji} ${def.nom}</button>`;
+        const stock = etat.outilsStock[id] || 0;
+        html += `<button class="btn-outil${possede ? ' selectionne' : ''}" data-outil="${id}" ${(possede || stock <= 0) ? 'disabled' : ''} title="${def.metier} · en stock : ${stock}">${def.emoji} ${def.nom} (${stock})</button>`;
       }
       html += '</div>';
+      html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement.</p>';
     }
 
     conteneur.innerHTML = html;
@@ -1777,18 +1947,11 @@
       conteneur.querySelectorAll('.btn-outil').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.outil;
-          const def = OUTILS[id];
-          const cout = {};
-          for (const r in def.cout) cout[r] = Math.ceil(def.cout[r] * etat.multiplicateurs.coutOutils);
-          for (const r in cout) {
-            if ((etat.ressources[r] || 0) < cout[r]) {
-              notifier('❌ Ressources insuffisantes pour fabriquer : ' + def.nom);
-              return;
-            }
-          }
-          for (const r in cout) etat.ressources[r] -= cout[r];
+          if ((etat.outilsStock[id] || 0) <= 0) return;
+          etat.outilsStock[id]--;
+          if (v.outil) etat.outilsStock[v.outil] = (etat.outilsStock[v.outil] || 0) + 1;
           v.outil = id;
-          notifier(def.emoji + ' ' + v.prenom + ' devient ' + def.metier.toLowerCase() + '.');
+          notifier(OUTILS[id].emoji + ' ' + v.prenom + ' devient ' + OUTILS[id].metier.toLowerCase() + '.');
           afficherSelection();
         });
       });
@@ -1815,9 +1978,10 @@
     const cle = col + ',' + row;
     const noeud = etat.noeuds.get(cle);
     let batiment = etat.batiments.get(cle);
+    let batimentCol = col, batimentRow = row;
     if (batiment === 'zone_secondaire') {
       const origine = trouverOrigineBatiment(col, row);
-      if (origine) batiment = origine.type;
+      if (origine) { batiment = origine.type; batimentCol = origine.col; batimentRow = origine.row; }
     }
 
     const chantier = etat.chantiers.find(ch => ch.cases.some(c => c.cle === cle));
@@ -1842,6 +2006,13 @@
     if (batiment) {
       const def = BATIMENTS[batiment];
       html += `<p>${def.emoji} <b>${def.nom}</b><br>${def.desc}</p>`;
+      if (!def.nonConstructible) {
+        const remb = coutBatiment(def);
+        html += `<div class="ligne-action">
+          <button id="btnDemolir">🔨 Démolir</button>
+          <span class="astuce">+${remb.bois}🪵 +${remb.pierre}🪨</span>
+        </div>`;
+      }
     } else if (chantier) {
       const def = BATIMENTS[chantier.type];
       const restant = Math.max(0, Math.ceil(chantier.tempsRestant));
@@ -1866,6 +2037,9 @@
     }
 
     conteneur.innerHTML = html;
+
+    const btnD = document.getElementById('btnDemolir');
+    if (btnD) btnD.addEventListener('click', () => demolirBatiment(batimentCol, batimentRow, batiment));
 
     const btnA = document.getElementById('btnAssigner');
     const btnR = document.getElementById('btnRetirer');
@@ -2343,6 +2517,7 @@
       if (!enPause) tick();
       majInterface();
       if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionneId !== null) afficherSelection();
+      if (!document.getElementById('modalVillage').hidden) afficherModalVillage();
     }, TICK_MS);
   }
 
@@ -2385,6 +2560,26 @@
   document.getElementById('fermerTech').addEventListener('click', fermerModalTech);
   document.getElementById('modalTech').addEventListener('click', (e) => {
     if (e.target.id === 'modalTech') fermerModalTech();
+  });
+
+  document.getElementById('btnAtelier').addEventListener('click', ouvrirModalAtelier);
+  document.getElementById('fermerAtelier').addEventListener('click', fermerModalAtelier);
+  document.getElementById('modalAtelier').addEventListener('click', (e) => {
+    if (e.target.id === 'modalAtelier') fermerModalAtelier();
+  });
+
+  document.getElementById('btnVillage').addEventListener('click', ouvrirModalVillage);
+  document.getElementById('fermerVillage').addEventListener('click', fermerModalVillage);
+  document.getElementById('modalVillage').addEventListener('click', (e) => {
+    if (e.target.id === 'modalVillage') fermerModalVillage();
+  });
+  document.getElementById('ongletHabitants').addEventListener('click', () => {
+    ongletVillageActif = 'habitants';
+    afficherModalVillage();
+  });
+  document.getElementById('ongletAssignations').addEventListener('click', () => {
+    ongletVillageActif = 'assignations';
+    afficherModalVillage();
   });
 
   document.getElementById('btnZoomPlus').addEventListener('click', () => definirZoom(zoom * 1.3));

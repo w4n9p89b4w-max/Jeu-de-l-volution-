@@ -22,6 +22,8 @@
       <div class="barre-xp"><div id="barreXpRemplie" class="barre-xp-remplie"></div></div>
       <span class="points-tech">🔬 <b id="stPoints">0</b> pts</span>
       <button id="btnTech">Technologies</button>
+      <button id="btnAtelier">🛠️ Atelier</button>
+      <button id="btnVillage">👥 Village</button>
     </div>
 
     <span id="stAmbiance" class="ambiance" title="Heure et météo">☀️ Jour</span>
@@ -126,6 +128,31 @@
         <svg id="arbreTechLiens" class="arbre-tech-liens"></svg>
         <div id="grilleTech" class="arbre-tech-grille"></div>
       </div>
+    </div>
+  </div>
+
+  <div id="modalAtelier" class="modal" hidden>
+    <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>🛠️ Atelier</h2>
+        <button id="fermerAtelier">✕</button>
+      </div>
+      <p class="astuce">Fabriquez des outils à l'avance ; équipez-les ensuite gratuitement depuis la fiche d'un villageois.</p>
+      <div id="atelierListe" class="atelier-liste"></div>
+    </div>
+  </div>
+
+  <div id="modalVillage" class="modal" hidden>
+    <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>👥 Village</h2>
+        <button id="fermerVillage">✕</button>
+      </div>
+      <div class="onglets-village">
+        <button id="ongletHabitants" class="onglet-actif">Habitants</button>
+        <button id="ongletAssignations">Assignations</button>
+      </div>
+      <div id="contenuVillage" class="liste-village"></div>
     </div>
   </div>
 

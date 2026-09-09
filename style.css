@@ -375,6 +375,88 @@ main {
   letter-spacing: 0.03em;
 }
 
+/* ---------- Atelier ---------- */
+
+.atelier-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.carte-outil {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  background: #101830;
+}
+
+.carte-outil small {
+  display: block;
+  color: var(--texte-att);
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+.carte-outil .stock {
+  color: var(--accent-2);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+/* ---------- Village ---------- */
+
+.onglets-village {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.onglets-village button.onglet-actif {
+  background: var(--accent);
+  color: #0b1220;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.liste-village {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.groupe-assignation h3 {
+  margin: 0.8rem 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--texte-att);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.groupe-assignation:first-child h3 {
+  margin-top: 0;
+}
+
+.carte-villageois {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  width: 100%;
+}
+
+.carte-villageois small {
+  display: block;
+  color: var(--texte-att);
+  font-weight: 400;
+}
+
 /* ---------- Modale technologies ---------- */
 
 .modal {
