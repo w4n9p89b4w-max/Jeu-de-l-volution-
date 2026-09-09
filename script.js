@@ -4332,8 +4332,17 @@
   document.getElementById('btnZoomMoins').addEventListener('click', () => definirZoom(zoom / 1.3));
 
   // Tiroir du panneau latéral sur mobile (masqué par défaut via CSS, voir ouvrirPanneauMobile).
+  // Le bouton ☰ ouvre toujours le menu général (Mode + astuce par défaut),
+  // jamais la fiche d'une sélection en cours : l'ouvrir désélectionne tout.
   document.getElementById('btnPanneauMobile').addEventListener('click', () => {
-    definirPanneauMobileOuvert(!document.querySelector('.panneau').classList.contains('ouvert'));
+    const ouvertActuellement = document.querySelector('.panneau').classList.contains('ouvert');
+    if (!ouvertActuellement) {
+      villageoisSelectionnes.clear();
+      creatureSelectionneeId = null;
+      caseSelectionnee = null;
+      afficherSelection();
+    }
+    definirPanneauMobileOuvert(!ouvertActuellement);
   });
 
   // ============================================================
