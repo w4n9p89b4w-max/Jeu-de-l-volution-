@@ -40,11 +40,15 @@
   const DUREE_ENFANCE = 60;  // secondes avant qu'un enfant devienne adulte et puisse travailler
   const DUREE_GESTATION_JOURS = 30; // jours de grossesse avant la naissance (voir DUREE_JOUR)
   const PV_VILLAGEOIS = 100;
+  const PV_REGEN_PAR_SEC = 8; // vitesse de soin autour du feu de camp, en sortant d'une grotte
 
   // Intérieur des grottes : une petite salle générée une fois par grotte,
   // avec des gisements à miner sur place et une sortie qui ramène dehors.
-  const GROTTE_INT_COLS = 11;
-  const GROTTE_INT_ROWS = 9;
+  // Sa taille et sa difficulté (obstacles, gisements, créatures) augmentent
+  // par paliers avec l'éloignement du feu de camp de base (difficulteGrotte).
+  const GROTTE_INT_COLS_BASE = 15;
+  const GROTTE_INT_ROWS_BASE = 11;
+  const GROTTE_DIST_PALIERS = [40, 90]; // distance (en cases) du feu séparant les 3 paliers
   const DUREE_MINAGE_GROTTE = 3;  // secondes par extraction sur un gisement
   const GAIN_MINAGE_GROTTE = 6;   // valeur extraite par cycle de minage
 
@@ -68,6 +72,12 @@
   const DUREE_ATTAQUE_CREATURE = 1.2; // secondes entre deux coups
   const DEGATS_GARDE = 8;             // dégâts infligés en retour par un villageois armé d'une épée
   const MAX_CREATURES = 6;
+
+  // Combat volontaire : cliquer sur une créature hostile pendant qu'un
+  // villageois est sélectionné l'envoie l'attaquer (voir combatCibleId).
+  const DUREE_ATTAQUE_VILLAGEOIS = 1;      // secondes entre deux coups portés volontairement
+  const DEGATS_ATTAQUE_VILLAGEOIS_NU = 3;  // dégâts à mains nues (l'épée inflige DEGATS_GARDE, bien plus efficace)
+  const PORTEE_ATTAQUE_VILLAGEOIS = 20;    // distance en pixels pour porter un coup
 
   // Outils assignables : chacun donne un métier et, pour la plupart, un bonus
   // de récolte sur le type de ressource correspondant.
@@ -751,12 +761,25 @@
     return grottes;
   }
 
+  // Difficulté d'une grotte (0 = proche, 1 = moyenne, 2 = éloignée) selon sa
+  // distance au feu de camp de base : détermine la taille de la salle, le
+  // nombre d'obstacles/gisements, et la dangerosité des créatures qui y rôdent.
+  function difficulteGrotte(grotte) {
+    const base = trouverBase();
+    const dist = Math.hypot(grotte.col - base.x / TAILLE_TUILE, grotte.row - base.y / TAILLE_TUILE);
+    if (dist < GROTTE_DIST_PALIERS[0]) return 0;
+    if (dist < GROTTE_DIST_PALIERS[1]) return 1;
+    return 2;
+  }
+
   // Génère la petite salle intérieure d'une grotte : un rectangle de roche
-  // avec quelques obstacles isolés, une sortie en bas, et 3 à 5 gisements à
+  // avec quelques obstacles isolés, une sortie en bas, et des gisements à
   // miner. Une recherche en largeur depuis la sortie garantit que toute case
   // praticable reste accessible (les rochers isolant une poche sont annulés).
-  function genererInterieurGrotte() {
-    const cols = GROTTE_INT_COLS, rows = GROTTE_INT_ROWS;
+  // La taille et la densité augmentent avec le niveau de difficulté (0-2).
+  function genererInterieurGrotte(niveau = 0) {
+    const cols = GROTTE_INT_COLS_BASE + niveau * 4, rows = GROTTE_INT_ROWS_BASE + niveau * 3;
+    const aireRatio = (cols * rows) / (GROTTE_INT_COLS_BASE * GROTTE_INT_ROWS_BASE);
     const tuiles = [];
     for (let r = 0; r < rows; r++) {
       const ligne = [];
@@ -769,7 +792,7 @@
     const sortie = { col: Math.floor(cols / 2), row: rows - 1 };
     tuiles[sortie.row][sortie.col] = 'sol';
 
-    const nbObstacles = Math.round(aleatoire(4, 8));
+    const nbObstacles = Math.round(aleatoire(4, 8) * aireRatio + niveau * 3);
     for (let i = 0; i < nbObstacles; i++) {
       const col = Math.floor(aleatoire(1, cols - 1));
       const row = Math.floor(aleatoire(1, rows - 2));
@@ -804,14 +827,14 @@
       solLibres.push({ col: c, row: r });
     }
     const noeuds = [];
-    const nbNoeuds = Math.round(aleatoire(3, 5));
+    const nbNoeuds = Math.round(aleatoire(3, 5) * aireRatio + niveau);
     for (let i = 0; i < nbNoeuds && solLibres.length; i++) {
       const idx = Math.floor(Math.random() * solLibres.length);
       const [pos] = solLibres.splice(idx, 1);
-      noeuds.push({ col: pos.col, row: pos.row, quantite: Math.round(aleatoire(24, 48)) });
+      noeuds.push({ col: pos.col, row: pos.row, quantite: Math.round(aleatoire(24, 48) * (1 + niveau * 0.35)) });
     }
 
-    return { cols, rows, tuiles, sortie, noeuds };
+    return { cols, rows, tuiles, sortie, noeuds, niveau };
   }
 
   // Une case « sol » libre de l'intérieur, hors sortie : utilisée pour placer
@@ -856,9 +879,11 @@
   }
 
   // Un villageois est « libre » s'il n'a ni tâche, ni enfance, ni expédition
-  // de grotte en cours (en chemin ou déjà à l'intérieur), et ne fuit pas.
+  // de grotte en cours (en chemin, en attente du groupe, ou déjà à
+  // l'intérieur), ne fuit pas, ne se soigne pas au feu, et n'est pas au combat.
   function estVillageoisLibre(v) {
-    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.dansGrotte && !v.enFuite && v.expeditionZone === null;
+    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.attenteGrotte && !v.dansGrotte
+      && !v.enFuite && v.expeditionZone === null && !v.recupereAuFeu && v.combatCibleId === null;
   }
 
   // Un outil spécialisé (hache, pioche, arc, canne) ne peut travailler que le
@@ -1049,10 +1074,16 @@
       pv: PV_VILLAGEOIS,
       pvMax: PV_VILLAGEOIS,
       grotteAssignee: null,
+      grotteGroupeId: null,
+      attenteGrotte: null,
       dansGrotte: null,
       cibleNoeudGrotte: null,
       tempsMinage: 0,
       enFuite: false,
+      recupereAuFeu: false,
+      commandeManuelle: null,
+      combatCibleId: null,
+      tempsAttaqueVillageois: 0,
       expeditionZone: null,
       expeditionTempsRestant: 0,
     };
@@ -1217,26 +1248,101 @@
         continue;
       }
 
+      // Combat volontaire : le joueur a cliqué sur une créature pendant que
+      // ce villageois était sélectionné. Il s'en approche puis la frappe à
+      // intervalles réguliers ; la créature riposte de son côté (voir
+      // mettreAJourCreatures, qui le ciblera naturellement une fois proche).
+      if (v.combatCibleId !== null) {
+        const cible = etat.creatures.find(c => c.id === v.combatCibleId && c.pv > 0 && (c.dansGrotte || null) === null);
+        if (!cible) {
+          v.combatCibleId = null;
+        } else {
+          const d = Math.hypot(cible.x - v.x, cible.y - v.y);
+          if (d > PORTEE_ATTAQUE_VILLAGEOIS) {
+            v.enMouvement = true;
+            v.travaille = false;
+            const pas = Math.min(d, v.vitesseBase * 1.3 * dt);
+            v.x += (cible.x - v.x) / d * pas;
+            v.y += (cible.y - v.y) / d * pas;
+            v.tempsAttaqueVillageois = 0;
+          } else {
+            v.enMouvement = false;
+            v.travaille = true;
+            v.tempsAttaqueVillageois += dt;
+            if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
+              v.tempsAttaqueVillageois = 0;
+              cible.pv -= (v.outil === 'epee' ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
+              cible.cibleId = v.id;
+              if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
+            }
+          }
+          continue;
+        }
+      }
+
+      // Retour d'une grotte : le villageois marche jusqu'au feu de camp pour
+      // récupérer des PV avant de reprendre une activité normale.
+      if (v.recupereAuFeu) {
+        const base = trouverBase();
+        const angle = (v.id % 8) / 8 * Math.PI * 2;
+        const tx = base.x + Math.cos(angle) * TAILLE_TUILE * 0.9;
+        const ty = base.y + Math.sin(angle) * TAILLE_TUILE * 0.9;
+        const arrive = avancerVersCible(v, tx, ty, v.vitesseBase, dt);
+        v.enMouvement = !arrive;
+        v.travaille = false;
+        if (arrive) {
+          v.pv = Math.min(v.pvMax, v.pv + PV_REGEN_PAR_SEC * dt);
+          if (v.pv >= v.pvMax) {
+            v.recupereAuFeu = false;
+            v.mode = 'attente';
+            v.pause = aleatoire(0.3, 1);
+          }
+        }
+        continue;
+      }
+
+      // Ordre de déplacement manuel (clic sur la carte pendant que ce
+      // villageois est sélectionné) : priorité sur toute tâche en cours, qui
+      // reprend normalement une fois l'arrivée constatée.
+      if (v.commandeManuelle) {
+        const arrive = avancerVersCible(v, v.commandeManuelle.x, v.commandeManuelle.y, v.vitesseBase * 1.3, dt);
+        v.travaille = false;
+        v.enMouvement = !arrive;
+        if (arrive) {
+          v.commandeManuelle = null;
+          v.mode = 'attente';
+          v.pause = aleatoire(0.5, 1.5);
+        }
+        continue;
+      }
+
       // Expédition en route vers une grotte : marche jusqu'à l'entrée, puis
-      // apparaît à l'intérieur, à la sortie de la salle générée.
+      // attend le reste du groupe envoyé avec lui (voir verifierEntreeGroupeGrotte)
+      // pour que tout le monde entre en même temps.
       if (v.grotteAssignee) {
         const grotte = etat.grottes.get(v.grotteAssignee);
-        if (!grotte) { v.grotteAssignee = null; v.mode = 'attente'; continue; }
+        if (!grotte) { v.grotteAssignee = null; v.grotteGroupeId = null; v.mode = 'attente'; continue; }
         const gx = grotte.col * TAILLE_TUILE + TAILLE_TUILE / 2;
         const gy = grotte.row * TAILLE_TUILE + TAILLE_TUILE / 2;
         const arrive = avancerVersCible(v, gx, gy, v.vitesseBase, dt);
         v.enMouvement = !arrive;
-        v.travaille = arrive;
+        v.travaille = false;
         if (arrive) {
+          const cle = v.grotteAssignee;
           v.grotteAssignee = null;
-          if (!grotte.interieur) grotte.interieur = genererInterieurGrotte();
-          v.dansGrotte = grotte.col + ',' + grotte.row;
-          v.x = grotte.interieur.sortie.col * TAILLE_TUILE + TAILLE_TUILE / 2;
-          v.y = grotte.interieur.sortie.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+          v.attenteGrotte = cle;
           v.mode = 'attente';
-          v.pause = aleatoire(0.2, 0.8);
-          notifier('🕳️ ' + v.prenom + ' entre dans la grotte...');
+          v.pause = 0;
+          verifierEntreeGroupeGrotte(v.grotteGroupeId);
         }
+        continue;
+      }
+
+      // Arrivé à l'entrée, patiente sagement le temps que le reste du groupe
+      // le rejoigne (verifierEntreeGroupeGrotte les fera tous entrer ensemble).
+      if (v.attenteGrotte) {
+        v.enMouvement = false;
+        v.travaille = false;
         continue;
       }
 
@@ -1335,6 +1441,55 @@
       return;
     }
 
+    // Combat volontaire contre une créature de la salle (clic du joueur).
+    if (v.combatCibleId !== null) {
+      const cible = etat.creatures.find(c => c.id === v.combatCibleId && c.pv > 0 && c.dansGrotte === v.dansGrotte);
+      if (!cible) {
+        v.combatCibleId = null;
+      } else {
+        const d = Math.hypot(cible.x - v.x, cible.y - v.y);
+        if (d > PORTEE_ATTAQUE_VILLAGEOIS) {
+          v.enMouvement = true;
+          v.travaille = false;
+          const pas = Math.min(d, v.vitesseBase * 1.3 * dt);
+          v.x += (cible.x - v.x) / d * pas;
+          v.y += (cible.y - v.y) / d * pas;
+          v.tempsAttaqueVillageois = 0;
+        } else {
+          v.enMouvement = false;
+          v.travaille = true;
+          v.tempsAttaqueVillageois += dt;
+          if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
+            v.tempsAttaqueVillageois = 0;
+            cible.pv -= (v.outil === 'epee' ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
+            cible.cibleId = v.id;
+            if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
+          }
+        }
+        return;
+      }
+    }
+
+    // Ordre de déplacement manuel dans la salle (clic sur une case libre) :
+    // priorité sur le minage automatique, en ligne directe (petite salle).
+    if (v.commandeManuelle) {
+      const tx = v.commandeManuelle.x, ty = v.commandeManuelle.y;
+      const d = Math.hypot(tx - v.x, ty - v.y);
+      v.travaille = false;
+      v.enMouvement = d > 2;
+      if (d > 2) {
+        const pas = Math.min(d, v.vitesseBase * dt);
+        v.x += (tx - v.x) / d * pas;
+        v.y += (ty - v.y) / d * pas;
+      } else {
+        v.commandeManuelle = null;
+        v.cibleNoeudGrotte = null;
+        v.mode = 'attente';
+        v.pause = aleatoire(0.5, 1.5);
+      }
+      return;
+    }
+
     let cibleNoeud = v.cibleNoeudGrotte
       ? interieur.noeuds.find(n => n.col === v.cibleNoeudGrotte.col && n.row === v.cibleNoeudGrotte.row && n.quantite > 0)
       : null;
@@ -1415,10 +1570,12 @@
   function sortirVillageoisDeGrotte(v, grotte) {
     v.dansGrotte = null;
     v.cibleNoeudGrotte = null;
+    v.combatCibleId = null;
     v.tempsMinage = 0;
     v.x = grotte.col * TAILLE_TUILE + TAILLE_TUILE / 2;
     v.y = grotte.row * TAILLE_TUILE + TAILLE_TUILE / 2;
     if (!v.enFuite) {
+      v.recupereAuFeu = v.pv < v.pvMax;
       v.mode = 'attente';
       v.pause = aleatoire(0.3, 1);
     }
@@ -1426,22 +1583,61 @@
 
   let camSauvegardeGrotte = null;
 
+  // Type de créature apparaissant dans une grotte selon sa difficulté : plus
+  // on s'éloigne du feu de camp, plus les loups et les ours dominent sur les
+  // chauves-souris, plus faciles.
+  function typeCreatureGrotteSelonNiveau(niveau) {
+    const r = Math.random();
+    if (niveau === 0) return r < 0.8 ? 'chauve_souris' : 'loup';
+    if (niveau === 1) return r < 0.45 ? 'chauve_souris' : r < 0.8 ? 'loup' : 'ours';
+    return r < 0.25 ? 'chauve_souris' : r < 0.6 ? 'loup' : 'ours';
+  }
+
+  // Une fois que tous les villageois d'un même envoi ont atteint l'entrée de
+  // la grotte, ils y entrent ensemble plutôt qu'un par un.
+  function verifierEntreeGroupeGrotte(groupeId) {
+    if (groupeId === null || groupeId === undefined) return;
+    const membres = etat.villageois.filter(v => v.grotteGroupeId === groupeId && (v.grotteAssignee || v.attenteGrotte));
+    if (!membres.length || membres.some(v => v.grotteAssignee)) return;
+    const cle = membres[0].attenteGrotte;
+    const grotte = etat.grottes.get(cle);
+    if (!grotte) {
+      for (const v of membres) { v.attenteGrotte = null; v.grotteGroupeId = null; v.mode = 'attente'; v.pause = aleatoire(0.3, 1); }
+      return;
+    }
+    entrerDansGrotte(grotte);
+    for (const v of membres) {
+      v.attenteGrotte = null;
+      v.grotteGroupeId = null;
+      v.dansGrotte = cle;
+      v.x = grotte.interieur.sortie.col * TAILLE_TUILE + TAILLE_TUILE / 2 + aleatoire(-8, 8);
+      v.y = grotte.interieur.sortie.row * TAILLE_TUILE + TAILLE_TUILE / 2 + aleatoire(-8, 8);
+      v.mode = 'attente';
+      v.pause = aleatoire(0.2, 0.8);
+    }
+    notifier(membres.length > 1 ? '🕳️ Le groupe entre dans la grotte...' : '🕳️ ' + membres[0].prenom + ' entre dans la grotte...');
+  }
+
   // Bascule l'affichage vers la salle intérieure d'une grotte (génération à
-  // la demande si besoin) et y fait apparaître 0-2 créatures si elle est
-  // actuellement vide de danger.
+  // la demande si besoin, avec une difficulté croissante selon l'éloignement
+  // du feu de camp) et y fait apparaître des créatures si elle est
+  // actuellement vide de danger — d'autant plus nombreuses et dangereuses que
+  // la grotte est difficile.
   function entrerDansGrotte(grotte) {
-    if (!grotte.interieur) grotte.interieur = genererInterieurGrotte();
+    const niveau = difficulteGrotte(grotte);
+    if (!grotte.interieur) grotte.interieur = genererInterieurGrotte(niveau);
     grotte.exploree = true;
     const cle = grotte.col + ',' + grotte.row;
 
     const dejaMenacee = etat.creatures.some(c => c.dansGrotte === cle && c.pv > 0);
-    if (!dejaMenacee && Math.random() < 0.55) {
-      const nb = Math.random() < 0.6 ? 1 : 2;
+    if (!dejaMenacee && Math.random() < (0.45 + niveau * 0.15)) {
+      const nb = niveau === 0 ? (Math.random() < 0.6 ? 1 : 2)
+        : niveau === 1 ? (Math.random() < 0.5 ? 2 : 3)
+        : (Math.random() < 0.5 ? 3 : 4);
       for (let i = 0; i < nb; i++) {
         const pos = positionInterieureAleatoire(grotte.interieur);
         if (!pos) continue;
-        const type = Math.random() < 0.8 ? 'chauve_souris' : 'loup';
-        creerCreature(type, pos.col, pos.row);
+        creerCreature(typeCreatureGrotteSelonNiveau(niveau), pos.col, pos.row);
         etat.creatures[etat.creatures.length - 1].dansGrotte = cle;
       }
     }
@@ -1502,18 +1698,23 @@
   // ------------------------------------------------------------
 
   let grotteEnPopup = null;
+  let grotteGroupeIdCompteur = 0;
+
+  const LABEL_DIFFICULTE_GROTTE = ['facile', 'moyenne', 'difficile'];
 
   function ouvrirPopupGrotte(grotte) {
     grotteEnPopup = grotte;
     const libres = etat.villageois.filter(estVillageoisLibre);
     const info = document.getElementById('grotteInfo');
+    const niveau = difficulteGrotte(grotte);
+    const etoiles = '⭐'.repeat(niveau + 1) + ' ' + LABEL_DIFFICULTE_GROTTE[niveau];
     if (grotte.interieur) {
       const restants = grotte.interieur.noeuds.filter(n => n.quantite > 0).length;
-      info.textContent = restants > 0
+      info.textContent = (restants > 0
         ? `Déjà visitée — ${restants} gisement${restants > 1 ? 's' : ''} encore exploitable${restants > 1 ? 's' : ''}.`
-        : 'Déjà visitée — gisements épuisés, mais peut-être encore dangereuse.';
+        : 'Déjà visitée — gisements épuisés, mais peut-être encore dangereuse.') + ` (${etoiles})`;
     } else {
-      info.textContent = 'Grotte inexplorée : trésors à miner, danger inconnu.';
+      info.textContent = `Grotte inexplorée (${etoiles}) : trésors à miner, danger inconnu. Tous les villageois envoyés entreront ensemble.`;
     }
 
     const liste = document.getElementById('grotteVillageoisListe');
@@ -1554,17 +1755,18 @@
     const cle = grotte.col + ',' + grotte.row;
     const ids = [...document.getElementById('grotteVillageoisListe').querySelectorAll('input[type=checkbox]:checked')].map(cb => Number(cb.dataset.id));
     if (ids.length === 0) return;
+    const groupeId = ++grotteGroupeIdCompteur;
     let envoyes = 0;
     for (const id of ids) {
       const v = etat.villageois.find(x => x.id === id);
       if (!v || !estVillageoisLibre(v)) continue;
       v.grotteAssignee = cle;
+      v.grotteGroupeId = groupeId;
       v.mode = 'grotte';
       envoyes++;
     }
-    if (envoyes > 0) notifier('🕯️ ' + envoyes + ' villageois partent explorer la grotte...');
+    if (envoyes > 0) notifier('🕯️ ' + envoyes + ' villageois partent vers la grotte' + (envoyes > 1 ? ', ils entreront ensemble' : '') + '...');
     fermerModalGrotte();
-    entrerDansGrotte(grotte);
   }
 
   // ============================================================
@@ -1633,6 +1835,11 @@
       v.enFuite = true;
       v.assigneA = null;
       v.grotteAssignee = null;
+      v.grotteGroupeId = null;
+      v.attenteGrotte = null;
+      v.combatCibleId = null;
+      v.recupereAuFeu = false;
+      v.commandeManuelle = null;
       notifier('🏃 ' + v.prenom + ' fuit un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + ' !');
     }
   }
@@ -1798,8 +2005,24 @@
       if (v.enFuite) {
         ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
         ctx.fillText('💨', -8, -18);
+      } else if (v.combatCibleId !== null) {
+        ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
+        ctx.fillText('⚔️', -8, -18);
+      } else if (v.recupereAuFeu) {
+        ctx.font = (TAILLE_TUILE * 0.32) + 'px serif';
+        ctx.fillText('❤️', -8, -18);
       }
       ctx.restore();
+
+      if (v.commandeManuelle) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(v.commandeManuelle.x, v.commandeManuelle.y, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#e0ac5c';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      }
 
       if (v.pv < v.pvMax) {
         const largeurBarre = 18;
@@ -2470,6 +2693,15 @@
       if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
     }
     if (cibleCreature) {
+      // Un villageois déjà sélectionné part attaquer la créature ciblée.
+      if (villageoisSelectionneId !== null) {
+        const attaquant = etat.villageois.find(x => x.id === villageoisSelectionneId && !x.dansGrotte && !x.estEnfant);
+        if (attaquant) {
+          attaquant.combatCibleId = cibleCreature.id;
+          attaquant.commandeManuelle = null;
+          notifier('⚔️ ' + attaquant.prenom + ' attaque un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
+        }
+      }
       creatureSelectionneeId = cibleCreature.id;
       villageoisSelectionneId = null;
       caseSelectionnee = null;
@@ -2486,6 +2718,21 @@
       return;
     }
 
+    // Un villageois sélectionné, disponible pour être dirigé, reçoit un
+    // ordre de déplacement vers la case cliquée plutôt que de simplement
+    // afficher les informations de la case.
+    if (villageoisSelectionneId !== null) {
+      const controle = etat.villageois.find(x => x.id === villageoisSelectionneId
+        && !x.dansGrotte && !x.enFuite && x.expeditionZone === null && !x.grotteAssignee && !x.attenteGrotte);
+      if (controle && tuileMarchable(col, row)) {
+        controle.commandeManuelle = { x: col * TAILLE_TUILE + TAILLE_TUILE / 2, y: row * TAILLE_TUILE + TAILLE_TUILE / 2 };
+        controle.combatCibleId = null;
+        afficherSelection();
+        ouvrirPanneauMobile();
+        return;
+      }
+    }
+
     villageoisSelectionneId = null;
     creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
@@ -2494,7 +2741,8 @@
   }
 
   // Gère les clics sur la vue intérieure d'une grotte : sélection d'un
-  // villageois/créature présent, ou clic sur la sortie pour ressortir.
+  // villageois/créature présent, ordre d'attaque ou de déplacement, ou clic
+  // sur la sortie pour ressortir.
   function gererClicInterieur(px, py) {
     const grotte = etat.grottes.get(etat.grotteActive);
     if (!grotte || !grotte.interieur) return;
@@ -2523,6 +2771,14 @@
       if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
     }
     if (cibleCreature) {
+      if (villageoisSelectionneId !== null) {
+        const attaquant = etat.villageois.find(x => x.id === villageoisSelectionneId && x.dansGrotte === etat.grotteActive);
+        if (attaquant) {
+          attaquant.combatCibleId = cibleCreature.id;
+          attaquant.commandeManuelle = null;
+          notifier('⚔️ ' + attaquant.prenom + ' attaque un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
+        }
+      }
       creatureSelectionneeId = cibleCreature.id;
       villageoisSelectionneId = null;
       afficherSelection();
@@ -2535,6 +2791,20 @@
     if (col === grotte.interieur.sortie.col && row === grotte.interieur.sortie.row) {
       sortirDeGrotte();
       return;
+    }
+
+    // Un villageois sélectionné se déplace vers la case cliquée de la salle.
+    if (villageoisSelectionneId !== null) {
+      const controle = etat.villageois.find(x => x.id === villageoisSelectionneId && x.dansGrotte === etat.grotteActive && !x.enFuite);
+      const praticable = col > 0 && row > 0 && col < grotte.interieur.cols - 1 && row < grotte.interieur.rows - 1
+        && grotte.interieur.tuiles[row][col] === 'sol';
+      if (controle && praticable) {
+        controle.commandeManuelle = { x: col * TAILLE_TUILE + TAILLE_TUILE / 2, y: row * TAILLE_TUILE + TAILLE_TUILE / 2 };
+        controle.combatCibleId = null;
+        afficherSelection();
+        ouvrirPanneauMobile();
+        return;
+      }
     }
 
     villageoisSelectionneId = null;
@@ -2671,11 +2941,15 @@
     let statut;
     if (v.estEnfant) statut = 'Grandit encore ' + Math.max(0, Math.ceil(DUREE_ENFANCE - v.age)) + ' s';
     else if (v.enFuite) statut = '🏃 En fuite';
+    else if (v.combatCibleId !== null) statut = '⚔️ Combat';
     else if (v.pv < v.pvMax * 0.5) statut = '🩸 Blessé(e)';
+    else if (v.recupereAuFeu) statut = '🔥 Se soigne au feu';
     else if (v.enceinte) statut = '🤰 Enceinte';
     else if (v.expeditionZone !== null) statut = '🧭 En expédition';
     else if (v.grotteAssignee) statut = '🕯️ En route vers une grotte';
+    else if (v.attenteGrotte) statut = '⏳ Attend le groupe';
     else if (v.dansGrotte) statut = '🕳️ Dans une grotte';
+    else if (v.commandeManuelle) statut = '🖐️ Déplacement dirigé';
     else if (v.assigneA) statut = 'Au travail';
     else statut = 'Libre';
     return `<button class="carte-villageois" data-id="${v.id}">
@@ -3048,8 +3322,12 @@
     let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${v.estEnfant ? ' · Enfant' : ''}<br>Métier : <b>${metier}</b></p>`;
     if (v.pv < v.pvMax) html += `<p>❤️ PV : ${Math.max(0, Math.round(v.pv))} / ${v.pvMax}</p>`;
     if (v.enFuite) html += v.dansGrotte ? '<p>🏃 En fuite — court vers la sortie de la grotte.</p>' : '<p>🏃 En fuite — court se réfugier au campement.</p>';
+    if (v.combatCibleId !== null) html += '<p>⚔️ Attaque une créature hostile.</p>';
+    if (v.recupereAuFeu) html += '<p>🔥 Se soigne près du feu de camp.</p>';
     if (v.grotteAssignee) html += '<p>🕯️ En route vers une grotte...</p>';
+    if (v.attenteGrotte) html += '<p>⏳ Attend le reste du groupe pour entrer.</p>';
     if (v.dansGrotte) html += '<p>🕳️ Explore l\'intérieur d\'une grotte.</p>';
+    if (v.commandeManuelle) html += '<p>🖐️ Se dirige vers l\'endroit indiqué.</p>';
     if (v.expeditionZone !== null) html += '<p>🧭 En expédition — retour dans ' + Math.max(0, Math.ceil(v.expeditionTempsRestant)) + ' s.</p>';
 
     if (v.estEnfant) {
@@ -3079,6 +3357,9 @@
       }
       html += '</div>';
       html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement.</p>';
+      if (!v.enFuite && v.expeditionZone === null && !v.grotteAssignee && !v.attenteGrotte) {
+        html += '<p class="astuce">🖐️ Cliquez sur la carte pour le/la faire marcher jusque-là, ou sur une créature hostile pour l\'attaquer.</p>';
+      }
     }
 
     conteneur.innerHTML = html;
@@ -3111,7 +3392,7 @@
     const etatTxt = c.mode === 'attaque' ? '⚔️ Attaque' : c.mode === 'poursuite' ? '🏃 Poursuite' : '🚶 Errance';
     conteneur.innerHTML = `<h3>${def.emoji} ${def.nom}</h3>
       <p>PV : ${Math.max(0, Math.round(c.pv))} / ${c.pvMax}<br>État : ${etatTxt}</p>
-      <p class="astuce">Équipez un villageois d'une épée (métier Garde) pour qu'il se défende automatiquement quand il est attaqué.</p>`;
+      <p class="astuce">Sélectionnez un villageois puis cliquez sur cette créature pour l'attaquer. Une épée (métier Garde) rend les coups bien plus efficaces.</p>`;
   }
 
   function afficherSelection() {
