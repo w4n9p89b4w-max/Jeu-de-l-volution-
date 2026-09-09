@@ -38,6 +38,7 @@
   const GAIN_PAR_VOYAGE = 4; // ressources rapportées à chaque aller-retour complet
   const DUREE_RECOLTE = 3;   // secondes passées sur la ressource avant de repartir
   const DUREE_ENFANCE = 60;  // secondes avant qu'un enfant devienne adulte et puisse travailler
+  const DUREE_GESTATION_JOURS = 30; // jours de grossesse avant la naissance (voir DUREE_JOUR)
 
   // Outils assignables : chacun donne un métier et, pour la plupart, un bonus
   // de récolte sur le type de ressource correspondant.
@@ -132,24 +133,27 @@
     technologie:          'Technologie',
   };
 
+  // Chaque tech porte un « palier » (1, 2, 3...) au sein de sa branche : le
+  // palier N n'est disponible que si TOUTES les techs du palier N-1 de la
+  // même branche sont déjà acquises (voir techDisponible).
   const TECHS = [
     // --- Métiers : améliore les outils et les gains des professions ---
-    { id: 'outils_bois',   nom: 'Outils en pierre',      desc: '+50% de récolte de bois.', cout: 1, prerequis: [], branche: 'metier', effet: m => m.bois *= 1.5 },
-    { id: 'outils_pierre', nom: 'Pics miniers',          desc: '+50% de récolte de pierre.', cout: 1, prerequis: [], branche: 'metier', effet: m => m.pierre *= 1.5 },
-    { id: 'chasse',        nom: 'Techniques de chasse',  desc: '+50% de récolte de gibier et de poisson.', cout: 1, prerequis: [], branche: 'metier', effet: m => m.nourriture *= 1.5 },
-    { id: 'forge',         nom: 'Forge',                 desc: '-30% de coût de fabrication des outils.', cout: 2, prerequis: ['outils_pierre'], branche: 'metier', effet: m => m.coutOutils *= 0.7 },
-    { id: 'corporations',  nom: 'Corporations de métier', desc: '+25% de bonus pour les villageois équipés d\'un outil adapté.', cout: 2, prerequis: ['forge'], branche: 'metier', effet: m => m.bonusMetier *= 1.25 },
+    { id: 'outils_bois',   nom: 'Outils en pierre',      desc: '+50% de récolte de bois.', cout: 1, prerequis: [], branche: 'metier', palier: 1, effet: m => m.bois *= 1.5 },
+    { id: 'outils_pierre', nom: 'Pics miniers',          desc: '+50% de récolte de pierre.', cout: 1, prerequis: [], branche: 'metier', palier: 1, effet: m => m.pierre *= 1.5 },
+    { id: 'chasse',        nom: 'Techniques de chasse',  desc: '+50% de récolte de gibier et de poisson.', cout: 1, prerequis: [], branche: 'metier', palier: 1, effet: m => m.nourriture *= 1.5 },
+    { id: 'forge',         nom: 'Forge',                 desc: '-30% de coût de fabrication des outils.', cout: 2, prerequis: ['outils_pierre'], branche: 'metier', palier: 2, effet: m => m.coutOutils *= 0.7 },
+    { id: 'corporations',  nom: 'Corporations de métier', desc: '+25% de bonus pour les villageois équipés d\'un outil adapté.', cout: 2, prerequis: ['forge'], branche: 'metier', palier: 3, effet: m => m.bonusMetier *= 1.25 },
 
     // --- Élevage & agriculture : nourriture et croissance de la population ---
-    { id: 'agriculture',   nom: 'Agriculture',           desc: 'Les champs produisent deux fois plus.', cout: 2, prerequis: [], branche: 'elevage_agriculture', effet: m => m.champ *= 2 },
-    { id: 'elevage',       nom: 'Élevage',                desc: 'Débloque la construction des enclos à animaux.', cout: 2, prerequis: ['chasse'], branche: 'elevage_agriculture', effet: () => {} },
-    { id: 'natalite',      nom: 'Médecine ancestrale',    desc: '+40% de vitesse de reproduction.', cout: 2, prerequis: ['agriculture'], branche: 'elevage_agriculture', effet: m => m.natalite *= 1.4 },
-    { id: 'vie_famille',   nom: 'Vie de famille',         desc: '+50% de chances de formation de nouveaux couples.', cout: 1, prerequis: [], branche: 'elevage_agriculture', effet: m => m.coupleChance *= 1.5 },
+    { id: 'agriculture',   nom: 'Agriculture',           desc: 'Les champs produisent deux fois plus.', cout: 2, prerequis: [], branche: 'elevage_agriculture', palier: 1, effet: m => m.champ *= 2 },
+    { id: 'vie_famille',   nom: 'Vie de famille',         desc: '+50% de chances de formation de nouveaux couples.', cout: 1, prerequis: [], branche: 'elevage_agriculture', palier: 1, effet: m => m.coupleChance *= 1.5 },
+    { id: 'elevage',       nom: 'Élevage',                desc: 'Débloque la construction des enclos à animaux.', cout: 2, prerequis: ['chasse'], branche: 'elevage_agriculture', palier: 2, effet: () => {} },
+    { id: 'natalite',      nom: 'Médecine ancestrale',    desc: '+40% de vitesse de reproduction.', cout: 2, prerequis: ['agriculture'], branche: 'elevage_agriculture', palier: 2, effet: m => m.natalite *= 1.4 },
 
     // --- Technologie : constructions et infrastructure ---
-    { id: 'urbanisme',     nom: 'Urbanisme',              desc: '-25% de coût de construction.', cout: 2, prerequis: [], branche: 'technologie', effet: m => m.coutConstruction *= 0.75 },
-    { id: 'entreposage',   nom: 'Grands entrepôts',       desc: '+100 capacité de stockage de base.', cout: 1, prerequis: [], branche: 'technologie', effet: m => m.stockageBonus += 100 },
-    { id: 'charpente',     nom: 'Charpente avancée',      desc: '-20% de durée de construction.', cout: 2, prerequis: ['urbanisme'], branche: 'technologie', effet: m => m.dureeConstruction *= 0.8 },
+    { id: 'urbanisme',     nom: 'Urbanisme',              desc: '-25% de coût de construction.', cout: 2, prerequis: [], branche: 'technologie', palier: 1, effet: m => m.coutConstruction *= 0.75 },
+    { id: 'entreposage',   nom: 'Grands entrepôts',       desc: '+100 capacité de stockage de base.', cout: 1, prerequis: [], branche: 'technologie', palier: 1, effet: m => m.stockageBonus += 100 },
+    { id: 'charpente',     nom: 'Charpente avancée',      desc: '-20% de durée de construction.', cout: 2, prerequis: ['urbanisme'], branche: 'technologie', palier: 2, effet: m => m.dureeConstruction *= 0.8 },
   ];
 
   const NOMS_ZONES = ['Nord-Ouest', 'Nord', 'Nord-Est', 'Ouest', 'Centre', 'Est', 'Sud-Ouest', 'Sud', 'Sud-Est'];
@@ -164,6 +168,7 @@
       prerequis: bord ? [] : [1, 3, 5, 7].filter(b => estAdjacent(b, i)).map(b => 'zone_' + b),
       zone: i,
       branche: 'exploration',
+      palier: bord ? 1 : 2,
       effet: () => {},
     });
   }
@@ -226,6 +231,7 @@
       tempsJeu: DUREE_JOUR * 0.15, // démarre le matin
       meteo: 'clair',
       meteoMinuteur: aleatoire(35, 70),
+      naissancesBloquees: false,
     };
   }
 
@@ -672,6 +678,9 @@
       age: 0,
       parentA: null,
       parentB: null,
+      enceinte: false,
+      grossesseRestante: 0,
+      pereId: null,
     };
   }
 
@@ -775,6 +784,23 @@
       if (v.age >= DUREE_ENFANCE) {
         v.estEnfant = false;
         notifier('🧑 ' + v.prenom + ' a grandi et peut désormais travailler.');
+      }
+    }
+
+    for (const v of etat.villageois) {
+      if (!v.enceinte) continue;
+      v.grossesseRestante -= dt;
+      if (v.grossesseRestante <= 0) {
+        v.enceinte = false;
+        const pos = trouverTuileMarchable(Math.round(v.x / TAILLE_TUILE), Math.round(v.y / TAILLE_TUILE), 2);
+        const enfant = creerVillageois(pos.col, pos.row);
+        enfant.estEnfant = true;
+        enfant.parentA = v.id;
+        enfant.parentB = v.pereId;
+        etat.villageois.push(enfant);
+        const pere = etat.villageois.find(p => p.id === v.pereId);
+        notifier('👶 ' + v.prenom + (pere ? ' et ' + pere.prenom : '') + ' ont eu un enfant : ' + enfant.prenom + ' !');
+        v.pereId = null;
       }
     }
 
@@ -980,6 +1006,9 @@
     dessinerMinicarteFond();
     fermerModalTech();
     document.getElementById('notifications').innerHTML = '';
+    const btnNaissances = document.getElementById('btnNaissances');
+    btnNaissances.textContent = '👶 Naissances';
+    btnNaissances.classList.remove('mode-actif');
   }
 
   function centrerCameraSurLeDepart() {
@@ -1724,6 +1753,10 @@
       } else {
         html += '<p class="astuce">Célibataire.</p>';
       }
+      if (v.enceinte) {
+        const joursRestants = Math.max(1, Math.ceil(v.grossesseRestante / DUREE_JOUR));
+        html += `<p>🤰 Enceinte — naissance dans ${joursRestants} jour${joursRestants > 1 ? 's' : ''}</p>`;
+      }
       const enfants = etat.villageois.filter(e => e.parentA === v.id || e.parentB === v.id);
       if (enfants.length) html += `<p>👶 Enfant${enfants.length > 1 ? 's' : ''} : ${enfants.map(e => e.prenom).join(', ')}</p>`;
 
@@ -1884,23 +1917,23 @@
 
     evoluerCouples(m);
 
-    // Reproduction de la population : réservée aux couples formés
-    if (etat.ressources.nourriture >= 15 && nbPopulation() < etat.capacitePopulation) {
-      const couples = couplesFormes();
+    // Grossesse : réservée aux couples formés dont personne n'est déjà
+    // enceinte ; la naissance elle-même arrive DUREE_GESTATION_JOURS jours
+    // plus tard (voir mettreAJourVillageois). Peut être coupée via
+    // l'interrupteur de naissances du bandeau du haut.
+    if (!etat.naissancesBloquees && etat.ressources.nourriture >= 15 && nbPopulation() < etat.capacitePopulation) {
+      const couples = couplesFormes().filter(([a, b]) => !a.enceinte && !b.enceinte);
       if (couples.length > 0) {
         const chance = 0.15 * m.natalite;
         if (Math.random() < chance) {
           etat.ressources.nourriture -= 10;
-          const [parentA, parentB] = couples[Math.floor(Math.random() * couples.length)];
-          const colNaissance = Math.round(parentA.x / TAILLE_TUILE);
-          const rowNaissance = Math.round(parentA.y / TAILLE_TUILE);
-          const pos = trouverTuileMarchable(colNaissance, rowNaissance, 2);
-          const enfant = creerVillageois(pos.col, pos.row);
-          enfant.estEnfant = true;
-          enfant.parentA = parentA.id;
-          enfant.parentB = parentB.id;
-          etat.villageois.push(enfant);
-          notifier('👶 ' + parentA.prenom + ' et ' + parentB.prenom + ' ont eu un enfant : ' + enfant.prenom + ' !');
+          const [a, b] = couples[Math.floor(Math.random() * couples.length)];
+          const mere = a.genre === 'f' ? a : b;
+          const pere = mere === a ? b : a;
+          mere.enceinte = true;
+          mere.grossesseRestante = DUREE_GESTATION_JOURS * DUREE_JOUR;
+          mere.pereId = pere.id;
+          notifier('🤰 ' + mere.prenom + ' attend un heureux événement avec ' + pere.prenom + '.');
         }
       }
     }
@@ -1963,8 +1996,16 @@
   // Technologies
   // ============================================================
 
+  // Une tech est disponible si ses prérequis explicites sont acquis ET,
+  // sauf au palier 1, si TOUT le palier précédent de sa branche est acquis :
+  // impossible de sauter un palier, même sans prérequis direct.
   function techDisponible(t) {
-    return t.prerequis.every(p => etat.techsAcquises.has(p));
+    if (!t.prerequis.every(p => etat.techsAcquises.has(p))) return false;
+    const palier = t.palier || 1;
+    if (palier <= 1) return true;
+    const branche = t.branche || 'technologie';
+    return TECHS.filter(a => (a.branche || 'technologie') === branche && (a.palier || 1) === palier - 1)
+      .every(a => etat.techsAcquises.has(a.id));
   }
 
   function acquerirTech(t) {
@@ -1979,45 +2020,113 @@
     afficherModalTech();
   }
 
-  // Regroupe les technologies par branche (métier / exploration /
-  // élevage-agriculture / technologie) dans l'arbre technologique.
+  // Dessine l'arbre technologique comme un vrai arbre : une colonne par
+  // branche, le palier 1 en bas (le tronc) et les paliers suivants qui
+  // poussent vers le haut, reliés par des traits vers ce dont ils dépendent
+  // (les prérequis explicites, et tout le palier précédent de la branche).
   function afficherModalTech() {
     const grille = document.getElementById('grilleTech');
+    const liens = document.getElementById('arbreTechLiens');
     grille.innerHTML = '';
+    liens.innerHTML = '';
+
     const parBranche = {};
+    let paletteMax = 1;
     for (const t of TECHS) {
       const cle = t.branche || 'technologie';
       if (!parBranche[cle]) parBranche[cle] = [];
       parBranche[cle].push(t);
+      paletteMax = Math.max(paletteMax, t.palier || 1);
     }
-    for (const cle in BRANCHES_TECH) {
-      const liste = parBranche[cle];
-      if (!liste || liste.length === 0) continue;
-      const section = document.createElement('div');
-      section.className = 'branche-tech';
-      section.innerHTML = `<h3>${BRANCHES_TECH[cle]}</h3>`;
-      const sousGrille = document.createElement('div');
-      sousGrille.className = 'grille-tech';
-      for (const t of liste) {
-        const acquise = etat.techsAcquises.has(t.id);
-        const dispo = techDisponible(t);
-        const div = document.createElement('div');
-        div.className = 'carte-tech' + (acquise ? ' acquise' : (!dispo ? ' verrouillee' : ''));
-        div.innerHTML = `<h3>${acquise ? '✅' : (dispo ? '🔓' : '🔒')} ${t.nom}</h3>
-          <p>${t.desc}</p>
-          <span class="cout">${acquise ? 'Acquise' : 'Coût : ' + t.cout + ' pt(s)'}</span>`;
-        if (!acquise && dispo) {
-          const btn = document.createElement('button');
-          btn.textContent = 'Débloquer';
-          btn.disabled = etat.pointsTech < t.cout;
-          btn.addEventListener('click', () => acquerirTech(t));
-          div.appendChild(btn);
-        }
-        sousGrille.appendChild(div);
+
+    const branches = Object.keys(BRANCHES_TECH).filter(cle => parBranche[cle] && parBranche[cle].length);
+    grille.style.gridTemplateColumns = `repeat(${branches.length}, minmax(130px, 1fr))`;
+
+    branches.forEach((cle, colIdx) => {
+      const entete = document.createElement('div');
+      entete.className = 'arbre-branche-entete';
+      entete.textContent = BRANCHES_TECH[cle];
+      entete.style.gridColumn = colIdx + 1;
+      entete.style.gridRow = 1;
+      grille.appendChild(entete);
+
+      // Plusieurs techs peuvent partager le même palier d'une branche (p. ex.
+      // les 4 zones frontalières d'exploration) : elles vont dans un même
+      // groupe qui occupe la cellule de la grille, pour ne pas se superposer.
+      const parPalier = {};
+      for (const t of parBranche[cle]) {
+        const palier = t.palier || 1;
+        (parPalier[palier] || (parPalier[palier] = [])).push(t);
       }
-      section.appendChild(sousGrille);
-      grille.appendChild(section);
-    }
+
+      for (const palierStr in parPalier) {
+        const palier = Number(palierStr);
+        const groupe = document.createElement('div');
+        groupe.className = 'arbre-palier-groupe';
+        groupe.style.gridColumn = colIdx + 1;
+        groupe.style.gridRow = (paletteMax - palier) + 2;
+
+        for (const t of parPalier[palier]) {
+          const acquise = etat.techsAcquises.has(t.id);
+          const dispo = techDisponible(t);
+          const div = document.createElement('div');
+          div.className = 'noeud-tech' + (acquise ? ' acquise' : (!dispo ? ' verrouillee' : ''));
+          div.dataset.techId = t.id;
+          div.innerHTML = `<h3>${acquise ? '✅' : (dispo ? '🔓' : '🔒')} ${t.nom}</h3>
+            <p>${t.desc}</p>
+            <span class="cout">${acquise ? 'Acquise' : 'Coût : ' + t.cout + ' pt(s)'}</span>`;
+          if (!acquise && dispo) {
+            const btn = document.createElement('button');
+            btn.textContent = 'Débloquer';
+            btn.disabled = etat.pointsTech < t.cout;
+            btn.addEventListener('click', () => acquerirTech(t));
+            div.appendChild(btn);
+          }
+          groupe.appendChild(div);
+        }
+        grille.appendChild(groupe);
+      }
+    });
+
+    // Les traits sont dessinés après coup, une fois les nœuds mis en page,
+    // à partir de leurs positions réelles dans le conteneur.
+    requestAnimationFrame(() => {
+      const conteneur = document.getElementById('arbreTechConteneur');
+      const rectConteneur = conteneur.getBoundingClientRect();
+      const centreHaut = (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2 - rectConteneur.left, y: r.top - rectConteneur.top };
+      };
+      const centreBas = (el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2 - rectConteneur.left, y: r.bottom - rectConteneur.top };
+      };
+      const noeudDe = (id) => grille.querySelector(`[data-tech-id="${id}"]`);
+
+      function relier(idDepart, idArrivee) {
+        const depart = noeudDe(idDepart), arrivee = noeudDe(idArrivee);
+        if (!depart || !arrivee) return;
+        const a = centreHaut(depart), b = centreBas(arrivee);
+        const trait = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        trait.setAttribute('x1', a.x); trait.setAttribute('y1', a.y);
+        trait.setAttribute('x2', b.x); trait.setAttribute('y2', b.y);
+        trait.setAttribute('class', etat.techsAcquises.has(idDepart) && etat.techsAcquises.has(idArrivee) ? 'lien-acquis' : 'lien-verrouille');
+        liens.appendChild(trait);
+      }
+
+      for (const t of TECHS) {
+        for (const p of t.prerequis) relier(p, t.id);
+        const palier = t.palier || 1;
+        if (palier <= 1) continue;
+        const branche = t.branche || 'technologie';
+        for (const precedente of TECHS) {
+          if ((precedente.branche || 'technologie') !== branche) continue;
+          if ((precedente.palier || 1) !== palier - 1) continue;
+          if (t.prerequis.includes(precedente.id)) continue; // déjà tracé ci-dessus
+          relier(precedente.id, t.id);
+        }
+      }
+    });
   }
 
   function ouvrirModalTech() {
@@ -2244,6 +2353,12 @@
   document.getElementById('btnPause').addEventListener('click', (e) => {
     enPause = !enPause;
     e.target.textContent = enPause ? '▶ Reprendre' : '⏸ Pause';
+  });
+  document.getElementById('btnNaissances').addEventListener('click', (e) => {
+    etat.naissancesBloquees = !etat.naissancesBloquees;
+    e.target.textContent = etat.naissancesBloquees ? '🚫 Naissances' : '👶 Naissances';
+    e.target.classList.toggle('mode-actif', etat.naissancesBloquees);
+    notifier(etat.naissancesBloquees ? '🚫 Les naissances sont désormais bloquées.' : '👶 Les naissances sont de nouveau autorisées.');
   });
   document.getElementById('btnNouvellePartie').addEventListener('click', nouvellePartie);
 

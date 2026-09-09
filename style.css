@@ -410,60 +410,104 @@ main {
 
 .modal-entete h2 { margin: 0; }
 
-.arbre-tech {
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  margin-top: 1rem;
+.modal-tech-contenu {
+  max-width: 1080px;
 }
 
-.branche-tech h3 {
-  margin: 0 0 0.6rem;
-  font-size: 0.9rem;
+/* ---------- Arbre technologique : un vrai arbre, palier 1 en bas ---------- */
+
+.arbre-tech-conteneur {
+  position: relative;
+  margin-top: 1.2rem;
+  overflow-x: auto;
+}
+
+.arbre-tech-liens {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.arbre-tech-liens line {
+  stroke: var(--bordure);
+  stroke-width: 2;
+}
+
+.arbre-tech-liens line.lien-acquis {
+  stroke: var(--accent);
+}
+
+.arbre-tech-grille {
+  position: relative;
+  display: grid;
+  gap: 1.6rem 1.2rem;
+  align-items: end;
+  min-width: 640px;
+}
+
+.arbre-palier-groupe {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: end;
+  gap: 0.6rem;
+}
+
+.arbre-branche-entete {
+  font-size: 0.85rem;
   color: var(--texte-att);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  text-align: center;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--bordure);
+  align-self: end;
 }
 
-.grille-tech {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.8rem;
-}
-
-.carte-tech {
-  border: 1px solid var(--bordure);
-  border-radius: 8px;
-  padding: 0.8rem;
+.noeud-tech {
+  position: relative;
+  width: 118px;
+  flex: 0 0 auto;
+  border: 2px solid var(--bordure);
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
   background: #101830;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
-.carte-tech h3 {
+.noeud-tech h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
-.carte-tech p {
+.noeud-tech p {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 0.64rem;
+  line-height: 1.3;
   color: var(--texte-att);
-  flex: 1;
 }
 
-.carte-tech .cout {
-  font-size: 0.8rem;
+.noeud-tech .cout {
+  font-size: 0.64rem;
   color: var(--accent-2);
 }
 
-.carte-tech.acquise {
+.noeud-tech button {
+  font-size: 0.68rem;
+  padding: 0.25rem 0.4rem;
+}
+
+.noeud-tech.acquise {
   border-color: var(--accent);
   background: #0f2a1c;
 }
 
-.carte-tech.verrouillee {
+.noeud-tech.verrouillee {
   opacity: 0.55;
 }
 
