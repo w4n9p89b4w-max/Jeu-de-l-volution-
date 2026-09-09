@@ -496,6 +496,48 @@ main {
   max-width: 1080px;
 }
 
+/* ---------- Popup de grotte ---------- */
+
+.modal-grotte-contenu {
+  max-width: 420px;
+}
+
+.grotte-villageois-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 0.9rem;
+}
+
+.grotte-villageois-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--bordure);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.grotte-villageois-item:hover {
+  border-color: var(--accent);
+}
+
+.grotte-villageois-item input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.grotte-villageois-item small {
+  display: block;
+  color: var(--texte-att);
+  font-weight: 400;
+}
+
 /* ---------- Arbre technologique : un vrai arbre, palier 1 en bas ---------- */
 
 .arbre-tech-conteneur {

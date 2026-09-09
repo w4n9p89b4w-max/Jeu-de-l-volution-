@@ -39,8 +39,14 @@
   const DUREE_RECOLTE = 3;   // secondes passées sur la ressource avant de repartir
   const DUREE_ENFANCE = 60;  // secondes avant qu'un enfant devienne adulte et puisse travailler
   const DUREE_GESTATION_JOURS = 30; // jours de grossesse avant la naissance (voir DUREE_JOUR)
-  const DUREE_EXPLORATION_GROTTE = 5; // secondes passées à explorer une grotte
   const PV_VILLAGEOIS = 100;
+
+  // Intérieur des grottes : une petite salle générée une fois par grotte,
+  // avec des gisements à miner sur place et une sortie qui ramène dehors.
+  const GROTTE_INT_COLS = 11;
+  const GROTTE_INT_ROWS = 9;
+  const DUREE_MINAGE_GROTTE = 3;  // secondes par extraction sur un gisement
+  const GAIN_MINAGE_GROTTE = 6;   // valeur extraite par cycle de minage
 
   // Créatures hostiles : rôdent, poursuivent et attaquent les villageois.
   // Un villageois équipé d'une épée (métier Garde) riposte automatiquement.
@@ -231,8 +237,9 @@
       tuiles: [],      // biome par tuile
       noeuds: new Map(),    // "col,row" -> noeud de ressource
       batiments: new Map(), // "col,row" -> type de bâtiment
-      grottes: new Map(),   // "col,row" -> { col, row, exploree }
-      creatures: [],         // créatures hostiles en vadrouille
+      grottes: new Map(),   // "col,row" -> { col, row, exploree, interieur }
+      grotteActive: null,    // clé de la grotte actuellement visitée en intérieur, ou null
+      creatures: [],         // créatures hostiles en vadrouille (dehors ou dans une grotte)
       creatureMinuteur: aleatoire(30, 55),
       chantiers: [],        // constructions en cours : { type, cases, tempsRestant, dureeTotale }
       zonesDebloquees: new Set([4]),
@@ -622,8 +629,9 @@
     return noeuds;
   }
 
-  // Grottes : points d'intérêt fixes sur les tuiles de montagne/carrière,
-  // explorables une fois par un villageois (voir explorerGrotte).
+  // Grottes : points d'intérêt fixes sur les tuiles de montagne/carrière.
+  // Chacune peut être visitée (voir ouvrirPopupGrotte / entrerDansGrotte) :
+  // sa salle intérieure n'est générée qu'à la première expédition envoyée.
   function genererGrottes() {
     const grottes = new Map();
     const candidats = [];
@@ -641,10 +649,88 @@
       const cle = col + ',' + row;
       if (grottes.has(cle) || etat.noeuds.has(cle)) continue;
       if (placees.some(([pc, pr]) => Math.hypot(pc - col, pr - row) < 10)) continue;
-      grottes.set(cle, { col, row, exploree: false });
+      grottes.set(cle, { col, row, exploree: false, interieur: null });
       placees.push([col, row]);
     }
     return grottes;
+  }
+
+  // Génère la petite salle intérieure d'une grotte : un rectangle de roche
+  // avec quelques obstacles isolés, une sortie en bas, et 3 à 5 gisements à
+  // miner. Une recherche en largeur depuis la sortie garantit que toute case
+  // praticable reste accessible (les rochers isolant une poche sont annulés).
+  function genererInterieurGrotte() {
+    const cols = GROTTE_INT_COLS, rows = GROTTE_INT_ROWS;
+    const tuiles = [];
+    for (let r = 0; r < rows; r++) {
+      const ligne = [];
+      for (let c = 0; c < cols; c++) {
+        const bord = c === 0 || r === 0 || c === cols - 1 || r === rows - 1;
+        ligne.push(bord ? 'roche' : 'sol');
+      }
+      tuiles.push(ligne);
+    }
+    const sortie = { col: Math.floor(cols / 2), row: rows - 1 };
+    tuiles[sortie.row][sortie.col] = 'sol';
+
+    const nbObstacles = Math.round(aleatoire(4, 8));
+    for (let i = 0; i < nbObstacles; i++) {
+      const col = Math.floor(aleatoire(1, cols - 1));
+      const row = Math.floor(aleatoire(1, rows - 2));
+      if (col === sortie.col && row === sortie.row) continue;
+      tuiles[row][col] = 'roche';
+    }
+
+    const accessible = new Set([sortie.col + ',' + sortie.row]);
+    const file = [[sortie.col, sortie.row]];
+    while (file.length) {
+      const [c, r] = file.shift();
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+        if (tuiles[nr][nc] !== 'sol') continue;
+        const cle = nc + ',' + nr;
+        if (accessible.has(cle)) continue;
+        accessible.add(cle);
+        file.push([nc, nr]);
+      }
+    }
+    for (let r = 1; r < rows - 1; r++) {
+      for (let c = 1; c < cols - 1; c++) {
+        if (tuiles[r][c] === 'sol' && !accessible.has(c + ',' + r)) tuiles[r][c] = 'roche';
+      }
+    }
+
+    const solLibres = [];
+    for (const cle of accessible) {
+      const [c, r] = cle.split(',').map(Number);
+      if (c === sortie.col && r === sortie.row) continue;
+      solLibres.push({ col: c, row: r });
+    }
+    const noeuds = [];
+    const nbNoeuds = Math.round(aleatoire(3, 5));
+    for (let i = 0; i < nbNoeuds && solLibres.length; i++) {
+      const idx = Math.floor(Math.random() * solLibres.length);
+      const [pos] = solLibres.splice(idx, 1);
+      noeuds.push({ col: pos.col, row: pos.row, quantite: Math.round(aleatoire(24, 48)) });
+    }
+
+    return { cols, rows, tuiles, sortie, noeuds };
+  }
+
+  // Une case « sol » libre de l'intérieur, hors sortie : utilisée pour placer
+  // des créatures et pour l'errance des villageois sans gisement à miner.
+  function positionInterieureAleatoire(interieur) {
+    const options = [];
+    for (let r = 1; r < interieur.rows - 1; r++) {
+      for (let c = 1; c < interieur.cols - 1; c++) {
+        if (interieur.tuiles[r][c] !== 'sol') continue;
+        if (c === interieur.sortie.col && r === interieur.sortie.row) continue;
+        options.push({ col: c, row: r });
+      }
+    }
+    if (!options.length) return null;
+    return options[Math.floor(Math.random() * options.length)];
   }
 
   // ============================================================
@@ -673,10 +759,10 @@
     return liste;
   }
 
-  // Un villageois est « libre » s'il n'a ni tâche, ni enfance, ni grotte en
-  // cours d'exploration, et n'est pas en train de fuir une créature.
+  // Un villageois est « libre » s'il n'a ni tâche, ni enfance, ni expédition
+  // de grotte en cours (en chemin ou déjà à l'intérieur), et ne fuit pas.
   function estVillageoisLibre(v) {
-    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.enFuite;
+    return v.assigneA === null && !v.estEnfant && !v.grotteAssignee && !v.dansGrotte && !v.enFuite;
   }
 
   function population_libre() {
@@ -732,7 +818,9 @@
       pv: PV_VILLAGEOIS,
       pvMax: PV_VILLAGEOIS,
       grotteAssignee: null,
-      tempsExploration: 0,
+      dansGrotte: null,
+      cibleNoeudGrotte: null,
+      tempsMinage: 0,
       enFuite: false,
     };
   }
@@ -865,6 +953,14 @@
     }
 
     for (const v of etat.villageois) {
+      // Villageois actuellement à l'intérieur d'une grotte : logique dédiée
+      // (minage des gisements, errance locale, fuite vers la sortie), sans
+      // rapport avec les coordonnées ou l'état du monde extérieur.
+      if (v.dansGrotte) {
+        mettreAJourVillageoisDansGrotte(v, dt);
+        continue;
+      }
+
       // Un villageois qui fuit une créature abandonne tout le reste et
       // court vers le campement, plus vite que d'habitude.
       if (v.enFuite) {
@@ -884,8 +980,8 @@
         continue;
       }
 
-      // Exploration d'une grotte : marche jusqu'à l'entrée, puis reste sur
-      // place DUREE_EXPLORATION_GROTTE secondes avant de résoudre l'issue.
+      // Expédition en route vers une grotte : marche jusqu'à l'entrée, puis
+      // apparaît à l'intérieur, à la sortie de la salle générée.
       if (v.grotteAssignee) {
         const grotte = etat.grottes.get(v.grotteAssignee);
         if (!grotte) { v.grotteAssignee = null; v.mode = 'attente'; continue; }
@@ -899,10 +995,14 @@
           v.x += (gx - v.x) / d * pas;
           v.y += (gy - v.y) / d * pas;
         } else {
-          v.tempsExploration += dt;
-          if (v.tempsExploration >= DUREE_EXPLORATION_GROTTE) {
-            resoudreExplorationGrotte(v, grotte);
-          }
+          v.grotteAssignee = null;
+          if (!grotte.interieur) grotte.interieur = genererInterieurGrotte();
+          v.dansGrotte = grotte.col + ',' + grotte.row;
+          v.x = grotte.interieur.sortie.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+          v.y = grotte.interieur.sortie.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+          v.mode = 'attente';
+          v.pause = aleatoire(0.2, 0.8);
+          notifier('🕳️ ' + v.prenom + ' entre dans la grotte...');
         }
         continue;
       }
@@ -988,46 +1088,263 @@
   }
 
   // ============================================================
-  // Grottes : exploration à risque
+  // Grottes : expéditions, salle intérieure, minage
   // ============================================================
 
-  // Envoie un villageois libre explorer une grotte non explorée.
-  function explorerGrotte(grotte) {
-    if (grotte.exploree) return;
-    const libre = etat.villageois.find(estVillageoisLibre);
-    if (!libre) { notifier('❌ Aucun villageois disponible pour explorer.'); return; }
-    libre.grotteAssignee = grotte.col + ',' + grotte.row;
-    libre.tempsExploration = 0;
-    libre.mode = 'grotte';
-    notifier('🕯️ ' + libre.prenom + ' part explorer la grotte...');
+  // IA d'un villageois actuellement dans la salle intérieure d'une grotte :
+  // fuite vers la sortie s'il est attaqué, sinon minage du gisement le plus
+  // proche, sinon errance locale une fois tous les gisements épuisés.
+  function mettreAJourVillageoisDansGrotte(v, dt) {
+    const grotte = etat.grottes.get(v.dansGrotte);
+    if (!grotte || !grotte.interieur) { v.dansGrotte = null; v.mode = 'attente'; return; }
+    const interieur = grotte.interieur;
+    const sx = interieur.sortie.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+    const sy = interieur.sortie.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+
+    if (v.enFuite) {
+      const d = Math.hypot(sx - v.x, sy - v.y);
+      v.travaille = false;
+      v.enMouvement = d > 4;
+      if (d > 4) {
+        const pas = Math.min(d, v.vitesseBase * 2.2 * dt);
+        v.x += (sx - v.x) / d * pas;
+        v.y += (sy - v.y) / d * pas;
+      } else {
+        sortirVillageoisDeGrotte(v, grotte);
+      }
+      return;
+    }
+
+    let cibleNoeud = v.cibleNoeudGrotte
+      ? interieur.noeuds.find(n => n.col === v.cibleNoeudGrotte.col && n.row === v.cibleNoeudGrotte.row && n.quantite > 0)
+      : null;
+    if (!cibleNoeud) {
+      const dispo = interieur.noeuds.filter(n => n.quantite > 0);
+      cibleNoeud = dispo.length
+        ? dispo.reduce((a, b) => (Math.hypot(a.col * TAILLE_TUILE - v.x, a.row * TAILLE_TUILE - v.y) < Math.hypot(b.col * TAILLE_TUILE - v.x, b.row * TAILLE_TUILE - v.y) ? a : b))
+        : null;
+      v.cibleNoeudGrotte = cibleNoeud ? { col: cibleNoeud.col, row: cibleNoeud.row } : null;
+    }
+
+    if (cibleNoeud) {
+      const tx = cibleNoeud.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const ty = cibleNoeud.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const d = Math.hypot(tx - v.x, ty - v.y);
+      v.enMouvement = d > 2;
+      v.travaille = !v.enMouvement;
+      if (v.enMouvement) {
+        const pas = Math.min(d, v.vitesseBase * dt);
+        v.x += (tx - v.x) / d * pas;
+        v.y += (ty - v.y) / d * pas;
+        v.tempsMinage = 0;
+      } else {
+        v.tempsMinage += dt;
+        if (v.tempsMinage >= DUREE_MINAGE_GROTTE) {
+          v.tempsMinage = 0;
+          const extrait = Math.min(cibleNoeud.quantite, GAIN_MINAGE_GROTTE);
+          cibleNoeud.quantite -= extrait;
+          const cap = capaciteStockage();
+          const part = Math.round(extrait / 3);
+          etat.ressources.bois = Math.min(cap, etat.ressources.bois + part);
+          etat.ressources.pierre = Math.min(cap, etat.ressources.pierre + part);
+          etat.ressources.nourriture = Math.min(cap, etat.ressources.nourriture + part);
+          gagnerXp(2);
+          if (cibleNoeud.quantite <= 0) {
+            v.cibleNoeudGrotte = null;
+            notifier('💎 ' + v.prenom + ' a épuisé un gisement de la grotte.');
+          }
+        }
+      }
+      return;
+    }
+
+    // Plus aucun gisement disponible : petite errance locale dans la salle.
+    v.travaille = false;
+    if (v.mode !== 'marche') v.mode = 'attente';
+    if (v.mode === 'attente') {
+      v.enMouvement = false;
+      v.pause -= dt;
+      if (v.pause <= 0) {
+        const pos = positionInterieureAleatoire(interieur);
+        if (pos) {
+          v.cibleX = pos.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+          v.cibleY = pos.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+          v.mode = 'marche';
+        } else {
+          v.pause = aleatoire(1, 3);
+        }
+      }
+    } else {
+      const d = Math.hypot(v.cibleX - v.x, v.cibleY - v.y);
+      if (d < 2) {
+        v.mode = 'attente';
+        v.pause = aleatoire(1, 3);
+        v.enMouvement = false;
+      } else {
+        const pas = Math.min(d, v.vitesseBase * dt);
+        v.x += (v.cibleX - v.x) / d * pas;
+        v.y += (v.cibleY - v.y) / d * pas;
+        v.enMouvement = true;
+      }
+    }
+  }
+
+  // Fait ressortir un villageois de la salle intérieure : il réapparaît sur
+  // la tuile de la grotte, à l'extérieur. S'il fuyait encore, il continue sa
+  // course vers le campement dès le prochain passage (v.enFuite inchangé).
+  function sortirVillageoisDeGrotte(v, grotte) {
+    v.dansGrotte = null;
+    v.cibleNoeudGrotte = null;
+    v.tempsMinage = 0;
+    v.x = grotte.col * TAILLE_TUILE + TAILLE_TUILE / 2;
+    v.y = grotte.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+    if (!v.enFuite) {
+      v.mode = 'attente';
+      v.pause = aleatoire(0.3, 1);
+    }
+  }
+
+  let camSauvegardeGrotte = null;
+
+  // Bascule l'affichage vers la salle intérieure d'une grotte (génération à
+  // la demande si besoin) et y fait apparaître 0-2 créatures si elle est
+  // actuellement vide de danger.
+  function entrerDansGrotte(grotte) {
+    if (!grotte.interieur) grotte.interieur = genererInterieurGrotte();
+    grotte.exploree = true;
+    const cle = grotte.col + ',' + grotte.row;
+
+    const dejaMenacee = etat.creatures.some(c => c.dansGrotte === cle && c.pv > 0);
+    if (!dejaMenacee && Math.random() < 0.55) {
+      const nb = Math.random() < 0.6 ? 1 : 2;
+      for (let i = 0; i < nb; i++) {
+        const pos = positionInterieureAleatoire(grotte.interieur);
+        if (!pos) continue;
+        const type = Math.random() < 0.8 ? 'chauve_souris' : 'loup';
+        creerCreature(type, pos.col, pos.row);
+        etat.creatures[etat.creatures.length - 1].dansGrotte = cle;
+      }
+    }
+
+    camSauvegardeGrotte = { x: camera.x, y: camera.y, zoom };
+    etat.grotteActive = cle;
+    villageoisSelectionneId = null;
+    creatureSelectionneeId = null;
+    caseSelectionnee = null;
+    if (modeConstruction) { modeConstruction = null; propositionConstruction = null; masquerOverlayConstruction(); }
+
+    zoom = Math.min(ZOOM_MAX, 2.2);
+    majAffichageZoom();
+    camera.x = (grotte.interieur.cols * TAILLE_TUILE) / 2 - largeurVisible() / 2;
+    camera.y = (grotte.interieur.rows * TAILLE_TUILE) / 2 - hauteurVisible() / 2;
+    clamperCamera();
+
+    const btnSortir = document.getElementById('btnSortirGrotte');
+    if (btnSortir) btnSortir.hidden = false;
+    document.getElementById('btnModeConstruire').disabled = true;
+    minicarte.style.display = 'none';
     afficherSelection();
   }
 
-  // 60% de chances de trouver un trésor, 40% de réveiller des chauves-souris.
-  function resoudreExplorationGrotte(v, grotte) {
-    grotte.exploree = true;
-    v.grotteAssignee = null;
-    v.tempsExploration = 0;
-    v.mode = 'attente';
-    v.pause = aleatoire(0.5, 1.5);
-
-    if (Math.random() < 0.6) {
-      const cap = capaciteStockage();
-      const gains = { bois: Math.round(aleatoire(10, 25)), pierre: Math.round(aleatoire(10, 25)), nourriture: Math.round(aleatoire(10, 25)) };
-      for (const r in gains) etat.ressources[r] = Math.min(cap, etat.ressources[r] + gains[r]);
-      gagnerXp(15);
-      notifier('💎 ' + v.prenom + ' a trouvé un trésor dans la grotte ! (+' + gains.bois + '🪵 +' + gains.pierre + '🪨 +' + gains.nourriture + '🍖)');
-    } else {
-      const nb = Math.random() < 0.5 ? 1 : 2;
-      let creees = 0;
-      for (let i = 0; i < nb && etat.creatures.length < MAX_CREATURES; i++) {
-        creerCreature('chauve_souris', grotte.col, grotte.row);
-        creees++;
+  // Fait ressortir tous les villageois actuellement dans la grotte active et
+  // revient à la vue extérieure. Les créatures de la salle restent dedans.
+  function sortirDeGrotte() {
+    if (!etat.grotteActive) return;
+    const cle = etat.grotteActive;
+    const grotte = etat.grottes.get(cle);
+    if (grotte) {
+      for (const v of etat.villageois) {
+        if (v.dansGrotte === cle) sortirVillageoisDeGrotte(v, grotte);
       }
-      if (creees > 0) notifier('🦇 ' + v.prenom + ' a réveillé des chauves-souris dans la grotte !');
-      else notifier('🕳️ ' + v.prenom + ' ressort de la grotte les mains vides.');
     }
+    etat.creatures = etat.creatures.filter(c => c.dansGrotte !== cle);
+    etat.grotteActive = null;
+    villageoisSelectionneId = null;
+    creatureSelectionneeId = null;
+
+    const btnSortir = document.getElementById('btnSortirGrotte');
+    if (btnSortir) btnSortir.hidden = true;
+    document.getElementById('btnModeConstruire').disabled = false;
+    minicarte.style.display = '';
+    if (camSauvegardeGrotte) {
+      camera.x = camSauvegardeGrotte.x;
+      camera.y = camSauvegardeGrotte.y;
+      zoom = camSauvegardeGrotte.zoom;
+      majAffichageZoom();
+      camSauvegardeGrotte = null;
+    }
+    clamperCamera();
     afficherSelection();
+  }
+
+  // ------------------------------------------------------------
+  // Popup d'expédition : choix des villageois à envoyer, puis entrée.
+  // ------------------------------------------------------------
+
+  let grotteEnPopup = null;
+
+  function ouvrirPopupGrotte(grotte) {
+    grotteEnPopup = grotte;
+    const libres = etat.villageois.filter(estVillageoisLibre);
+    const info = document.getElementById('grotteInfo');
+    if (grotte.interieur) {
+      const restants = grotte.interieur.noeuds.filter(n => n.quantite > 0).length;
+      info.textContent = restants > 0
+        ? `Déjà visitée — ${restants} gisement${restants > 1 ? 's' : ''} encore exploitable${restants > 1 ? 's' : ''}.`
+        : 'Déjà visitée — gisements épuisés, mais peut-être encore dangereuse.';
+    } else {
+      info.textContent = 'Grotte inexplorée : trésors à miner, danger inconnu.';
+    }
+
+    const liste = document.getElementById('grotteVillageoisListe');
+    liste.innerHTML = libres.length
+      ? libres.map(v => {
+        const icone = v.genre === 'f' ? '👩' : '🧑';
+        const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
+        return `<label class="grotte-villageois-item">
+          <input type="checkbox" data-id="${v.id}">
+          <span>${icone} <b>${v.prenom}</b><br><small>${metier}</small></span>
+        </label>`;
+      }).join('')
+      : '<p class="astuce">Aucun villageois disponible en ce moment.</p>';
+
+    liste.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', majBoutonEntrerGrotte);
+    });
+    majBoutonEntrerGrotte();
+    document.getElementById('modalGrotte').hidden = false;
+  }
+
+  function majBoutonEntrerGrotte() {
+    const liste = document.getElementById('grotteVillageoisListe');
+    const nb = liste.querySelectorAll('input[type=checkbox]:checked').length;
+    const btn = document.getElementById('btnEntrerGrotte');
+    btn.disabled = nb === 0;
+    document.getElementById('grotteSelectionCompte').textContent = nb > 0 ? nb + ' sélectionné' + (nb > 1 ? 's' : '') : '';
+  }
+
+  function fermerModalGrotte() {
+    document.getElementById('modalGrotte').hidden = true;
+    grotteEnPopup = null;
+  }
+
+  function lancerExpeditionGrotte() {
+    if (!grotteEnPopup) return;
+    const grotte = grotteEnPopup;
+    const cle = grotte.col + ',' + grotte.row;
+    const ids = [...document.getElementById('grotteVillageoisListe').querySelectorAll('input[type=checkbox]:checked')].map(cb => Number(cb.dataset.id));
+    if (ids.length === 0) return;
+    let envoyes = 0;
+    for (const id of ids) {
+      const v = etat.villageois.find(x => x.id === id);
+      if (!v || !estVillageoisLibre(v)) continue;
+      v.grotteAssignee = cle;
+      v.mode = 'grotte';
+      envoyes++;
+    }
+    if (envoyes > 0) notifier('🕯️ ' + envoyes + ' villageois partent explorer la grotte...');
+    fermerModalGrotte();
+    entrerDansGrotte(grotte);
   }
 
   // ============================================================
@@ -1053,13 +1370,15 @@
       tempsAttaque: 0,
       cibleX: undefined,
       cibleY: undefined,
+      dansGrotte: null,
     });
   }
 
   // Fait apparaître une créature aléatoire dans un biome adapté à son type,
-  // avec un biais nocturne pour les loups et les ours.
+  // avec un biais nocturne pour les loups et les ours. Les créatures à
+  // l'intérieur des grottes ne comptent pas dans ce plafond extérieur.
   function genererCreatureAleatoire() {
-    if (etat.creatures.length >= MAX_CREATURES) return;
+    if (etat.creatures.filter(c => !c.dansGrotte).length >= MAX_CREATURES) return;
     const nuit = luminosite() < 0.4;
     const tirage = Math.random();
     let type;
@@ -1133,12 +1452,15 @@
       if (c.pv <= 0) continue;
       const def = TYPES_CREATURES[c.type];
 
-      let cible = c.cibleId ? etat.villageois.find(v => v.id === c.cibleId && !v.estEnfant) : null;
+      // Une créature ne peut détecter que des villageois dans le même espace
+      // qu'elle (dehors, ou à l'intérieur de la même grotte).
+      let cible = c.cibleId ? etat.villageois.find(v => v.id === c.cibleId && !v.estEnfant && (v.dansGrotte || null) === (c.dansGrotte || null)) : null;
       if (cible && Math.hypot(cible.x - c.x, cible.y - c.y) > def.detection * 1.6) cible = null;
       if (!cible) {
         let meilleure = null, meilleureDist = def.detection;
         for (const v of etat.villageois) {
           if (v.estEnfant) continue;
+          if ((v.dansGrotte || null) !== (c.dansGrotte || null)) continue;
           const d = Math.hypot(v.x - c.x, v.y - c.y);
           if (d < meilleureDist) { meilleureDist = d; meilleure = v; }
         }
@@ -1168,9 +1490,11 @@
         continue;
       }
 
-      // Errance : petites promenades locales, seulement sur terrain marchable.
+      // Errance : petites promenades locales, seulement sur terrain marchable
+      // (les tuiles de la salle intérieure pour une créature de grotte).
       c.mode = 'errance';
       if (c.cibleX === undefined) { c.cibleX = c.x; c.cibleY = c.y; }
+      const interieurCreature = c.dansGrotte ? etat.grottes.get(c.dansGrotte)?.interieur : null;
       const dErrance = Math.hypot(c.cibleX - c.x, c.cibleY - c.y);
       if (dErrance < 2) {
         c.pause -= dt;
@@ -1179,7 +1503,10 @@
             const nx = c.x + aleatoire(-100, 100);
             const ny = c.y + aleatoire(-100, 100);
             const ncol = Math.round(nx / TAILLE_TUILE), nrow = Math.round(ny / TAILLE_TUILE);
-            if (!tuileMarchable(ncol, nrow)) continue;
+            const marchable = interieurCreature
+              ? (ncol > 0 && nrow > 0 && ncol < interieurCreature.cols - 1 && nrow < interieurCreature.rows - 1 && interieurCreature.tuiles[nrow][ncol] === 'sol')
+              : tuileMarchable(ncol, nrow);
+            if (!marchable) continue;
             c.cibleX = nx;
             c.cibleY = ny;
             break;
@@ -1200,6 +1527,7 @@
     const t = temps / 1000;
     const vw = largeurVisible(), vh = hauteurVisible();
     for (const v of etat.villageois) {
+      if ((v.dansGrotte || null) !== (etat.grotteActive || null)) continue;
       const x = v.x, y = v.y;
       if (x < camera.x - 20 || x > camera.x + vw + 20 || y < camera.y - 20 || y > camera.y + vh + 20) continue;
 
@@ -1267,6 +1595,7 @@
     const t = temps / 1000;
     const vw = largeurVisible(), vh = hauteurVisible();
     for (const c of etat.creatures) {
+      if ((c.dansGrotte || null) !== (etat.grotteActive || null)) continue;
       const x = c.x, y = c.y;
       if (x < camera.x - 20 || x > camera.x + vw + 20 || y < camera.y - 20 || y > camera.y + vh + 20) continue;
       const def = TYPES_CREATURES[c.type];
@@ -1363,6 +1692,12 @@
     modeConstruction = null;
     propositionConstruction = null;
     masquerOverlayConstruction();
+    camSauvegardeGrotte = null;
+    grotteEnPopup = null;
+    document.getElementById('btnSortirGrotte').hidden = true;
+    document.getElementById('btnModeConstruire').disabled = false;
+    minicarte.style.display = '';
+    fermerModalGrotte();
     afficherSelection();
     centrerCameraSurLeDepart();
     dessinerMinicarteFond();
@@ -1426,12 +1761,22 @@
   }
   window.addEventListener('resize', redimensionner);
 
+  // Bornes de la caméra : celles du monde extérieur, ou celles — bien plus
+  // petites — de la salle intérieure quand une grotte est en cours de visite.
   function clamperCamera() {
     const vw = largeurVisible(), vh = hauteurVisible();
-    camera.x = Math.max(0, Math.min(LARGEUR_MONDE - vw, camera.x));
-    camera.y = Math.max(0, Math.min(HAUTEUR_MONDE - vh, camera.y));
-    if (LARGEUR_MONDE <= vw) camera.x = -(vw - LARGEUR_MONDE) / 2;
-    if (HAUTEUR_MONDE <= vh) camera.y = -(vh - HAUTEUR_MONDE) / 2;
+    let largeurMonde = LARGEUR_MONDE, hauteurMonde = HAUTEUR_MONDE;
+    if (etat && etat.grotteActive) {
+      const grotte = etat.grottes.get(etat.grotteActive);
+      if (grotte && grotte.interieur) {
+        largeurMonde = grotte.interieur.cols * TAILLE_TUILE;
+        hauteurMonde = grotte.interieur.rows * TAILLE_TUILE;
+      }
+    }
+    camera.x = Math.max(0, Math.min(largeurMonde - vw, camera.x));
+    camera.y = Math.max(0, Math.min(hauteurMonde - vh, camera.y));
+    if (largeurMonde <= vw) camera.x = -(vw - largeurMonde) / 2;
+    if (hauteurMonde <= vh) camera.y = -(vh - hauteurMonde) / 2;
   }
 
   function definirZoom(nouveauZoom, centreEcranX, centreEcranY) {
@@ -1489,6 +1834,8 @@
   }
 
   function dessinerCarte(temps) {
+    if (etat.grotteActive) { dessinerVueInterieure(temps); return; }
+
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1660,6 +2007,46 @@
     dessinerPluie();
   }
 
+  // Vue intérieure d'une grotte : petite salle fixe (pas de texture, pas de
+  // cycle jour/nuit ni de pluie), gisements et sortie, puis entités par-dessus.
+  function dessinerVueInterieure(temps) {
+    const grotte = etat.grottes.get(etat.grotteActive);
+    if (!grotte || !grotte.interieur) return;
+    const interieur = grotte.interieur;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#050403';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const echelle = zoom * ratioPixels;
+    ctx.setTransform(echelle, 0, 0, echelle, -camera.x * echelle, -camera.y * echelle);
+
+    for (let row = 0; row < interieur.rows; row++) {
+      for (let col = 0; col < interieur.cols; col++) {
+        const x = col * TAILLE_TUILE, y = row * TAILLE_TUILE;
+        const estSortie = col === interieur.sortie.col && row === interieur.sortie.row;
+        ctx.fillStyle = interieur.tuiles[row][col] === 'roche' ? '#2b2620' : (estSortie ? '#4a3f2e' : '#443b2f');
+        ctx.fillRect(x, y, TAILLE_TUILE + 1, TAILLE_TUILE + 1);
+      }
+    }
+
+    const sx = interieur.sortie.col * TAILLE_TUILE, sy = interieur.sortie.row * TAILLE_TUILE;
+    dessinerRessourceOuEmoji('🚪', sx + TAILLE_TUILE / 2, sy + TAILLE_TUILE / 2, TAILLE_TUILE * 0.8);
+    ctx.font = 'bold 8px sans-serif';
+    ctx.fillStyle = '#e0ac5c';
+    ctx.textAlign = 'center';
+    ctx.fillText('SORTIE', sx + TAILLE_TUILE / 2, sy + TAILLE_TUILE * 0.92);
+
+    for (const n of interieur.noeuds) {
+      if (n.quantite <= 0) continue;
+      const x = n.col * TAILLE_TUILE + TAILLE_TUILE / 2, y = n.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      dessinerRessourceOuEmoji('💎', x, y, TAILLE_TUILE * 0.72);
+    }
+
+    dessinerVillageois(temps);
+    dessinerCreatures(temps);
+  }
+
   // ============================================================
   // Interactions : navigation caméra
   // ============================================================
@@ -1801,6 +2188,8 @@
   }
 
   function gererClicCarte(px, py) {
+    if (etat.grotteActive) { gererClicInterieur(px, py); return; }
+
     const col = Math.floor((px / zoom + camera.x) / TAILLE_TUILE);
     const row = Math.floor((py / zoom + camera.y) / TAILLE_TUILE);
     if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) return;
@@ -1823,11 +2212,13 @@
     }
 
     // En mode exploration, un clic proche d'un villageois ou d'une créature
-    // le/la sélectionne plutôt que la case sous-jacente.
+    // le/la sélectionne plutôt que la case sous-jacente (seulement parmi les
+    // entités dehors : celles dans une grotte ne sont pas cliquables ici).
     const wx = px / zoom + camera.x;
     const wy = py / zoom + camera.y;
     let cible = null, meilleureDist = TAILLE_TUILE * 0.55;
     for (const v of etat.villageois) {
+      if (v.dansGrotte) continue;
       const d = Math.hypot(v.x - wx, v.y - wy);
       if (d < meilleureDist) { meilleureDist = d; cible = v; }
     }
@@ -1843,6 +2234,7 @@
     let cibleCreature = null;
     meilleureDist = TAILLE_TUILE * 0.55;
     for (const c of etat.creatures) {
+      if (c.dansGrotte) continue;
       const d = Math.hypot(c.x - wx, c.y - wy);
       if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
     }
@@ -1855,11 +2247,68 @@
       return;
     }
 
+    // Une grotte s'ouvre dans un petit popup dédié plutôt que dans le
+    // panneau de sélection générique.
+    const grotteClic = etat.grottes.get(col + ',' + row);
+    if (grotteClic) {
+      ouvrirPopupGrotte(grotteClic);
+      return;
+    }
+
     villageoisSelectionneId = null;
     creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
     ouvrirPanneauMobile();
+  }
+
+  // Gère les clics sur la vue intérieure d'une grotte : sélection d'un
+  // villageois/créature présent, ou clic sur la sortie pour ressortir.
+  function gererClicInterieur(px, py) {
+    const grotte = etat.grottes.get(etat.grotteActive);
+    if (!grotte || !grotte.interieur) return;
+    const wx = px / zoom + camera.x;
+    const wy = py / zoom + camera.y;
+
+    let cible = null, meilleureDist = TAILLE_TUILE * 0.55;
+    for (const v of etat.villageois) {
+      if (v.dansGrotte !== etat.grotteActive) continue;
+      const d = Math.hypot(v.x - wx, v.y - wy);
+      if (d < meilleureDist) { meilleureDist = d; cible = v; }
+    }
+    if (cible) {
+      villageoisSelectionneId = cible.id;
+      creatureSelectionneeId = null;
+      afficherSelection();
+      ouvrirPanneauMobile();
+      return;
+    }
+
+    let cibleCreature = null;
+    meilleureDist = TAILLE_TUILE * 0.55;
+    for (const c of etat.creatures) {
+      if (c.dansGrotte !== etat.grotteActive) continue;
+      const d = Math.hypot(c.x - wx, c.y - wy);
+      if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
+    }
+    if (cibleCreature) {
+      creatureSelectionneeId = cibleCreature.id;
+      villageoisSelectionneId = null;
+      afficherSelection();
+      ouvrirPanneauMobile();
+      return;
+    }
+
+    const col = Math.floor(wx / TAILLE_TUILE);
+    const row = Math.floor(wy / TAILLE_TUILE);
+    if (col === grotte.interieur.sortie.col && row === grotte.interieur.sortie.row) {
+      sortirDeGrotte();
+      return;
+    }
+
+    villageoisSelectionneId = null;
+    creatureSelectionneeId = null;
+    afficherSelection();
   }
 
   // ============================================================
@@ -1909,6 +2358,7 @@
   }
 
   function ouvrirModalConstruction() {
+    if (etat.grotteActive) return; // La construction ne s'applique pas à l'intérieur d'une grotte.
     remplirLivreConstruction();
     document.getElementById('modalConstruction').hidden = false;
   }
@@ -1992,7 +2442,8 @@
     else if (v.enFuite) statut = '🏃 En fuite';
     else if (v.pv < v.pvMax * 0.5) statut = '🩸 Blessé(e)';
     else if (v.enceinte) statut = '🤰 Enceinte';
-    else if (v.grotteAssignee) statut = '🕯️ Explore une grotte';
+    else if (v.grotteAssignee) statut = '🕯️ En route vers une grotte';
+    else if (v.dansGrotte) statut = '🕳️ Dans une grotte';
     else if (v.assigneA) statut = 'Au travail';
     else statut = 'Libre';
     return `<button class="carte-villageois" data-id="${v.id}">
@@ -2302,8 +2753,9 @@
     const metier = v.outil ? OUTILS[v.outil].metier : 'Sans métier';
     let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${v.estEnfant ? ' · Enfant' : ''}<br>Métier : <b>${metier}</b></p>`;
     if (v.pv < v.pvMax) html += `<p>❤️ PV : ${Math.max(0, Math.round(v.pv))} / ${v.pvMax}</p>`;
-    if (v.enFuite) html += '<p>🏃 En fuite — court se réfugier au campement.</p>';
-    if (v.grotteAssignee) html += '<p>🕯️ En train d\'explorer une grotte...</p>';
+    if (v.enFuite) html += v.dansGrotte ? '<p>🏃 En fuite — court vers la sortie de la grotte.</p>' : '<p>🏃 En fuite — court se réfugier au campement.</p>';
+    if (v.grotteAssignee) html += '<p>🕯️ En route vers une grotte...</p>';
+    if (v.dansGrotte) html += '<p>🕳️ Explore l\'intérieur d\'une grotte.</p>';
 
     if (v.estEnfant) {
       const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
@@ -2390,7 +2842,6 @@
     const biome = etat.tuiles[row][col];
     const cle = col + ',' + row;
     const noeud = etat.noeuds.get(cle);
-    const grotte = etat.grottes.get(cle);
     let batiment = etat.batiments.get(cle);
     let batimentCol = col, batimentRow = row;
     if (batiment === 'zone_secondaire') {
@@ -2446,17 +2897,6 @@
         <span>👥 ${idle} libres</span>
         <button id="btnAssigner" ${(idle <= 0 || travailleursZone >= capaciteZone) ? 'disabled' : ''}>+ Assigner</button>
       </div>`;
-    } else if (grotte) {
-      if (grotte.exploree) {
-        html += '<p>🕳️ <b>Grotte</b><br>Déjà explorée.</p>';
-      } else {
-        const idle = population_libre();
-        html += '<p>🕳️ <b>Grotte inexplorée</b><br>Envoyez un villageois l\'explorer : trésor ou danger...</p>';
-        html += `<div class="ligne-action">
-          <button id="btnExplorerGrotte" ${idle <= 0 ? 'disabled' : ''}>🕯️ Explorer</button>
-          <span>👥 ${idle} libres</span>
-        </div>`;
-      }
     } else {
       html += '<p class="astuce">Case libre. Passez en mode Construire pour y bâtir quelque chose.</p>';
     }
@@ -2465,9 +2905,6 @@
 
     const btnD = document.getElementById('btnDemolir');
     if (btnD) btnD.addEventListener('click', () => demolirBatiment(batimentCol, batimentRow, batiment));
-
-    const btnExplorer = document.getElementById('btnExplorerGrotte');
-    if (btnExplorer) btnExplorer.addEventListener('click', () => explorerGrotte(grotte));
 
     const btnA = document.getElementById('btnAssigner');
     const btnR = document.getElementById('btnRetirer');
@@ -3010,6 +3447,13 @@
     ongletVillageActif = 'assignations';
     afficherModalVillage();
   });
+
+  document.getElementById('fermerGrotte').addEventListener('click', fermerModalGrotte);
+  document.getElementById('modalGrotte').addEventListener('click', (e) => {
+    if (e.target.id === 'modalGrotte') fermerModalGrotte();
+  });
+  document.getElementById('btnEntrerGrotte').addEventListener('click', lancerExpeditionGrotte);
+  document.getElementById('btnSortirGrotte').addEventListener('click', sortirDeGrotte);
 
   document.getElementById('btnZoomPlus').addEventListener('click', () => definirZoom(zoom * 1.3));
   document.getElementById('btnZoomMoins').addEventListener('click', () => definirZoom(zoom / 1.3));
