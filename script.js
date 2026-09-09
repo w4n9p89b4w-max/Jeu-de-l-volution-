@@ -2228,6 +2228,9 @@
   // hostile donne un ordre à tous les membres actuellement sélectionnés.
   let villageoisSelectionnes = new Set();
   let creatureSelectionneeId = null;
+  // Id du villageois dont la case d'inventaire « + » est actuellement
+  // dépliée (affiche le choix d'outils à ajouter), ou null si repliée.
+  let pickerOutilPourId = null;
   let modeConstruction = null;
   let caseSurvolee = null;
   let propositionConstruction = null;
@@ -3419,16 +3422,36 @@
       const enfants = etat.villageois.filter(e => e.parentA === v.id || e.parentB === v.id);
       if (enfants.length) html += `<p>👶 Enfant${enfants.length > 1 ? 's' : ''} : ${enfants.map(e => e.prenom).join(', ')}</p>`;
 
-      html += `<p>${v.outils.size ? [...v.outils].map(id => OUTILS[id].emoji + ' ' + OUTILS[id].nom).join(', ') + ' équipé(e)' : 'Aucun outil équipé.'}</p>`;
+      // Inventaire en cases : une case pleine par outil équipé (cliquer la
+      // range), plus une case vide « + » pour en ajouter un depuis le stock
+      // (cliquer la déplie sur un choix d'outils disponibles).
+      const idsOutils = Object.keys(OUTILS);
+      const equipes = idsOutils.filter(id => v.outils.has(id));
+      const dispo = idsOutils.filter(id => !v.outils.has(id));
+      const pickerOuvert = pickerOutilPourId === v.id && dispo.length > 0;
+
+      html += `<p>${equipes.length ? equipes.map(id => OUTILS[id].emoji + ' ' + OUTILS[id].nom).join(', ') + ' équipé(e)' : 'Aucun outil équipé.'}</p>`;
       html += '<div class="outils-liste">';
-      for (const id in OUTILS) {
+      for (const id of equipes) {
         const def = OUTILS[id];
-        const possede = v.outils.has(id);
-        const stock = etat.outilsStock[id] || 0;
-        html += `<button class="btn-outil${possede ? ' selectionne' : ''}" data-outil="${id}" ${(!possede && stock <= 0) ? 'disabled' : ''} title="${def.metier} · en stock : ${stock}">${def.emoji} ${def.nom} (${stock})</button>`;
+        html += `<button class="case-outil case-outil-pleine" data-outil="${id}" title="${def.metier} — cliquer pour ranger">
+          <span class="case-outil-emoji">${def.emoji}</span><span class="case-outil-nom">${def.nom}</span>
+        </button>`;
+      }
+      if (dispo.length > 0) {
+        html += `<button class="case-outil case-outil-vide${pickerOuvert ? ' active' : ''}" id="caseAjouterOutil" title="Ajouter un outil">+</button>`;
       }
       html += '</div>';
-      html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement. Un villageois peut porter plusieurs outils à la fois ; cliquez sur un outil déjà équipé pour le ranger.</p>';
+      if (pickerOuvert) {
+        html += '<div class="outils-choix">';
+        for (const id of dispo) {
+          const def = OUTILS[id];
+          const stock = etat.outilsStock[id] || 0;
+          html += `<button class="btn-choix-outil" data-outil="${id}" ${stock <= 0 ? 'disabled' : ''} title="${def.metier} · en stock : ${stock}">${def.emoji} ${def.nom} (${stock})</button>`;
+        }
+        html += '</div>';
+      }
+      html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement. Un villageois peut porter plusieurs outils à la fois : cliquez sur « + » pour en ajouter un, ou sur une case pleine pour la ranger.</p>';
       if (!peutPartirExpedition(v)) {
         html += '<p class="astuce">🧭 Pour partir en expédition, il faut une torche et une épée ou un arc, tous deux équipés en même temps.</p>';
       }
@@ -3440,19 +3463,27 @@
     conteneur.innerHTML = html;
 
     if (!v.estEnfant) {
-      conteneur.querySelectorAll('.btn-outil').forEach(btn => {
+      conteneur.querySelectorAll('.case-outil-pleine').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.outil;
-          if (v.outils.has(id)) {
-            v.outils.delete(id);
-            etat.outilsStock[id] = (etat.outilsStock[id] || 0) + 1;
-            notifier(OUTILS[id].emoji + ' ' + v.prenom + ' range ' + OUTILS[id].nom.toLowerCase() + '.');
-          } else {
-            if ((etat.outilsStock[id] || 0) <= 0) return;
-            etat.outilsStock[id]--;
-            v.outils.add(id);
-            notifier(OUTILS[id].emoji + ' ' + v.prenom + ' s\'équipe de ' + OUTILS[id].nom.toLowerCase() + '.');
-          }
+          v.outils.delete(id);
+          etat.outilsStock[id] = (etat.outilsStock[id] || 0) + 1;
+          notifier(OUTILS[id].emoji + ' ' + v.prenom + ' range ' + OUTILS[id].nom.toLowerCase() + '.');
+          afficherSelection();
+        });
+      });
+      const btnAjouter = document.getElementById('caseAjouterOutil');
+      if (btnAjouter) btnAjouter.addEventListener('click', () => {
+        pickerOutilPourId = pickerOutilPourId === v.id ? null : v.id;
+        afficherSelection();
+      });
+      conteneur.querySelectorAll('.btn-choix-outil').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.outil;
+          if ((etat.outilsStock[id] || 0) <= 0) return;
+          etat.outilsStock[id]--;
+          v.outils.add(id);
+          notifier(OUTILS[id].emoji + ' ' + v.prenom + ' s\'équipe de ' + OUTILS[id].nom.toLowerCase() + '.');
           afficherSelection();
         });
       });
