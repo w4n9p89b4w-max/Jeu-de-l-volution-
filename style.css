@@ -482,6 +482,11 @@ main {
   font-weight: 400;
 }
 
+.btn-vider-selection {
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
 .carte-villageois-assign {
   display: flex;
   align-items: center;

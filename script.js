@@ -1644,7 +1644,7 @@
 
     camSauvegardeGrotte = { x: camera.x, y: camera.y, zoom };
     etat.grotteActive = cle;
-    villageoisSelectionneId = null;
+    villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     caseSelectionnee = null;
     if (modeConstruction) { modeConstruction = null; propositionConstruction = null; masquerOverlayConstruction(); }
@@ -1675,7 +1675,7 @@
     }
     etat.creatures = etat.creatures.filter(c => c.dansGrotte !== cle);
     etat.grotteActive = null;
-    villageoisSelectionneId = null;
+    villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
 
     const btnSortir = document.getElementById('btnSortirGrotte');
@@ -1851,10 +1851,7 @@
       if (partenaire) partenaire.partenaireId = null;
     }
     etat.villageois = etat.villageois.filter(x => x.id !== v.id);
-    if (villageoisSelectionneId === v.id) {
-      villageoisSelectionneId = null;
-      afficherSelection();
-    }
+    if (villageoisSelectionnes.delete(v.id)) afficherSelection();
   }
 
   function tuerCreature(c, tueur) {
@@ -1972,7 +1969,7 @@
 
       ctx.save();
       ctx.translate(x, y + 3);
-      if (v.id === villageoisSelectionneId) {
+      if (villageoisSelectionnes.has(v.id)) {
         ctx.beginPath();
         ctx.ellipse(0, 2, 10 * echelleTaille, 4 * echelleTaille, 0, 0, Math.PI * 2);
         ctx.strokeStyle = '#e0ac5c';
@@ -2131,7 +2128,7 @@
     placerCampementDepart();
     etat.villageois = genererVillageoisInitiaux(2);
     caseSelectionnee = null;
-    villageoisSelectionneId = null;
+    villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     modeConstruction = null;
     propositionConstruction = null;
@@ -2185,7 +2182,10 @@
   let aBouge = false;
 
   let caseSelectionnee = null;
-  let villageoisSelectionneId = null;
+  // Sélection multiple : cliquer sur un villageois l'ajoute à l'ensemble
+  // (ou l'en retire s'il y est déjà) ; cliquer sur la carte ou une créature
+  // hostile donne un ordre à tous les membres actuellement sélectionnés.
+  let villageoisSelectionnes = new Set();
   let creatureSelectionneeId = null;
   let modeConstruction = null;
   let caseSurvolee = null;
@@ -2650,7 +2650,7 @@
 
     const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
     if (!zoneOk) {
-      villageoisSelectionneId = null;
+      villageoisSelectionnes.clear();
       creatureSelectionneeId = null;
       caseSelectionnee = { col, row, verrouillee: true };
       afficherSelection();
@@ -2668,6 +2668,8 @@
     // En mode exploration, un clic proche d'un villageois ou d'une créature
     // le/la sélectionne plutôt que la case sous-jacente (seulement parmi les
     // entités dehors : celles dans une grotte ne sont pas cliquables ici).
+    // Cliquer sur un villageois l'ajoute à la sélection (ou l'en retire s'il
+    // y était déjà), ce qui permet de sélectionner plusieurs villageois.
     const wx = px / zoom + camera.x;
     const wy = py / zoom + camera.y;
     let cible = null, meilleureDist = TAILLE_TUILE * 0.55;
@@ -2677,7 +2679,7 @@
       if (d < meilleureDist) { meilleureDist = d; cible = v; }
     }
     if (cible) {
-      villageoisSelectionneId = cible.id;
+      if (!villageoisSelectionnes.delete(cible.id)) villageoisSelectionnes.add(cible.id);
       creatureSelectionneeId = null;
       caseSelectionnee = null;
       afficherSelection();
@@ -2693,17 +2695,24 @@
       if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
     }
     if (cibleCreature) {
-      // Un villageois déjà sélectionné part attaquer la créature ciblée.
-      if (villageoisSelectionneId !== null) {
-        const attaquant = etat.villageois.find(x => x.id === villageoisSelectionneId && !x.dansGrotte && !x.estEnfant);
-        if (attaquant) {
-          attaquant.combatCibleId = cibleCreature.id;
-          attaquant.commandeManuelle = null;
-          notifier('⚔️ ' + attaquant.prenom + ' attaque un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
-        }
+      // Tous les villageois actuellement sélectionnés partent attaquer la
+      // créature ciblée.
+      let attaquants = 0;
+      for (const id of villageoisSelectionnes) {
+        const attaquant = etat.villageois.find(x => x.id === id && !x.dansGrotte && !x.estEnfant);
+        if (!attaquant) continue;
+        attaquant.combatCibleId = cibleCreature.id;
+        attaquant.commandeManuelle = null;
+        attaquants++;
+      }
+      if (attaquants === 1) {
+        const nom = etat.villageois.find(x => villageoisSelectionnes.has(x.id))?.prenom || '';
+        notifier('⚔️ ' + nom + ' attaque un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
+      } else if (attaquants > 1) {
+        notifier('⚔️ ' + attaquants + ' villageois attaquent un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
       }
       creatureSelectionneeId = cibleCreature.id;
-      villageoisSelectionneId = null;
+      villageoisSelectionnes.clear();
       caseSelectionnee = null;
       afficherSelection();
       ouvrirPanneauMobile();
@@ -2718,22 +2727,29 @@
       return;
     }
 
-    // Un villageois sélectionné, disponible pour être dirigé, reçoit un
-    // ordre de déplacement vers la case cliquée plutôt que de simplement
-    // afficher les informations de la case.
-    if (villageoisSelectionneId !== null) {
-      const controle = etat.villageois.find(x => x.id === villageoisSelectionneId
-        && !x.dansGrotte && !x.enFuite && x.expeditionZone === null && !x.grotteAssignee && !x.attenteGrotte);
-      if (controle && tuileMarchable(col, row)) {
-        controle.commandeManuelle = { x: col * TAILLE_TUILE + TAILLE_TUILE / 2, y: row * TAILLE_TUILE + TAILLE_TUILE / 2 };
-        controle.combatCibleId = null;
+    // Les villageois sélectionnés, disponibles pour être dirigés, reçoivent
+    // un ordre de déplacement vers la case cliquée plutôt que de simplement
+    // afficher les informations de la case (léger éparpillement en cercle
+    // pour ne pas tous se superposer en groupe).
+    if (villageoisSelectionnes.size > 0 && tuileMarchable(col, row)) {
+      const controlables = [...villageoisSelectionnes]
+        .map(id => etat.villageois.find(x => x.id === id))
+        .filter(v => v && !v.dansGrotte && !v.enFuite && v.expeditionZone === null && !v.grotteAssignee && !v.attenteGrotte);
+      if (controlables.length > 0) {
+        const cx = col * TAILLE_TUILE + TAILLE_TUILE / 2, cy = row * TAILLE_TUILE + TAILLE_TUILE / 2;
+        const rayon = controlables.length > 1 ? TAILLE_TUILE * 0.45 : 0;
+        controlables.forEach((v, i) => {
+          const angle = (i / controlables.length) * Math.PI * 2;
+          v.commandeManuelle = { x: cx + Math.cos(angle) * rayon, y: cy + Math.sin(angle) * rayon };
+          v.combatCibleId = null;
+        });
         afficherSelection();
         ouvrirPanneauMobile();
         return;
       }
     }
 
-    villageoisSelectionneId = null;
+    villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
@@ -2756,7 +2772,7 @@
       if (d < meilleureDist) { meilleureDist = d; cible = v; }
     }
     if (cible) {
-      villageoisSelectionneId = cible.id;
+      if (!villageoisSelectionnes.delete(cible.id)) villageoisSelectionnes.add(cible.id);
       creatureSelectionneeId = null;
       afficherSelection();
       ouvrirPanneauMobile();
@@ -2771,16 +2787,22 @@
       if (d < meilleureDist) { meilleureDist = d; cibleCreature = c; }
     }
     if (cibleCreature) {
-      if (villageoisSelectionneId !== null) {
-        const attaquant = etat.villageois.find(x => x.id === villageoisSelectionneId && x.dansGrotte === etat.grotteActive);
-        if (attaquant) {
-          attaquant.combatCibleId = cibleCreature.id;
-          attaquant.commandeManuelle = null;
-          notifier('⚔️ ' + attaquant.prenom + ' attaque un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
-        }
+      let attaquants = 0;
+      for (const id of villageoisSelectionnes) {
+        const attaquant = etat.villageois.find(x => x.id === id && x.dansGrotte === etat.grotteActive);
+        if (!attaquant) continue;
+        attaquant.combatCibleId = cibleCreature.id;
+        attaquant.commandeManuelle = null;
+        attaquants++;
+      }
+      if (attaquants === 1) {
+        const nom = etat.villageois.find(x => villageoisSelectionnes.has(x.id))?.prenom || '';
+        notifier('⚔️ ' + nom + ' attaque un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
+      } else if (attaquants > 1) {
+        notifier('⚔️ ' + attaquants + ' villageois attaquent un(e) ' + TYPES_CREATURES[cibleCreature.type].nom.toLowerCase() + ' !');
       }
       creatureSelectionneeId = cibleCreature.id;
-      villageoisSelectionneId = null;
+      villageoisSelectionnes.clear();
       afficherSelection();
       ouvrirPanneauMobile();
       return;
@@ -2793,21 +2815,28 @@
       return;
     }
 
-    // Un villageois sélectionné se déplace vers la case cliquée de la salle.
-    if (villageoisSelectionneId !== null) {
-      const controle = etat.villageois.find(x => x.id === villageoisSelectionneId && x.dansGrotte === etat.grotteActive && !x.enFuite);
-      const praticable = col > 0 && row > 0 && col < grotte.interieur.cols - 1 && row < grotte.interieur.rows - 1
-        && grotte.interieur.tuiles[row][col] === 'sol';
-      if (controle && praticable) {
-        controle.commandeManuelle = { x: col * TAILLE_TUILE + TAILLE_TUILE / 2, y: row * TAILLE_TUILE + TAILLE_TUILE / 2 };
-        controle.combatCibleId = null;
+    // Les villageois sélectionnés se déplacent vers la case cliquée de la salle.
+    const praticable = col > 0 && row > 0 && col < grotte.interieur.cols - 1 && row < grotte.interieur.rows - 1
+      && grotte.interieur.tuiles[row][col] === 'sol';
+    if (villageoisSelectionnes.size > 0 && praticable) {
+      const controlables = [...villageoisSelectionnes]
+        .map(id => etat.villageois.find(x => x.id === id))
+        .filter(v => v && v.dansGrotte === etat.grotteActive && !v.enFuite);
+      if (controlables.length > 0) {
+        const cx = col * TAILLE_TUILE + TAILLE_TUILE / 2, cy = row * TAILLE_TUILE + TAILLE_TUILE / 2;
+        const rayon = controlables.length > 1 ? TAILLE_TUILE * 0.35 : 0;
+        controlables.forEach((v, i) => {
+          const angle = (i / controlables.length) * Math.PI * 2;
+          v.commandeManuelle = { x: cx + Math.cos(angle) * rayon, y: cy + Math.sin(angle) * rayon };
+          v.combatCibleId = null;
+        });
         afficherSelection();
         ouvrirPanneauMobile();
         return;
       }
     }
 
-    villageoisSelectionneId = null;
+    villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     afficherSelection();
   }
@@ -2887,7 +2916,7 @@
     etat.outilsStock[id] = (etat.outilsStock[id] || 0) + 1;
     notifier(def.emoji + ' ' + def.nom + ' fabriqué(e). En stock : ' + etat.outilsStock[id]);
     afficherModalAtelier();
-    if (villageoisSelectionneId !== null) afficherSelection();
+    if (villageoisSelectionnes.size > 0) afficherSelection();
   }
 
   function afficherModalAtelier() {
@@ -2923,7 +2952,8 @@
   let ongletVillageActif = 'habitants';
 
   function selectionnerVillageoisDepuisListe(id) {
-    villageoisSelectionneId = id;
+    villageoisSelectionnes.clear();
+    villageoisSelectionnes.add(id);
     caseSelectionnee = null;
     fermerModalVillage();
     const v = etat.villageois.find(x => x.id === id);
@@ -3309,9 +3339,10 @@
   // Panneau de sélection d'un villageois : métier (dérivé de son outil),
   // couple et enfants, et fabrication/attribution d'un nouvel outil.
   function afficherSelectionVillageois(conteneur) {
-    const v = etat.villageois.find(x => x.id === villageoisSelectionneId);
+    const id = [...villageoisSelectionnes][0];
+    const v = etat.villageois.find(x => x.id === id);
     if (!v) {
-      villageoisSelectionneId = null;
+      villageoisSelectionnes.delete(id);
       afficherSelection();
       return;
     }
@@ -3379,6 +3410,43 @@
     }
   }
 
+  // Panneau de sélection groupée (plusieurs villageois à la fois) : liste
+  // compacte, cliquable pour retirer un membre, plus un bouton pour tout
+  // désélectionner. Les ordres (déplacement, attaque) passent par les
+  // gestionnaires de clic, qui parcourent villageoisSelectionnes.
+  function afficherSelectionGroupe(conteneur) {
+    const membres = [...villageoisSelectionnes]
+      .map(id => etat.villageois.find(x => x.id === id))
+      .filter(Boolean);
+    if (membres.length !== villageoisSelectionnes.size) {
+      villageoisSelectionnes = new Set(membres.map(v => v.id));
+    }
+    if (membres.length === 0) { afficherSelection(); return; }
+    if (membres.length === 1) { afficherSelectionVillageois(conteneur); return; }
+
+    let html = `<h3>👥 ${membres.length} villageois sélectionnés</h3>`;
+    html += '<div class="liste-village">' + membres.map(v => {
+      const icone = v.genre === 'f' ? '👩' : '🧑';
+      return `<button class="carte-villageois" data-id="${v.id}" title="Retirer de la sélection">
+        <span>${icone} <b>${v.prenom}</b></span><span>✕</span>
+      </button>`;
+    }).join('') + '</div>';
+    html += '<p class="astuce">🖐️ Cliquez sur la carte pour les faire marcher jusque-là, ou sur une créature hostile pour les envoyer l\'attaquer.</p>';
+    html += '<button id="btnViderSelection" class="btn-vider-selection">Vider la sélection</button>';
+    conteneur.innerHTML = html;
+
+    conteneur.querySelectorAll('.carte-villageois').forEach(btn => {
+      btn.addEventListener('click', () => {
+        villageoisSelectionnes.delete(Number(btn.dataset.id));
+        afficherSelection();
+      });
+    });
+    document.getElementById('btnViderSelection').addEventListener('click', () => {
+      villageoisSelectionnes.clear();
+      afficherSelection();
+    });
+  }
+
   // Panneau de sélection d'une créature hostile : type, PV, état, et un
   // rappel que seul un villageois armé d'une épée se défend automatiquement.
   function afficherSelectionCreature(conteneur) {
@@ -3397,8 +3465,12 @@
 
   function afficherSelection() {
     const conteneur = document.getElementById('contenuSelection');
-    if (villageoisSelectionneId !== null) {
+    if (villageoisSelectionnes.size === 1) {
       afficherSelectionVillageois(conteneur);
+      return;
+    }
+    if (villageoisSelectionnes.size > 1) {
+      afficherSelectionGroupe(conteneur);
       return;
     }
     if (creatureSelectionneeId !== null) {
@@ -3726,7 +3798,7 @@
         if (partenaire) partenaire.partenaireId = null;
       }
       etat.villageois = etat.villageois.filter(x => x.id !== v.id);
-      if (villageoisSelectionneId === v.id) { villageoisSelectionneId = null; afficherSelection(); }
+      if (villageoisSelectionnes.delete(v.id)) afficherSelection();
       if (!document.getElementById('modalTech').hidden) afficherModalTech();
       return;
     }
@@ -4095,7 +4167,7 @@
     setInterval(() => {
       if (!enPause) tick();
       majInterface();
-      if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionneId !== null || creatureSelectionneeId !== null) afficherSelection();
+      if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionnes.size > 0 || creatureSelectionneeId !== null) afficherSelection();
       if (!document.getElementById('modalVillage').hidden) afficherModalVillage();
       if (!document.getElementById('modalTech').hidden) afficherModalTech();
       if (!document.getElementById('modalExpedition').hidden && expeditionEnPopup) ouvrirPopupExpedition(expeditionEnPopup);
