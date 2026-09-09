@@ -63,7 +63,9 @@
   const DEGATS_BLESSURE_EXPEDITION = [15, 30];
 
   // Créatures hostiles : rôdent, poursuivent et attaquent les villageois.
-  // Un villageois équipé d'une épée (métier Garde) riposte automatiquement.
+  // Tout villageois attaqué riposte automatiquement avec l'outil qu'il a en
+  // main (voir infligerDegatsVillageois) ; l'épée (métier Garde) reste
+  // l'arme la plus efficace, voir DEGATS_GARDE.
   const TYPES_CREATURES = {
     chauve_souris: { nom: 'Chauve-souris', emoji: '🦇', pv: 15, degats: 4,  vitesse: [55, 75], detection: 110, portee: 18, xp: 5 },
     loup:          { nom: 'Loup',          emoji: '🐺', pv: 40, degats: 9,  vitesse: [38, 52], detection: 150, portee: 22, xp: 15 },
@@ -1841,6 +1843,11 @@
       v.recupereAuFeu = false;
       v.commandeManuelle = null;
       notifier('🏃 ' + v.prenom + ' fuit un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + ' !');
+    } else if (!v.enFuite && v.combatCibleId !== creature.id) {
+      // Riposte automatique : un villageois attaqué se défend avec l'outil
+      // qu'il a en main (l'épée reste plus efficace, voir DEGATS_GARDE).
+      v.combatCibleId = creature.id;
+      v.commandeManuelle = null;
     }
   }
 
