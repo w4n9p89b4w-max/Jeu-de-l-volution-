@@ -102,6 +102,31 @@ button.mode-actif {
   transition: width 0.3s ease;
 }
 
+.jour-compteur {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--texte-att);
+  white-space: nowrap;
+}
+
+.barre-jour {
+  width: 60px;
+  height: 8px;
+  background: #0b1220;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--bordure);
+}
+
+.barre-jour-remplie {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
 .ambiance {
   font-size: 0.85rem;
   color: var(--texte-att);
@@ -702,6 +727,8 @@ main {
   .ressources { gap: 0.7rem; font-size: 0.8rem; flex-wrap: nowrap; }
   .progression { gap: 0.4rem; font-size: 0.78rem; }
   .barre-xp { width: 64px; }
+  .jour-compteur { font-size: 0.78rem; }
+  .barre-jour { width: 44px; }
   .ambiance { font-size: 0.78rem; }
   .vitesse { margin-left: 0; gap: 0.4rem; }
   .barre-haut button {

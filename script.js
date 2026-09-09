@@ -3644,6 +3644,9 @@
     const texteHeure = lum > 0.6 ? 'Jour' : lum > 0.25 ? 'Crépuscule' : 'Nuit';
     const iconMeteo = etat.meteo === 'pluie' ? ' · 🌧️ Pluie' : etat.meteo === 'nuageux' ? ' · ☁️ Nuageux' : '';
     document.getElementById('stAmbiance').textContent = `${iconHeure} ${texteHeure}${iconMeteo}`;
+
+    document.getElementById('stJour').textContent = Math.floor(etat.tempsJeu / DUREE_JOUR) + 1;
+    document.getElementById('barreJourRemplie').style.width = ((etat.tempsJeu % DUREE_JOUR) / DUREE_JOUR * 100) + '%';
   }
 
   // ============================================================
