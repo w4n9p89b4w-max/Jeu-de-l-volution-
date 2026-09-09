@@ -2727,7 +2727,10 @@
       creatureSelectionneeId = null;
       caseSelectionnee = null;
       afficherSelection();
-      ouvrirPanneauMobile();
+      // Pas d'ouverture automatique du tiroir ici : sur mobile il masquerait
+      // la moitié de la carte juste avant le tap suivant, qui sert
+      // justement à choisir où l'envoyer (voir plus bas, une fois l'ordre
+      // donné, le tiroir s'ouvre alors normalement).
       return;
     }
 
@@ -2819,7 +2822,8 @@
       if (!villageoisSelectionnes.delete(cible.id)) villageoisSelectionnes.add(cible.id);
       creatureSelectionneeId = null;
       afficherSelection();
-      ouvrirPanneauMobile();
+      // Idem qu'à l'extérieur : pas d'ouverture automatique, pour laisser la
+      // salle libre au tap suivant qui choisit la destination.
       return;
     }
 
