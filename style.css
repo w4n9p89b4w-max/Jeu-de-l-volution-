@@ -832,9 +832,10 @@ main {
     right: 0;
     bottom: 0;
     width: auto;
-    max-height: min(58vh, 480px);
+    max-height: min(48vh, 420px);
+    gap: 0.6rem;
     border-radius: 16px 16px 0 0;
-    padding: 1.2rem 0.9rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.8rem 0.8rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
     background: rgba(15, 20, 32, 0.96);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -845,6 +846,22 @@ main {
     box-shadow: 0 -10px 26px rgba(0, 0, 0, 0.45);
   }
   .panneau.ouvert { transform: translateY(0); }
+
+  /* Contenu de la fiche le plus condensé possible : c'est ce qui occupe le
+     tiroir sur mobile, donc chaque rem gagné ici rend d'autant plus de
+     carte visible au-dessus. */
+  .panneau .bloc { padding: 0.65rem 0.75rem; }
+  .panneau .bloc h2 { margin-bottom: 0.4rem; font-size: 0.82rem; }
+  .selection { font-size: 0.82rem; line-height: 1.32; }
+  .selection p { margin: 0 0 0.3rem; }
+  .selection h3 { margin-bottom: 0.15rem; }
+  .outils-liste { margin-top: 0.35rem; gap: 0.35rem; }
+  .case-outil { width: 56px; height: 56px; gap: 0.05rem; }
+  .case-outil-emoji { font-size: 1.15rem; }
+  .case-outil-nom { font-size: 0.6rem; }
+  .case-outil-vide { font-size: 1.3rem; }
+  .outils-choix { margin-top: 0.35rem; padding: 0.4rem; gap: 0.3rem; }
+  .btn-choix-outil { font-size: 0.72rem; padding: 0.28rem 0.5rem; }
 
   /* Poignée décorative en tête de tiroir, pour rappeler qu'il se glisse
      depuis le bas et peut se refermer (via le bouton ☰/✕). */
