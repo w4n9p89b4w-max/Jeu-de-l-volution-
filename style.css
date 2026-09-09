@@ -771,19 +771,41 @@ main {
     touch-action: manipulation;
   }
 
+  /* En tiroir latéral, le panneau masquait presque toute la carte sur un
+     écran de téléphone (elle ne restait visible que sur une mince bande).
+     En bas d'écran plutôt qu'à droite, il laisse toute la largeur de la
+     carte visible : bien plus lisible pour suivre villageois/créatures
+     pendant qu'on consulte une fiche. */
   .panneau {
-    top: 0;
+    top: auto;
+    left: 0;
     right: 0;
     bottom: 0;
-    width: min(86vw, 320px);
-    max-height: none;
-    border-radius: 0;
-    padding: 3.4rem 0.9rem 0.9rem;
-    background: var(--fond);
-    border-left: 1px solid var(--bordure);
-    transform: translateX(105%);
+    width: auto;
+    max-height: min(58vh, 480px);
+    border-radius: 16px 16px 0 0;
+    padding: 1.2rem 0.9rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(15, 20, 32, 0.96);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-left: none;
+    border-top: 1px solid var(--bordure);
+    transform: translateY(105%);
     transition: transform 0.25s ease;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.45);
+    box-shadow: 0 -10px 26px rgba(0, 0, 0, 0.45);
   }
-  .panneau.ouvert { transform: translateX(0); }
+  .panneau.ouvert { transform: translateY(0); }
+
+  /* Poignée décorative en tête de tiroir, pour rappeler qu'il se glisse
+     depuis le bas et peut se refermer (via le bouton ☰/✕). */
+  .panneau::before {
+    content: '';
+    order: -1;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 0.2rem;
+    border-radius: 2px;
+    background: var(--bordure);
+  }
 }
