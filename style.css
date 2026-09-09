@@ -858,4 +858,9 @@ main {
     border-radius: 2px;
     background: var(--bordure);
   }
+
+  /* Dès qu'un villageois ou une créature est sélectionné(e), le bloc Mode
+     cède toute la place à sa fiche plutôt que de l'encombrer — il reparaît
+     en retapant une case vide de la carte (ce qui désélectionne). */
+  .panneau.a-une-selection #blocMode { display: none; }
 }

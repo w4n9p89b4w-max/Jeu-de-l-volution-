@@ -3451,13 +3451,6 @@
         }
         html += '</div>';
       }
-      html += '<p class="astuce">Fabriquez des outils à l\'Atelier (🛠️ dans le bandeau) pour les équiper ici, gratuitement. Un villageois peut porter plusieurs outils à la fois : cliquez sur « + » pour en ajouter un, ou sur une case pleine pour la ranger.</p>';
-      if (!peutPartirExpedition(v)) {
-        html += '<p class="astuce">🧭 Pour partir en expédition, il faut une torche et une épée ou un arc, tous deux équipés en même temps.</p>';
-      }
-      if (!v.enFuite && v.expeditionZone === null && !v.grotteAssignee && !v.attenteGrotte) {
-        html += '<p class="astuce">🖐️ Cliquez sur la carte pour le/la faire marcher jusque-là, ou sur une créature hostile pour l\'attaquer.</p>';
-      }
     }
 
     conteneur.innerHTML = html;
@@ -3545,6 +3538,13 @@
 
   function afficherSelection() {
     const conteneur = document.getElementById('contenuSelection');
+    // Sur mobile, le bloc Mode (Explorer/Construire) cède la place à la
+    // fiche dès qu'un villageois ou une créature est sélectionné(e) (voir
+    // la règle CSS associée), pour ne pas surcharger le tiroir ; il
+    // reparaît dès qu'on retape une case vide (ce qui désélectionne).
+    const panneau = document.getElementById('panneauLateral');
+    const entiteSelectionnee = villageoisSelectionnes.size > 0 || creatureSelectionneeId !== null;
+    if (panneau) panneau.classList.toggle('a-une-selection', entiteSelectionnee);
     if (villageoisSelectionnes.size === 1) {
       afficherSelectionVillageois(conteneur);
       return;
