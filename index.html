@@ -10,65 +10,183 @@
   <header class="barre-haut">
     <h1>🏕️ Jeu de l'Évolution</h1>
 
-    <div class="ressources">
-      <span class="ress" title="Bois">🪵 <b id="stBois">0</b>/<span id="stBoisCap">0</span></span>
-      <span class="ress" title="Pierre">🪨 <b id="stPierre">0</b>/<span id="stPierreCap">0</span></span>
-      <span class="ress" title="Nourriture">🍖 <b id="stNourriture">0</b>/<span id="stNourritureCap">0</span></span>
-      <span class="ress" title="Population">👥 <b id="stPopulation">0</b>/<span id="stCapacite">0</span></span>
-    </div>
-
     <div class="progression">
       <span class="niveau">Niveau <b id="stNiveau">1</b></span>
       <div class="barre-xp"><div id="barreXpRemplie" class="barre-xp-remplie"></div></div>
       <span class="points-tech">🔬 <b id="stPoints">0</b> pts</span>
       <button id="btnTech">Technologies</button>
+      <button id="btnAtelier">🛠️ Atelier</button>
+      <button id="btnVillage">👥 Village</button>
     </div>
 
-    <div class="vitesse">
-      <button id="btnPause">⏸ Pause</button>
-      <button id="btnNouvellePartie">↺ Nouvelle carte</button>
+    <div class="jour-compteur" title="Jour actuel — la barre se remplit jusqu'au prochain jour">
+      <span>📅 Jour <b id="stJour">1</b></span>
+      <div class="barre-jour"><div id="barreJourRemplie" class="barre-jour-remplie"></div></div>
     </div>
+
+    <span id="stAmbiance" class="ambiance" title="Heure et météo">☀️ Jour</span>
   </header>
 
   <main>
     <div class="stage">
       <canvas id="carte"></canvas>
       <canvas id="minicarte" title="Cliquez pour naviguer"></canvas>
-      <div class="aide-navigation">🖱️ Glisser pour déplacer la caméra · Flèches / ZQSD pour naviguer</div>
+      <div class="ressources">
+        <span class="ress" title="Bois">🪵 <b id="stBois">0</b>/<span id="stBoisCap">0</span></span>
+        <span class="ress" title="Pierre">🪨 <b id="stPierre">0</b>/<span id="stPierreCap">0</span></span>
+        <span class="ress" title="Nourriture">🍖 <b id="stNourriture">0</b>/<span id="stNourritureCap">0</span></span>
+        <span class="ress" title="Population">👥 <b id="stPopulation">0</b>/<span id="stCapacite">0</span></span>
+      </div>
+      <div class="vitesse">
+        <button id="btnPause" title="Mettre en pause">⏸</button>
+        <button id="btnNaissances" title="Autoriser ou bloquer les nouvelles naissances">👶</button>
+        <button id="btnSortirGrotte" hidden title="Sortir de la grotte">🚪</button>
+        <button id="btnNouvellePartie" title="Nouvelle carte">↺</button>
+      </div>
+      <div class="controles" id="blocMode">
+        <button id="btnModeExplorer" class="mode-actif">🔍 Explorer</button>
+        <button id="btnModeConstruire">🏗️ Construire</button>
+      </div>
+      <button id="btnPanneauMobile" class="btn-panneau-mobile" title="Afficher le panneau">☰</button>
+      <div class="controles-zoom">
+        <button id="btnZoomPlus" title="Zoomer">+</button>
+        <span id="valeurZoom">100%</span>
+        <button id="btnZoomMoins" title="Dézoomer">−</button>
+      </div>
+      <div class="aide-navigation">🖐️ Glisser pour déplacer la caméra · Flèches / ZQSD pour naviguer · Molette ou pincement à deux doigts pour zoomer</div>
+
+      <div id="boutonsConstruction" class="confirmation-boutons" hidden style="display:none">
+        <button id="btnValiderConstruction" class="btn-valider" title="Valider la construction">✓ Valider</button>
+        <button id="btnRefuserConstruction" class="btn-refuser" title="Annuler la construction">✕ Refuser</button>
+      </div>
+      <svg id="dpadConstruction" class="confirmation-dpad" viewBox="0 0 100 100" hidden style="display:none">
+        <circle cx="50" cy="50" r="49" fill="rgba(8,12,10,0.6)" stroke="rgba(255,255,255,0.35)" stroke-width="1"></circle>
+        <g class="dpad-btn" data-dir="haut">
+          <title>Déplacer vers le haut</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
+          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="50" y1="50" x2="50" y2="16"/>
+            <polyline points="38,28 50,15 62,28"/>
+          </g>
+        </g>
+        <g class="dpad-btn" data-dir="droite" transform="rotate(90 50 50)">
+          <title>Déplacer vers la droite</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
+          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="50" y1="50" x2="50" y2="16"/>
+            <polyline points="38,28 50,15 62,28"/>
+          </g>
+        </g>
+        <g class="dpad-btn" data-dir="bas" transform="rotate(180 50 50)">
+          <title>Déplacer vers le bas</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
+          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="50" y1="50" x2="50" y2="16"/>
+            <polyline points="38,28 50,15 62,28"/>
+          </g>
+        </g>
+        <g class="dpad-btn" data-dir="gauche" transform="rotate(270 50 50)">
+          <title>Déplacer vers la gauche</title>
+          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
+          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="50" y1="50" x2="50" y2="16"/>
+            <polyline points="38,28 50,15 62,28"/>
+          </g>
+        </g>
+      </svg>
     </div>
 
-    <aside class="panneau">
+    <aside class="panneau" id="panneauLateral" hidden>
       <section class="bloc">
-        <h2>Mode</h2>
-        <div class="controles">
-          <button id="btnModeExplorer" class="mode-actif">🔍 Explorer</button>
-          <button id="btnModeConstruire">🏗️ Construire</button>
-        </div>
-        <div id="paletteConstruction" class="palette" hidden></div>
-      </section>
-
-      <section class="bloc">
-        <h2>Sélection</h2>
-        <div id="contenuSelection" class="selection">
-          <p class="astuce">Cliquez sur une case de la carte pour l'inspecter.</p>
-        </div>
-      </section>
-
-      <section class="bloc">
-        <h2>Légende des biomes</h2>
-        <ul class="legende" id="legendeBiomes"></ul>
+        <div id="contenuSelection" class="selection"></div>
       </section>
     </aside>
   </main>
 
-  <div id="modalTech" class="modal" hidden>
+  <div id="modalConstruction" class="modal" hidden>
     <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>📖 Livre de construction</h2>
+        <button id="fermerConstruction">✕</button>
+      </div>
+      <p class="astuce">Choisissez un bâtiment, puis cliquez sur la carte pour proposer son emplacement.</p>
+      <div id="livreConstruction" class="livre-construction"></div>
+    </div>
+  </div>
+
+  <div id="modalTech" class="modal" hidden>
+    <div class="modal-contenu modal-tech-contenu">
       <div class="modal-entete">
         <h2>🔬 Arbre technologique</h2>
         <button id="fermerTech">✕</button>
       </div>
-      <p class="astuce">Dépensez vos points de technologie (gagnés en montant de niveau) pour débloquer des améliorations et de nouvelles zones de récolte.</p>
-      <div id="grilleTech" class="grille-tech"></div>
+      <p class="astuce">Dépensez vos points de technologie (gagnés en montant de niveau) pour débloquer des améliorations. Chaque palier doit être entièrement débloqué avant d'accéder au suivant.</p>
+      <div id="arbreTechConteneur" class="arbre-tech-conteneur">
+        <svg id="arbreTechLiens" class="arbre-tech-liens"></svg>
+        <div id="grilleTech" class="arbre-tech-grille"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalAtelier" class="modal" hidden>
+    <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>🛠️ Atelier</h2>
+        <button id="fermerAtelier">✕</button>
+      </div>
+      <p class="astuce">Fabriquez des outils à l'avance ; équipez-les ensuite gratuitement depuis la fiche d'un villageois.</p>
+      <div id="atelierListe" class="atelier-liste"></div>
+    </div>
+  </div>
+
+  <div id="modalVillage" class="modal" hidden>
+    <div class="modal-contenu">
+      <div class="modal-entete">
+        <h2>👥 Village</h2>
+        <button id="fermerVillage">✕</button>
+      </div>
+      <div class="onglets-village">
+        <button id="ongletHabitants" class="onglet-actif">Habitants</button>
+        <button id="ongletAssignations">Assignations</button>
+      </div>
+      <div id="contenuVillage" class="liste-village"></div>
+    </div>
+  </div>
+
+  <div id="modalGrotte" class="modal" hidden>
+    <div class="modal-contenu modal-grotte-contenu">
+      <div class="modal-entete">
+        <h2>🕳️ Grotte</h2>
+        <button id="fermerGrotte">✕</button>
+      </div>
+      <p id="grotteInfo" class="astuce"></p>
+      <div id="grotteVillageoisListe" class="grotte-villageois-liste"></div>
+      <div class="ligne-action">
+        <span id="grotteSelectionCompte" class="astuce"></span>
+        <button id="btnEntrerGrotte" disabled>🚪 Entrer</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalExpedition" class="modal" hidden>
+    <div class="modal-contenu modal-grotte-contenu">
+      <div class="modal-entete">
+        <h2>🧭 Expédition</h2>
+        <button id="fermerExpedition">✕</button>
+      </div>
+      <p id="expeditionInfo" class="astuce"></p>
+      <div id="expeditionVillageoisListe" class="grotte-villageois-liste"></div>
+    </div>
+  </div>
+
+  <div id="modalChoixOutil" class="modal" hidden>
+    <div class="modal-contenu modal-grotte-contenu">
+      <div class="modal-entete">
+        <h2>🧰 Choisir un outil</h2>
+        <button id="fermerChoixOutil">✕</button>
+      </div>
+      <p id="choixOutilInfo" class="astuce"></p>
+      <div id="choixOutilListe" class="outils-liste"></div>
     </div>
   </div>
 
