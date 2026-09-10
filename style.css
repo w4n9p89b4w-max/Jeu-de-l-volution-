@@ -142,15 +142,15 @@ button.mode-actif {
   white-space: nowrap;
 }
 
-/* Rangée d'icônes seules, centrée juste au-dessus de la carte (sous le
-   bandeau du haut), plutôt que des boutons texte dans le bandeau. Sans
+/* Rangée d'icônes seules, alignée sur le coin supérieur droit de la
+   mini-carte (même top:10px qu'elle) et prolongée juste à l'extérieur,
+   à sa droite — plutôt que des boutons texte dans le bandeau. Sans
    cadre : juste l'icône, avec une ombre portée pour rester lisible
    par-dessus la carte. */
 .vitesse {
   position: absolute;
   top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 178px;
   z-index: 7;
   display: flex;
   gap: 0.5rem;
@@ -797,11 +797,6 @@ main {
   .jour-compteur { font-size: 0.78rem; }
   .barre-jour { width: 44px; }
   .ambiance { font-size: 0.78rem; }
-
-  /* Un centrage sur toute la largeur de l'écran ferait chevaucher les
-     icônes avec la mini-carte sur un téléphone (bien plus étroit qu'un
-     écran de bureau) : on les recale juste à droite de celle-ci. */
-  .vitesse { left: 178px; transform: none; }
 
   .barre-haut button {
     padding: 0.4rem 0.6rem;
