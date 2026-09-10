@@ -2228,9 +2228,9 @@
   // hostile donne un ordre à tous les membres actuellement sélectionnés.
   let villageoisSelectionnes = new Set();
   let creatureSelectionneeId = null;
-  // Id du villageois dont la case d'inventaire « + » est actuellement
-  // dépliée (affiche le choix d'outils à ajouter), ou null si repliée.
-  let pickerOutilPourId = null;
+  // Id du villageois pour lequel la popup de choix d'outil (case « + »)
+  // est actuellement ouverte, ou null si fermée.
+  let choixOutilVillageoisId = null;
   let modeConstruction = null;
   let caseSurvolee = null;
   let propositionConstruction = null;
@@ -3409,12 +3409,11 @@
       if (enfants.length) html += `<p>👶 Enfant${enfants.length > 1 ? 's' : ''} : ${enfants.map(e => e.prenom).join(', ')}</p>`;
 
       // Inventaire en cases : une case pleine par outil équipé (cliquer la
-      // range), plus une case vide « + » pour en ajouter un depuis le stock
-      // (cliquer la déplie sur un choix d'outils disponibles).
+      // range), plus une case vide « + » pour en ouvrir la popup de choix
+      // d'un outil déjà fabriqué (voir ouvrirModalChoixOutil).
       const idsOutils = Object.keys(OUTILS);
       const equipes = idsOutils.filter(id => v.outils.has(id));
       const dispo = idsOutils.filter(id => !v.outils.has(id));
-      const pickerOuvert = pickerOutilPourId === v.id && dispo.length > 0;
 
       html += `<p>${equipes.length ? equipes.map(id => OUTILS[id].emoji + ' ' + OUTILS[id].nom).join(', ') + ' équipé(e)' : 'Aucun outil équipé.'}</p>`;
       html += '<div class="outils-liste">';
@@ -3425,18 +3424,9 @@
         </button>`;
       }
       if (dispo.length > 0) {
-        html += `<button class="case-outil case-outil-vide${pickerOuvert ? ' active' : ''}" id="caseAjouterOutil" title="Ajouter un outil">+</button>`;
+        html += `<button class="case-outil case-outil-vide" id="caseAjouterOutil" title="Ajouter un outil">+</button>`;
       }
       html += '</div>';
-      if (pickerOuvert) {
-        html += '<div class="outils-choix">';
-        for (const id of dispo) {
-          const def = OUTILS[id];
-          const stock = etat.outilsStock[id] || 0;
-          html += `<button class="btn-choix-outil" data-outil="${id}" ${stock <= 0 ? 'disabled' : ''} title="${def.metier} · en stock : ${stock}">${def.emoji} ${def.nom} (${stock})</button>`;
-        }
-        html += '</div>';
-      }
     }
 
     conteneur.innerHTML = html;
@@ -3452,21 +3442,54 @@
         });
       });
       const btnAjouter = document.getElementById('caseAjouterOutil');
-      if (btnAjouter) btnAjouter.addEventListener('click', () => {
-        pickerOutilPourId = pickerOutilPourId === v.id ? null : v.id;
+      if (btnAjouter) btnAjouter.addEventListener('click', () => ouvrirModalChoixOutil(v.id));
+    }
+  }
+
+  // ============================================================
+  // Popup de choix d'outil : ouverte depuis la case « + » d'un villageois,
+  // ne propose que les outils déjà fabriqués (en stock) et pas encore
+  // équipés par lui/elle.
+  // ============================================================
+
+  function afficherModalChoixOutil() {
+    const v = etat.villageois.find(x => x.id === choixOutilVillageoisId);
+    const info = document.getElementById('choixOutilInfo');
+    const conteneur = document.getElementById('choixOutilListe');
+    if (!v) { fermerModalChoixOutil(); return; }
+    const dispo = Object.keys(OUTILS).filter(id => !v.outils.has(id) && (etat.outilsStock[id] || 0) > 0);
+    info.textContent = dispo.length
+      ? 'Outils déjà fabriqués, disponibles pour ' + v.prenom + ' :'
+      : 'Aucun outil fabriqué en stock. Rendez-vous à l\'Atelier (🛠️ dans le bandeau) pour en fabriquer.';
+    conteneur.innerHTML = dispo.map(id => {
+      const def = OUTILS[id];
+      const stock = etat.outilsStock[id];
+      return `<button class="case-outil case-outil-pleine" data-outil="${id}" title="${def.metier} · en stock : ${stock}">
+        <span class="case-outil-emoji">${def.emoji}</span><span class="case-outil-nom">${def.nom}</span>
+      </button>`;
+    }).join('');
+    conteneur.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.outil;
+        if ((etat.outilsStock[id] || 0) <= 0) return;
+        etat.outilsStock[id]--;
+        v.outils.add(id);
+        notifier(OUTILS[id].emoji + ' ' + v.prenom + ' s\'équipe de ' + OUTILS[id].nom.toLowerCase() + '.');
+        fermerModalChoixOutil();
         afficherSelection();
       });
-      conteneur.querySelectorAll('.btn-choix-outil').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.dataset.outil;
-          if ((etat.outilsStock[id] || 0) <= 0) return;
-          etat.outilsStock[id]--;
-          v.outils.add(id);
-          notifier(OUTILS[id].emoji + ' ' + v.prenom + ' s\'équipe de ' + OUTILS[id].nom.toLowerCase() + '.');
-          afficherSelection();
-        });
-      });
-    }
+    });
+  }
+
+  function ouvrirModalChoixOutil(id) {
+    choixOutilVillageoisId = id;
+    afficherModalChoixOutil();
+    document.getElementById('modalChoixOutil').hidden = false;
+  }
+
+  function fermerModalChoixOutil() {
+    document.getElementById('modalChoixOutil').hidden = true;
+    choixOutilVillageoisId = null;
   }
 
   // Panneau de sélection groupée (plusieurs villageois à la fois) : liste
@@ -4238,6 +4261,7 @@
       if (!document.getElementById('modalVillage').hidden) afficherModalVillage();
       if (!document.getElementById('modalTech').hidden) afficherModalTech();
       if (!document.getElementById('modalExpedition').hidden && expeditionEnPopup) ouvrirPopupExpedition(expeditionEnPopup);
+      if (!document.getElementById('modalChoixOutil').hidden) afficherModalChoixOutil();
     }, TICK_MS);
   }
 
@@ -4286,6 +4310,11 @@
   document.getElementById('fermerAtelier').addEventListener('click', fermerModalAtelier);
   document.getElementById('modalAtelier').addEventListener('click', (e) => {
     if (e.target.id === 'modalAtelier') fermerModalAtelier();
+  });
+
+  document.getElementById('fermerChoixOutil').addEventListener('click', fermerModalChoixOutil);
+  document.getElementById('modalChoixOutil').addEventListener('click', (e) => {
+    if (e.target.id === 'modalChoixOutil') fermerModalChoixOutil();
   });
 
   document.getElementById('btnVillage').addEventListener('click', ouvrirModalVillage);
