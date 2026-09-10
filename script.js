@@ -3569,6 +3569,12 @@
 
   function afficherSelection() {
     const conteneur = document.getElementById('contenuSelection');
+    const panneau = document.getElementById('panneauLateral');
+    // Le panneau n'existe (et ne s'affiche) que lorsqu'il y a réellement
+    // quelque chose à montrer — pas de fiche vide avec juste une astuce.
+    const rienSelectionne = villageoisSelectionnes.size === 0 && creatureSelectionneeId === null && !caseSelectionnee;
+    if (panneau) panneau.hidden = rienSelectionne;
+    if (rienSelectionne) return;
     if (villageoisSelectionnes.size === 1) {
       afficherSelectionVillageois(conteneur);
       return;
@@ -3579,10 +3585,6 @@
     }
     if (creatureSelectionneeId !== null) {
       afficherSelectionCreature(conteneur);
-      return;
-    }
-    if (!caseSelectionnee) {
-      conteneur.innerHTML = '<p class="astuce">Cliquez sur une case de la carte pour l\'inspecter, ou sur un villageois pour lui attribuer un outil.</p>';
       return;
     }
     const { col, row, verrouillee } = caseSelectionnee;
@@ -4368,16 +4370,12 @@
 
   // Tiroir du panneau latéral sur mobile (masqué par défaut via CSS, voir ouvrirPanneauMobile).
   // Le bouton ☰ ouvre toujours le menu général (Mode + astuce par défaut),
-  // jamais la fiche d'une sélection en cours : l'ouvrir désélectionne tout.
+  // Le panneau ne contient plus que la fiche de sélection (le mode
+  // Explorer/Construire flotte désormais à part, au-dessus de la carte) et
+  // ne s'affiche que lorsqu'il y a quelque chose à montrer : ☰ se contente
+  // donc de replier/déplier le tiroir, sans toucher à la sélection.
   document.getElementById('btnPanneauMobile').addEventListener('click', () => {
-    const ouvertActuellement = document.querySelector('.panneau').classList.contains('ouvert');
-    if (!ouvertActuellement) {
-      villageoisSelectionnes.clear();
-      creatureSelectionneeId = null;
-      caseSelectionnee = null;
-      afficherSelection();
-    }
-    definirPanneauMobileOuvert(!ouvertActuellement);
+    definirPanneauMobileOuvert(!document.querySelector('.panneau').classList.contains('ouvert'));
   });
 
   // ============================================================

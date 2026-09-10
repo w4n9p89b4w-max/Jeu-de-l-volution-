@@ -320,6 +320,11 @@ main {
   z-index: 8;
 }
 
+/* display:flex ci-dessus a une spécificité égale à la règle [hidden] du
+   navigateur mais gagne (CSS auteur > CSS user-agent) : sans cette règle,
+   l'attribut hidden n'aurait aucun effet visuel sur le panneau. */
+.panneau[hidden] { display: none; }
+
 .bloc {
   background: var(--panneau);
   border: 1px solid var(--bordure);
