@@ -43,11 +43,10 @@
   const PV_REGEN_PAR_SEC = 8; // vitesse de soin autour du feu de camp, en sortant d'une grotte
   const RAYON_SOIN_FEU = TAILLE_TUILE * 3.5; // portée de l'aura passive de soin du feu de camp
   // Consommation lissée par tick plutôt que déduite d'un coup par jour, pour
-  // éviter les à-coups (~60/jour par adulte à TICK_MS=2000 ; voir tick()).
-  // Un enfant mange deux fois moins. Un seul champ (+2/tick) équilibre donc
-  // un village d'environ 5 adultes.
-  const CONSO_NOURRITURE_ADULTE = 0.4;
-  const CONSO_NOURRITURE_ENFANT = 0.2;
+  // éviter les à-coups : 6/jour par adulte (DUREE_JOUR / TICK_MS = 150 ticks
+  // par jour, donc 6/150 par tick ; voir tick()). Un enfant mange moitié moins.
+  const CONSO_NOURRITURE_ADULTE = 6 / 150;
+  const CONSO_NOURRITURE_ENFANT = 3 / 150;
   const DEGATS_FAMINE = 1; // PV perdus par tick et par villageois quand le stock de nourriture est à sec
 
   // Intérieur des grottes : une petite salle générée une fois par grotte,
