@@ -2257,6 +2257,8 @@
   let caseSurvolee = null;
   let propositionConstruction = null;
   let enPause = false;
+  // Multiplicateur de vitesse choisi via le bouton ⏩ (1, 2 ou 3).
+  let vitesseJeu = 1;
 
   let ratioPixels = window.devicePixelRatio || 1;
 
@@ -4265,10 +4267,11 @@
       clamperCamera();
     }
 
-    if (!enPause) mettreAJourVillageois(dt);
-    if (!enPause) mettreAJourChantiers(dt);
-    if (!enPause) mettreAJourAmbiance(dt);
-    if (!enPause) mettreAJourCreatures(dt);
+    const dtSim = dt * vitesseJeu;
+    if (!enPause) mettreAJourVillageois(dtSim);
+    if (!enPause) mettreAJourChantiers(dtSim);
+    if (!enPause) mettreAJourAmbiance(dtSim);
+    if (!enPause) mettreAJourCreatures(dtSim);
     dessinerCarte(temps);
     dessinerMinicarte();
     requestAnimationFrame(boucleRendu);
@@ -4276,7 +4279,7 @@
 
   function demarrerBoucleSimulation() {
     setInterval(() => {
-      if (!enPause) tick();
+      if (!enPause) { for (let i = 0; i < vitesseJeu; i++) tick(); }
       majInterface();
       if ((caseSelectionnee && !caseSelectionnee.verrouillee) || villageoisSelectionnes.size > 0 || creatureSelectionneeId !== null) afficherSelection();
       if (!document.getElementById('modalVillage').hidden) afficherModalVillage();
@@ -4294,6 +4297,12 @@
     enPause = !enPause;
     e.target.textContent = enPause ? '▶' : '⏸';
     e.target.title = enPause ? 'Reprendre' : 'Mettre en pause';
+  });
+  document.getElementById('btnAccelerer').addEventListener('click', (e) => {
+    vitesseJeu = vitesseJeu >= 3 ? 1 : vitesseJeu + 1;
+    e.target.textContent = vitesseJeu === 1 ? '⏩' : vitesseJeu === 2 ? '⏩²' : '⏩³';
+    e.target.title = vitesseJeu === 1 ? 'Accélérer la simulation' : 'Vitesse x' + vitesseJeu + ' — cliquer pour changer';
+    e.target.classList.toggle('actif', vitesseJeu > 1);
   });
   document.getElementById('btnNaissances').addEventListener('click', (e) => {
     etat.naissancesBloquees = !etat.naissancesBloquees;

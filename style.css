@@ -172,6 +172,32 @@ button.mode-actif {
   border-radius: 4px;
 }
 
+/* Bouton accéléré : juste sous Pause, même colonne (left:140px), en
+   dehors de la rangée .vitesse pour ne pas décaler Naissances/Nouvelle
+   carte qui doivent rester alignés à sa droite. */
+#btnAccelerer {
+  position: absolute;
+  top: 40px;
+  left: 140px;
+  z-index: 7;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--texte);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
+#btnAccelerer:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+#btnAccelerer.actif {
+  color: #ffd166;
+}
+
 /* ---------- Corps : la carte occupe tout l'écran restant, le panneau
    latéral flotte par-dessus plutôt que de la rétrécir. ---------- */
 
