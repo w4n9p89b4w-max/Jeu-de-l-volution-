@@ -42,6 +42,13 @@
   const PV_VILLAGEOIS = 100;
   const PV_REGEN_PAR_SEC = 8; // vitesse de soin autour du feu de camp, en sortant d'une grotte
   const RAYON_SOIN_FEU = TAILLE_TUILE * 3.5; // portée de l'aura passive de soin du feu de camp
+  // Consommation lissée par tick plutôt que déduite d'un coup par jour, pour
+  // éviter les à-coups (~60/jour par adulte à TICK_MS=2000 ; voir tick()).
+  // Un enfant mange deux fois moins. Un seul champ (+2/tick) équilibre donc
+  // un village d'environ 5 adultes.
+  const CONSO_NOURRITURE_ADULTE = 0.4;
+  const CONSO_NOURRITURE_ENFANT = 0.2;
+  const DEGATS_FAMINE = 1; // PV perdus par tick et par villageois quand le stock de nourriture est à sec
 
   // Intérieur des grottes : une petite salle générée une fois par grotte,
   // avec des gisements à miner sur place et une sortie qui ramène dehors.
@@ -292,6 +299,7 @@
       meteoMinuteur: aleatoire(35, 70),
       naissancesBloquees: false,
       outilsStock: Object.fromEntries(Object.keys(OUTILS).map(id => [id, 0])),
+      enFamine: false,
     };
   }
 
@@ -1326,7 +1334,9 @@
     // proximité récupère des PV, qu'il travaille, patiente ou combatte —
     // sans avoir besoin d'y être envoyé exprès (voir recupereAuFeu pour le
     // trajet dédié au retour d'une grotte, non cumulé avec cette aura).
-    {
+    // Coupée pendant une famine : se réchauffer au feu ne nourrit pas, la
+    // chaleur n'annule donc pas les dégâts de faim (voir DEGATS_FAMINE).
+    if (!etat.enFamine) {
       const base = trouverBase();
       for (const v of etat.villageois) {
         if (v.pv >= v.pvMax || v.dansGrotte || v.expeditionZone !== null || v.recupereAuFeu) continue;
@@ -1941,14 +1951,21 @@
     }
   }
 
-  function tuerVillageois(v, creature) {
-    notifier('💀 ' + v.prenom + ' a été tué(e) par un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + '...');
+  // Retire un villageois mort du village (partenaire libéré, désélection) —
+  // partagé entre les différentes causes de décès (créature, famine...),
+  // seul le message de notification diffère.
+  function retirerVillageoisMort(v) {
     if (v.partenaireId) {
       const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
       if (partenaire) partenaire.partenaireId = null;
     }
     etat.villageois = etat.villageois.filter(x => x.id !== v.id);
     if (villageoisSelectionnes.delete(v.id)) afficherSelection();
+  }
+
+  function tuerVillageois(v, creature) {
+    notifier('💀 ' + v.prenom + ' a été tué(e) par un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + '...');
+    retirerVillageoisMort(v);
   }
 
   function tuerCreature(c, tueur) {
@@ -3786,6 +3803,39 @@
     etat.ressources.bois = Math.min(cap, etat.ressources.bois + gainPassif.bois);
     etat.ressources.pierre = Math.min(cap, etat.ressources.pierre + gainPassif.pierre);
     etat.ressources.nourriture = Math.min(cap, etat.ressources.nourriture + gainPassif.nourriture);
+
+    // Consommation de nourriture : chaque villageois mange un peu à chaque
+    // tick (un enfant deux fois moins), lissé plutôt que déduit d'un coup
+    // par jour. À sec, le déficit affaiblit tout le monde au lieu de
+    // simplement bloquer les naissances — une vraie pression, sans mort
+    // instantanée (voir DEGATS_FAMINE, assez faible pour laisser le temps
+    // de réagir).
+    let besoinNourriture = 0;
+    for (const v of etat.villageois) besoinNourriture += v.estEnfant ? CONSO_NOURRITURE_ENFANT : CONSO_NOURRITURE_ADULTE;
+    if (besoinNourriture > 0) {
+      if (etat.ressources.nourriture >= besoinNourriture) {
+        etat.ressources.nourriture -= besoinNourriture;
+        if (etat.enFamine) {
+          etat.enFamine = false;
+          notifier('🍽️ Le village a de nouveau assez à manger.');
+        }
+      } else {
+        etat.ressources.nourriture = 0;
+        if (!etat.enFamine) {
+          etat.enFamine = true;
+          notifier('⚠️ Plus assez de nourriture : les villageois s\'affaiblissent !');
+        }
+        const morts = [];
+        for (const v of etat.villageois) {
+          v.pv -= DEGATS_FAMINE;
+          if (v.pv <= 0) morts.push(v);
+        }
+        for (const v of morts) {
+          notifier('💀 ' + v.prenom + ' est mort(e) de faim.');
+          retirerVillageoisMort(v);
+        }
+      }
+    }
 
     evoluerCouples(m);
 
