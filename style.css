@@ -142,10 +142,33 @@ button.mode-actif {
   white-space: nowrap;
 }
 
+/* Flotte au-dessus de la carte, sous le bloc ressources (même colonne que
+   la mini-carte), plutôt que dans le bandeau du haut. Boutons sans cadre :
+   juste l'icône et le texte, avec une ombre portée pour rester lisibles
+   par-dessus la carte. */
 .vitesse {
+  position: absolute;
+  top: 154px;
+  left: 10px;
+  z-index: 7;
   display: flex;
-  gap: 0.5rem;
-  margin-left: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.vitesse button {
+  background: none;
+  border: none;
+  padding: 1px 2px;
+  font-size: 0.68rem;
+  color: var(--texte);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
+.vitesse button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 
 /* ---------- Corps : la carte occupe tout l'écran restant, le panneau
@@ -774,7 +797,6 @@ main {
   .jour-compteur { font-size: 0.78rem; }
   .barre-jour { width: 44px; }
   .ambiance { font-size: 0.78rem; }
-  .vitesse { margin-left: 0; gap: 0.4rem; }
   .barre-haut button {
     padding: 0.4rem 0.6rem;
     font-size: 0.78rem;
