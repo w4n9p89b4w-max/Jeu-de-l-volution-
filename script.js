@@ -314,6 +314,17 @@
     return etat.ressources[ressource] >= capaciteStockage();
   }
 
+  // Libère un villageois de sa tâche de récolte en cours (stock plein, ou
+  // demande manuelle depuis sa fiche) : redevient libre et repart errer,
+  // plutôt que de continuer vers l'ancien poste de travail.
+  function desassignerVillageois(v) {
+    v.assigneA = null;
+    v.mode = 'attente';
+    v.pause = aleatoire(1, 3);
+    v.travaille = false;
+    v.enMouvement = false;
+  }
+
   function zoneDeCase(col, row) {
     const zc = Math.min(NB_ZONES_COTE - 1, Math.floor(col / (COLONNES / NB_ZONES_COTE)));
     const zr = Math.min(NB_ZONES_COTE - 1, Math.floor(row / (LIGNES / NB_ZONES_COTE)));
@@ -1453,11 +1464,7 @@
         // ressource ; il pourra être réassigné manuellement, ou automatiquement
         // ailleurs, une fois de la place libérée.
         if (stockPleinPourVillageois(v)) {
-          v.assigneA = null;
-          v.mode = 'attente';
-          v.pause = aleatoire(1, 3);
-          v.travaille = false;
-          v.enMouvement = false;
+          desassignerVillageois(v);
           continue;
         }
         const approche = pointApprochePourNoeud(noeudAssigne);
@@ -3462,6 +3469,17 @@
       const enfants = etat.villageois.filter(e => e.parentA === v.id || e.parentB === v.id);
       if (enfants.length) html += `<p>👶 Enfant${enfants.length > 1 ? 's' : ''} : ${enfants.map(e => e.prenom).join(', ')}</p>`;
 
+      // Tâche de récolte en cours : nom de la ressource visée, avec un
+      // bouton pour la libérer manuellement (elle redevient libre et repart
+      // errer, voir desassignerVillageois — même logique que l'auto-
+      // désassignation quand le stock de cette ressource est plein).
+      if (v.assigneA) {
+        const noeudAssigne = etat.noeuds.get(v.assigneA);
+        const nomRessource = noeudAssigne ? TYPES_RESSOURCE_NOEUD[noeudAssigne.type].nom : 'une ressource';
+        html += `<div class="ligne-action"><span>🎯 Récolte : <b>${nomRessource}</b></span>
+          <button id="btnDesassignerTache" title="Libérer ce villageois de sa tâche">✕ Désassigner</button></div>`;
+      }
+
       // Inventaire en cases : une case pleine par outil équipé (cliquer la
       // range), plus une case vide « + » pour en ouvrir la popup de choix
       // d'un outil déjà fabriqué (voir ouvrirModalChoixOutil).
@@ -3497,6 +3515,12 @@
       });
       const btnAjouter = document.getElementById('caseAjouterOutil');
       if (btnAjouter) btnAjouter.addEventListener('click', () => ouvrirModalChoixOutil(v.id));
+      const btnDesassigner = document.getElementById('btnDesassignerTache');
+      if (btnDesassigner) btnDesassigner.addEventListener('click', () => {
+        desassignerVillageois(v);
+        notifier('🚶 ' + v.prenom + ' est libéré(e) de sa tâche.');
+        afficherSelection();
+      });
     }
   }
 
