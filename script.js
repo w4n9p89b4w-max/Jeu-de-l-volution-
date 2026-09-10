@@ -4236,12 +4236,16 @@
     ctx.setTransform(ratioPixels, 0, 0, ratioPixels, 0, 0);
     ctx.strokeStyle = 'rgba(190, 210, 235, 0.45)';
     ctx.lineWidth = 1;
+    // Un seul chemin pour toutes les gouttes puis un seul stroke() : appeler
+    // stroke() séparément pour chacune des 140 gouttes à chaque frame (comme
+    // avant) coûtait ~8400 appels de dessin par seconde et faisait laguer le
+    // jeu dès qu'il pleuvait.
+    ctx.beginPath();
     for (const g of gouttesPluie) {
-      ctx.beginPath();
       ctx.moveTo(g.x, g.y);
       ctx.lineTo(g.x - g.longueur * 0.18, g.y - g.longueur);
-      ctx.stroke();
     }
+    ctx.stroke();
     ctx.restore();
   }
 
