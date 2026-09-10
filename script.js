@@ -3478,6 +3478,19 @@
         const nomRessource = noeudAssigne ? TYPES_RESSOURCE_NOEUD[noeudAssigne.type].nom : 'une ressource';
         html += `<div class="ligne-action"><span>🎯 Récolte : <b>${nomRessource}</b></span>
           <button id="btnDesassignerTache" title="Libérer ce villageois de sa tâche">✕ Désassigner</button></div>`;
+      } else if (estVillageoisLibre(v)) {
+        // Pendant miroir du bouton « Désassigner » : un villageois libre
+        // (aucune tâche en cours) peut être assigné directement depuis sa
+        // fiche, un bouton par ressource compatible avec son outil — même
+        // logique que l'assignation rapide de l'onglet Village > Assignations.
+        const boutonsAssign = TYPES_ASSIGNATION_RAPIDE
+          .filter(([typeNoeud]) => outilCompatibleAvecNoeud(v, typeNoeud))
+          .map(([typeNoeud, emoji, nom]) => `<button class="btn-assign-rapide" data-type="${typeNoeud}" title="Assigner à la zone de ${nom.toLowerCase()} la plus proche">${emoji}</button>`)
+          .join('');
+        if (boutonsAssign) {
+          html += `<div class="ligne-action"><span>🎯 Assigner à :</span>
+            <div class="assign-rapide-boutons">${boutonsAssign}</div></div>`;
+        }
       }
 
       // Inventaire en cases : une case pleine par outil équipé (cliquer la
@@ -3520,6 +3533,12 @@
         desassignerVillageois(v);
         notifier('🚶 ' + v.prenom + ' est libéré(e) de sa tâche.');
         afficherSelection();
+      });
+      conteneur.querySelectorAll('.btn-assign-rapide').forEach(btn => {
+        btn.addEventListener('click', () => {
+          assignerVillageoisZonePlusProche(v.id, btn.dataset.type);
+          afficherSelection();
+        });
       });
     }
   }
