@@ -41,6 +41,7 @@
   const DUREE_GESTATION_JOURS = 30; // jours de grossesse avant la naissance (voir DUREE_JOUR)
   const PV_VILLAGEOIS = 100;
   const PV_REGEN_PAR_SEC = 8; // vitesse de soin autour du feu de camp, en sortant d'une grotte
+  const RAYON_SOIN_FEU = TAILLE_TUILE * 3.5; // portée de l'aura passive de soin du feu de camp
 
   // Intérieur des grottes : une petite salle générée une fois par grotte,
   // avec des gisements à miner sur place et une sortie qui ramène dehors.
@@ -1247,6 +1248,19 @@
       if (!v.assigneA || v.mode === 'rapporte') continue;
       if (!parNoeud.has(v.assigneA)) parNoeud.set(v.assigneA, []);
       parNoeud.get(v.assigneA).push(v);
+    }
+
+    // Aura passive du feu de camp : tout villageois blessé qui se trouve à
+    // proximité récupère des PV, qu'il travaille, patiente ou combatte —
+    // sans avoir besoin d'y être envoyé exprès (voir recupereAuFeu pour le
+    // trajet dédié au retour d'une grotte, non cumulé avec cette aura).
+    {
+      const base = trouverBase();
+      for (const v of etat.villageois) {
+        if (v.pv >= v.pvMax || v.dansGrotte || v.expeditionZone !== null || v.recupereAuFeu) continue;
+        const d = Math.hypot(v.x - base.x, v.y - base.y);
+        if (d <= RAYON_SOIN_FEU) v.pv = Math.min(v.pvMax, v.pv + PV_REGEN_PAR_SEC * dt);
+      }
     }
 
     for (const v of etat.villageois) {
