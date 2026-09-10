@@ -2211,7 +2211,7 @@
     fermerModalVillage();
     document.getElementById('notifications').innerHTML = '';
     const btnNaissances = document.getElementById('btnNaissances');
-    btnNaissances.textContent = '👶 Naissances';
+    btnNaissances.textContent = '👶';
     btnNaissances.classList.remove('mode-actif');
   }
 
@@ -4293,11 +4293,12 @@
 
   document.getElementById('btnPause').addEventListener('click', (e) => {
     enPause = !enPause;
-    e.target.textContent = enPause ? '▶ Reprendre' : '⏸ Pause';
+    e.target.textContent = enPause ? '▶' : '⏸';
+    e.target.title = enPause ? 'Reprendre' : 'Mettre en pause';
   });
   document.getElementById('btnNaissances').addEventListener('click', (e) => {
     etat.naissancesBloquees = !etat.naissancesBloquees;
-    e.target.textContent = etat.naissancesBloquees ? '🚫 Naissances' : '👶 Naissances';
+    e.target.textContent = etat.naissancesBloquees ? '🚫' : '👶';
     e.target.classList.toggle('mode-actif', etat.naissancesBloquees);
     notifier(etat.naissancesBloquees ? '🚫 Les naissances sont désormais bloquées.' : '👶 Les naissances sont de nouveau autorisées.');
   });

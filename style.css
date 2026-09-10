@@ -142,26 +142,26 @@ button.mode-actif {
   white-space: nowrap;
 }
 
-/* Flotte au-dessus de la carte, sous le bloc ressources (même colonne que
-   la mini-carte), plutôt que dans le bandeau du haut. Boutons sans cadre :
-   juste l'icône et le texte, avec une ombre portée pour rester lisibles
+/* Rangée d'icônes seules, centrée juste au-dessus de la carte (sous le
+   bandeau du haut), plutôt que des boutons texte dans le bandeau. Sans
+   cadre : juste l'icône, avec une ombre portée pour rester lisible
    par-dessus la carte. */
 .vitesse {
   position: absolute;
-  top: 154px;
-  left: 10px;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 7;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
+  gap: 0.5rem;
 }
 
 .vitesse button {
   background: none;
   border: none;
-  padding: 1px 2px;
-  font-size: 0.68rem;
+  padding: 2px 4px;
+  font-size: 1.05rem;
+  line-height: 1;
   color: var(--texte);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 5px rgba(0, 0, 0, 0.8);
 }
@@ -797,6 +797,12 @@ main {
   .jour-compteur { font-size: 0.78rem; }
   .barre-jour { width: 44px; }
   .ambiance { font-size: 0.78rem; }
+
+  /* Un centrage sur toute la largeur de l'écran ferait chevaucher les
+     icônes avec la mini-carte sur un téléphone (bien plus étroit qu'un
+     écran de bureau) : on les recale juste à droite de celle-ci. */
+  .vitesse { left: 178px; transform: none; }
+
   .barre-haut button {
     padding: 0.4rem 0.6rem;
     font-size: 0.78rem;
