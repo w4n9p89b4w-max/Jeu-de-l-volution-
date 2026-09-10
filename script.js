@@ -80,7 +80,13 @@
   // villageois est sélectionné l'envoie l'attaquer (voir combatCibleId).
   const DUREE_ATTAQUE_VILLAGEOIS = 1;      // secondes entre deux coups portés volontairement
   const DEGATS_ATTAQUE_VILLAGEOIS_NU = 3;  // dégâts à mains nues (l'épée inflige DEGATS_GARDE, bien plus efficace)
-  const PORTEE_ATTAQUE_VILLAGEOIS = 20;    // distance en pixels pour porter un coup
+  const PORTEE_ATTAQUE_VILLAGEOIS = 20;    // distance en pixels pour porter un coup au corps à corps
+
+  // Un villageois à l'arc tire de loin et évite le corps à corps : il garde
+  // ses distances (recule si une créature s'approche trop) plutôt que de
+  // foncer dessus comme les autres.
+  const PORTEE_TIR_ARC = TAILLE_TUILE * 4.5;
+  const DISTANCE_SECURITE_ARC = TAILLE_TUILE * 2;
 
   // Outils assignables : chacun donne un métier et, pour la plupart, un bonus
   // de récolte sur le type de ressource correspondant.
@@ -1216,6 +1222,44 @@
     if (zone.length === 0) notifier('⚠️ Une zone de ressources est épuisée.');
   }
 
+  // Combat volontaire contre une créature déjà ciblée (voir combatCibleId,
+  // posé par un clic joueur ou une riposte automatique). Un villageois à
+  // l'arc tire à distance et recule s'il se retrouve trop près plutôt que
+  // de foncer au contact ; les autres (épée ou mains nues) s'approchent
+  // jusqu'à portée de corps à corps. Partagé entre l'extérieur et
+  // l'intérieur d'une grotte (seule la recherche de la cible diffère).
+  function resoudreCombatVolontaire(v, cible, dt) {
+    const d = Math.hypot(cible.x - v.x, cible.y - v.y);
+    const archer = v.outils.has('arc');
+    const portee = archer ? PORTEE_TIR_ARC : PORTEE_ATTAQUE_VILLAGEOIS;
+
+    if (archer && d < DISTANCE_SECURITE_ARC) {
+      v.enMouvement = true;
+      v.travaille = false;
+      const pas = Math.min(DISTANCE_SECURITE_ARC - d, v.vitesseBase * 1.3 * dt);
+      v.x -= (cible.x - v.x) / d * pas;
+      v.y -= (cible.y - v.y) / d * pas;
+      v.tempsAttaqueVillageois = 0;
+    } else if (d > portee) {
+      v.enMouvement = true;
+      v.travaille = false;
+      const pas = Math.min(d, v.vitesseBase * 1.3 * dt);
+      v.x += (cible.x - v.x) / d * pas;
+      v.y += (cible.y - v.y) / d * pas;
+      v.tempsAttaqueVillageois = 0;
+    } else {
+      v.enMouvement = false;
+      v.travaille = true;
+      v.tempsAttaqueVillageois += dt;
+      if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
+        v.tempsAttaqueVillageois = 0;
+        cible.pv -= (v.outils.has('epee') ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
+        cible.cibleId = v.id;
+        if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
+      }
+    }
+  }
+
   function mettreAJourVillageois(dt) {
     for (const v of etat.villageois) {
       if (!v.estEnfant) continue;
@@ -1304,25 +1348,7 @@
         if (!cible) {
           v.combatCibleId = null;
         } else {
-          const d = Math.hypot(cible.x - v.x, cible.y - v.y);
-          if (d > PORTEE_ATTAQUE_VILLAGEOIS) {
-            v.enMouvement = true;
-            v.travaille = false;
-            const pas = Math.min(d, v.vitesseBase * 1.3 * dt);
-            v.x += (cible.x - v.x) / d * pas;
-            v.y += (cible.y - v.y) / d * pas;
-            v.tempsAttaqueVillageois = 0;
-          } else {
-            v.enMouvement = false;
-            v.travaille = true;
-            v.tempsAttaqueVillageois += dt;
-            if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
-              v.tempsAttaqueVillageois = 0;
-              cible.pv -= (v.outils.has('epee') ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
-              cible.cibleId = v.id;
-              if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
-            }
-          }
+          resoudreCombatVolontaire(v, cible, dt);
           continue;
         }
       }
@@ -1494,25 +1520,7 @@
       if (!cible) {
         v.combatCibleId = null;
       } else {
-        const d = Math.hypot(cible.x - v.x, cible.y - v.y);
-        if (d > PORTEE_ATTAQUE_VILLAGEOIS) {
-          v.enMouvement = true;
-          v.travaille = false;
-          const pas = Math.min(d, v.vitesseBase * 1.3 * dt);
-          v.x += (cible.x - v.x) / d * pas;
-          v.y += (cible.y - v.y) / d * pas;
-          v.tempsAttaqueVillageois = 0;
-        } else {
-          v.enMouvement = false;
-          v.travaille = true;
-          v.tempsAttaqueVillageois += dt;
-          if (v.tempsAttaqueVillageois >= DUREE_ATTAQUE_VILLAGEOIS) {
-            v.tempsAttaqueVillageois = 0;
-            cible.pv -= (v.outils.has('epee') ? DEGATS_GARDE : DEGATS_ATTAQUE_VILLAGEOIS_NU);
-            cible.cibleId = v.id;
-            if (cible.pv <= 0) { tuerCreature(cible, v); v.combatCibleId = null; }
-          }
-        }
+        resoudreCombatVolontaire(v, cible, dt);
         return;
       }
     }
