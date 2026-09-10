@@ -309,10 +309,10 @@ main {
 
 .panneau {
   position: absolute;
-  top: 14px;
+  top: 52px;
   right: 14px;
   width: 300px;
-  max-height: calc(100% - 60px);
+  max-height: calc(100% - 98px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -339,6 +339,17 @@ main {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0.7rem;
+}
+
+/* Bascule Explorer/Construire, flottante en haut à droite de la carte —
+   sans cadre ni fond de section (contrairement à avant, dans le panneau) ;
+   les boutons gardent leur propre habillage (vert plein = mode actif). */
+#blocMode {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 7;
+  margin-bottom: 0;
 }
 
 .palette {
@@ -794,6 +805,12 @@ main {
 
   .barre-haut h1 { font-size: 1rem; }
   .progression { gap: 0.4rem; font-size: 0.78rem; }
+
+  /* Sur mobile, right:10px chevaucherait le bouton ☰ (même coin) : on
+     passe la bascule Explorer/Construire sous lui plutôt qu'à côté, et
+     on la resserre pour qu'elle tienne sans déborder sur la mini-carte. */
+  #blocMode { top: 56px; right: 10px; }
+  #blocMode button { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
   .barre-xp { width: 64px; }
   .jour-compteur { font-size: 0.78rem; }
   .barre-jour { width: 44px; }
@@ -886,9 +903,4 @@ main {
     border-radius: 2px;
     background: var(--bordure);
   }
-
-  /* Dès qu'un villageois ou une créature est sélectionné(e), le bloc Mode
-     cède toute la place à sa fiche plutôt que de l'encombrer — il reparaît
-     en retapant une case vide de la carte (ce qui désélectionne). */
-  .panneau.a-une-selection #blocMode { display: none; }
 }

@@ -3569,13 +3569,6 @@
 
   function afficherSelection() {
     const conteneur = document.getElementById('contenuSelection');
-    // Sur mobile, le bloc Mode (Explorer/Construire) cède la place à la
-    // fiche dès qu'un villageois ou une créature est sélectionné(e) (voir
-    // la règle CSS associée), pour ne pas surcharger le tiroir ; il
-    // reparaît dès qu'on retape une case vide (ce qui désélectionne).
-    const panneau = document.getElementById('panneauLateral');
-    const entiteSelectionnee = villageoisSelectionnes.size > 0 || creatureSelectionneeId !== null;
-    if (panneau) panneau.classList.toggle('a-une-selection', entiteSelectionnee);
     if (villageoisSelectionnes.size === 1) {
       afficherSelectionVillageois(conteneur);
       return;
