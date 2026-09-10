@@ -303,9 +303,9 @@
     return 80 + etat.multiplicateurs.stockageBonus + [...etat.batiments.values()].filter(b => b === 'entrepot').length * 60;
   }
 
-  // Vrai si un villageois travaille sur un nœud dont la ressource associée
-  // est déjà au plafond de stockage (voir la pause de récolte dans
-  // mettreAJourVillageois, pour l'afficher clairement côté joueur).
+  // Vrai si un villageois est assigné à un nœud dont la ressource associée
+  // est déjà au plafond de stockage (voir la désassignation automatique
+  // dans mettreAJourVillageois).
   function stockPleinPourVillageois(v) {
     if (!v.assigneA) return false;
     const noeud = etat.noeuds.get(v.assigneA);
@@ -1447,6 +1447,19 @@
       if (v.assigneA) {
         const noeudAssigne = etat.noeuds.get(v.assigneA);
         if (!noeudAssigne) { v.assigneA = null; continue; }
+        // Stock plein : inutile de récolter pour rien (livrerRessource
+        // plafonnerait le gain) — le villageois est complètement désassigné
+        // (redevient libre, part errer) plutôt que de patienter sur la
+        // ressource ; il pourra être réassigné manuellement, ou automatiquement
+        // ailleurs, une fois de la place libérée.
+        if (stockPleinPourVillageois(v)) {
+          v.assigneA = null;
+          v.mode = 'attente';
+          v.pause = aleatoire(1, 3);
+          v.travaille = false;
+          v.enMouvement = false;
+          continue;
+        }
         const approche = pointApprochePourNoeud(noeudAssigne);
         const groupe = parNoeud.get(v.assigneA);
         const idx = groupe.indexOf(v);
@@ -1455,14 +1468,9 @@
         const tx = approche.col * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.cos(angleOffset) * rayon;
         const ty = approche.row * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.sin(angleOffset) * rayon;
         const arrive = avancerVersCible(v, tx, ty, v.vitesseBase * 1.6, dt);
-        // Stock plein : inutile de récolter pour rien (livrerRessource
-        // plafonnerait le gain) — le villageois patiente sur place plutôt que
-        // de faire des allers-retours pour rien, et reprend dès qu'il y a à
-        // nouveau de la place (construction d'un entrepôt, consommation...).
-        const stockPlein = stockPleinPourVillageois(v);
         v.enMouvement = !arrive;
-        v.travaille = arrive && !stockPlein;
-        if (!arrive || stockPlein) {
+        v.travaille = arrive;
+        if (!arrive) {
           v.tempsRecolte = 0;
         } else {
           // Arrivé sur la ressource : récolte pendant DUREE_RECOLTE, puis
@@ -3056,7 +3064,6 @@
     else if (v.attenteGrotte) statut = '⏳ Attend le groupe';
     else if (v.dansGrotte) statut = '🕳️ Dans une grotte';
     else if (v.commandeManuelle) statut = '🖐️ Déplacement dirigé';
-    else if (v.assigneA && stockPleinPourVillageois(v)) statut = '📦 Stock plein — en pause';
     else if (v.assigneA) statut = 'Au travail';
     else statut = 'Libre';
     return `<button class="carte-villageois" data-id="${v.id}">
@@ -3437,7 +3444,6 @@
     if (v.dansGrotte) html += '<p>🕳️ Explore l\'intérieur d\'une grotte.</p>';
     if (v.commandeManuelle) html += '<p>🖐️ Se dirige vers l\'endroit indiqué.</p>';
     if (v.expeditionZone !== null) html += '<p>🧭 En expédition — retour dans ' + Math.max(0, Math.ceil(v.expeditionTempsRestant)) + ' s.</p>';
-    if (v.assigneA && stockPleinPourVillageois(v)) html += '<p>📦 Stock plein — patiente en attendant de la place.</p>';
 
     if (v.estEnfant) {
       const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
