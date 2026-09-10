@@ -796,20 +796,19 @@ main {
 }
 
 @media (max-width: 720px) {
-  /* Bandeau du haut : une seule ligne compacte et défilable plutôt que de
-     retomber sur plusieurs lignes qui mangent la moitié de l'écran. */
+  /* Bandeau du haut : passe à la ligne plutôt que de défiler horizontalement
+     — en scroll, Atelier/Village tombaient hors écran (~800px de contenu
+     pour 390px de large) sans aucun indice visuel qu'il fallait faire
+     défiler pour les atteindre, les rendant intouchables en pratique. */
   .barre-haut {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    gap: 0.8rem;
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+    gap: 0.5rem 0.8rem;
     padding: 0.5rem 0.7rem;
-    scrollbar-width: none;
   }
-  .barre-haut::-webkit-scrollbar { display: none; }
 
   .barre-haut h1 { font-size: 1rem; }
-  .progression { gap: 0.4rem; font-size: 0.78rem; }
+  .progression { gap: 0.4rem; font-size: 0.78rem; flex-wrap: wrap; row-gap: 0.3rem; }
 
   /* Sur mobile, right:10px chevaucherait le bouton ☰ (même coin) : on
      passe la bascule Explorer/Construire sous lui plutôt qu'à côté, et
