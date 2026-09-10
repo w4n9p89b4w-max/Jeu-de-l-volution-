@@ -10,13 +10,6 @@
   <header class="barre-haut">
     <h1>🏕️ Jeu de l'Évolution</h1>
 
-    <div class="ressources">
-      <span class="ress" title="Bois">🪵 <b id="stBois">0</b>/<span id="stBoisCap">0</span></span>
-      <span class="ress" title="Pierre">🪨 <b id="stPierre">0</b>/<span id="stPierreCap">0</span></span>
-      <span class="ress" title="Nourriture">🍖 <b id="stNourriture">0</b>/<span id="stNourritureCap">0</span></span>
-      <span class="ress" title="Population">👥 <b id="stPopulation">0</b>/<span id="stCapacite">0</span></span>
-    </div>
-
     <div class="progression">
       <span class="niveau">Niveau <b id="stNiveau">1</b></span>
       <div class="barre-xp"><div id="barreXpRemplie" class="barre-xp-remplie"></div></div>
@@ -45,6 +38,12 @@
     <div class="stage">
       <canvas id="carte"></canvas>
       <canvas id="minicarte" title="Cliquez pour naviguer"></canvas>
+      <div class="ressources">
+        <span class="ress" title="Bois">🪵 <b id="stBois">0</b>/<span id="stBoisCap">0</span></span>
+        <span class="ress" title="Pierre">🪨 <b id="stPierre">0</b>/<span id="stPierreCap">0</span></span>
+        <span class="ress" title="Nourriture">🍖 <b id="stNourriture">0</b>/<span id="stNourritureCap">0</span></span>
+        <span class="ress" title="Population">👥 <b id="stPopulation">0</b>/<span id="stCapacite">0</span></span>
+      </div>
       <button id="btnPanneauMobile" class="btn-panneau-mobile" title="Afficher le panneau">☰</button>
       <div class="controles-zoom">
         <button id="btnZoomPlus" title="Zoomer">+</button>
