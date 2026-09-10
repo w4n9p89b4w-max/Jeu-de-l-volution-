@@ -142,15 +142,16 @@ button.mode-actif {
   white-space: nowrap;
 }
 
-/* Rangée d'icônes seules, alignée sur le coin supérieur droit de la
-   mini-carte (même top:10px qu'elle) et prolongée juste à l'extérieur,
-   à sa droite — plutôt que des boutons texte dans le bandeau. Sans
-   cadre : juste l'icône, avec une ombre portée pour rester lisible
-   par-dessus la carte. */
+/* Rangée d'icônes seules, centrée verticalement sur la hauteur de la
+   mini-carte (104px avec sa bordure, départ à 10px → centre à 62px) et
+   placée juste à l'extérieur, à sa droite — plutôt que des boutons texte
+   dans le bandeau. Sans cadre : juste l'icône, avec une ombre portée pour
+   rester lisible par-dessus la carte. */
 .vitesse {
   position: absolute;
-  top: 10px;
+  top: 62px;
   left: 178px;
+  transform: translateY(-50%);
   z-index: 7;
   display: flex;
   gap: 0.5rem;
