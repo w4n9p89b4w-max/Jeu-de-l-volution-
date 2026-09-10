@@ -303,6 +303,17 @@
     return 80 + etat.multiplicateurs.stockageBonus + [...etat.batiments.values()].filter(b => b === 'entrepot').length * 60;
   }
 
+  // Vrai si un villageois travaille sur un nœud dont la ressource associée
+  // est déjà au plafond de stockage (voir la pause de récolte dans
+  // mettreAJourVillageois, pour l'afficher clairement côté joueur).
+  function stockPleinPourVillageois(v) {
+    if (!v.assigneA) return false;
+    const noeud = etat.noeuds.get(v.assigneA);
+    if (!noeud) return false;
+    const ressource = TYPES_RESSOURCE_NOEUD[noeud.type].ressource;
+    return etat.ressources[ressource] >= capaciteStockage();
+  }
+
   function zoneDeCase(col, row) {
     const zc = Math.min(NB_ZONES_COTE - 1, Math.floor(col / (COLONNES / NB_ZONES_COTE)));
     const zr = Math.min(NB_ZONES_COTE - 1, Math.floor(row / (LIGNES / NB_ZONES_COTE)));
@@ -1236,7 +1247,13 @@
     if (archer && d < DISTANCE_SECURITE_ARC) {
       v.enMouvement = true;
       v.travaille = false;
-      const pas = Math.min(DISTANCE_SECURITE_ARC - d, v.vitesseBase * 1.3 * dt);
+      // Recul nettement plus rapide que l'approche normale (×2.5 au lieu de
+      // ×1.3) : un loup (38-52) ou surtout une chauve-souris (55-75) sont
+      // plus rapides qu'un villageois de base (22-32) — sans cette marge,
+      // la créature reste collée à portée de corps à corps pour toujours,
+      // l'archer ne tirant jamais et se faisant traîner sur toute la carte
+      // en encaissant sans jamais pouvoir se dégager.
+      const pas = Math.min(DISTANCE_SECURITE_ARC - d, v.vitesseBase * 2.5 * dt);
       v.x -= (cible.x - v.x) / d * pas;
       v.y -= (cible.y - v.y) / d * pas;
       v.tempsAttaqueVillageois = 0;
@@ -1438,9 +1455,14 @@
         const tx = approche.col * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.cos(angleOffset) * rayon;
         const ty = approche.row * TAILLE_TUILE + TAILLE_TUILE / 2 + Math.sin(angleOffset) * rayon;
         const arrive = avancerVersCible(v, tx, ty, v.vitesseBase * 1.6, dt);
+        // Stock plein : inutile de récolter pour rien (livrerRessource
+        // plafonnerait le gain) — le villageois patiente sur place plutôt que
+        // de faire des allers-retours pour rien, et reprend dès qu'il y a à
+        // nouveau de la place (construction d'un entrepôt, consommation...).
+        const stockPlein = stockPleinPourVillageois(v);
         v.enMouvement = !arrive;
-        v.travaille = arrive;
-        if (!arrive) {
+        v.travaille = arrive && !stockPlein;
+        if (!arrive || stockPlein) {
           v.tempsRecolte = 0;
         } else {
           // Arrivé sur la ressource : récolte pendant DUREE_RECOLTE, puis
@@ -3034,6 +3056,7 @@
     else if (v.attenteGrotte) statut = '⏳ Attend le groupe';
     else if (v.dansGrotte) statut = '🕳️ Dans une grotte';
     else if (v.commandeManuelle) statut = '🖐️ Déplacement dirigé';
+    else if (v.assigneA && stockPleinPourVillageois(v)) statut = '📦 Stock plein — en pause';
     else if (v.assigneA) statut = 'Au travail';
     else statut = 'Libre';
     return `<button class="carte-villageois" data-id="${v.id}">
@@ -3414,6 +3437,7 @@
     if (v.dansGrotte) html += '<p>🕳️ Explore l\'intérieur d\'une grotte.</p>';
     if (v.commandeManuelle) html += '<p>🖐️ Se dirige vers l\'endroit indiqué.</p>';
     if (v.expeditionZone !== null) html += '<p>🧭 En expédition — retour dans ' + Math.max(0, Math.ceil(v.expeditionTempsRestant)) + ' s.</p>';
+    if (v.assigneA && stockPleinPourVillageois(v)) html += '<p>📦 Stock plein — patiente en attendant de la place.</p>';
 
     if (v.estEnfant) {
       const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
