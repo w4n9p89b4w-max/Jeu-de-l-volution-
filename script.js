@@ -3104,6 +3104,17 @@
     });
   }
 
+  // Carte d'un villageois déjà assigné dans l'onglet Assignations : un
+  // bouton ✕ pour le désassigner directement depuis la liste, sans passer
+  // par sa fiche (même logique que le bouton « Désassigner » de la
+  // sélection, voir desassignerVillageois).
+  function carteVillageoisDesassignationHtml(v) {
+    return `<div class="carte-villageois-assign">
+      ${carteVillageoisHtml(v)}
+      <button class="btn-desassign-rapide" data-id="${v.id}" title="Désassigner">✕</button>
+    </div>`;
+  }
+
   const GROUPES_ASSIGNATION = {
     bois: '🪓 Bûcherons',
     pierre: '⛏️ Mineurs',
@@ -3184,7 +3195,11 @@
       const liste = groupes[cle];
       if (!liste.length) continue;
       html += `<div class="groupe-assignation"><h3>${GROUPES_ASSIGNATION[cle]} (${liste.length})</h3>`;
-      html += liste.map(v => (cle === 'libres' && estVillageoisLibre(v)) ? carteVillageoisAssignationHtml(v) : carteVillageoisHtml(v)).join('');
+      html += liste.map(v => {
+        if (cle === 'libres' && estVillageoisLibre(v)) return carteVillageoisAssignationHtml(v);
+        if (cle !== 'libres' && cle !== 'enfants') return carteVillageoisDesassignationHtml(v);
+        return carteVillageoisHtml(v);
+      }).join('');
       html += '</div>';
     }
     conteneur.innerHTML = html || '<p class="astuce">Aucun villageois.</p>';
@@ -3195,6 +3210,16 @@
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         assignerVillageoisZonePlusProche(Number(btn.dataset.id), btn.dataset.type);
+      });
+    });
+    conteneur.querySelectorAll('.btn-desassign-rapide').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const v = etat.villageois.find(x => x.id === Number(btn.dataset.id));
+        if (!v) return;
+        desassignerVillageois(v);
+        notifier('🚶 ' + v.prenom + ' est libéré(e) de sa tâche.');
+        afficherOngletAssignations();
       });
     });
   }

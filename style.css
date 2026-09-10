@@ -614,6 +614,12 @@ main {
   font-size: 0.95rem;
 }
 
+.btn-desassign-rapide {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.95rem;
+}
+
 /* ---------- Modale technologies ---------- */
 
 .modal {
