@@ -875,10 +875,17 @@ main {
   .barre-haut h1 { font-size: 1rem; }
   .progression { gap: 0.4rem; font-size: 0.78rem; }
 
-  /* Sur mobile, right:10px chevaucherait le bouton ☰ (même coin) : on
-     passe la bascule Explorer/Construire sous lui plutôt qu'à côté, et
-     on la resserre pour qu'elle tienne sans déborder sur la mini-carte. */
-  #blocMode { top: 56px; right: 10px; }
+  /* À côté du bouton Nouvelle carte plutôt que flottante à part sur le
+     bord droit : continue la même rangée que .vitesse (Pause/Naissances/
+     Nouvelle carte), avec un retour à la ligne de secours si jamais ça ne
+     tient pas sur un écran très étroit. */
+  #blocMode {
+    top: 14px;
+    left: 232px;
+    right: auto;
+    flex-wrap: wrap;
+    max-width: calc(100vw - 242px);
+  }
   #blocMode button { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
   .barre-xp { width: 64px; }
   .jour-compteur { font-size: 0.78rem; }
@@ -947,7 +954,7 @@ main {
   .case-outil-vide { font-size: 1.3rem; }
 
   /* Poignée décorative en tête de tiroir, pour rappeler qu'il se glisse
-     depuis le bas et peut se refermer (via le bouton ☰/✕). */
+     depuis le bas et peut se refermer (via le bouton ✕ du panneau). */
   .panneau::before {
     content: '';
     order: -1;
