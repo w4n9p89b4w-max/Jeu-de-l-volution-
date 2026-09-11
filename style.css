@@ -289,11 +289,27 @@ main {
   white-space: nowrap;
 }
 
-/* Tiroir mobile : ce bouton ne sert qu'en dessous de 720px (voir le media
-   query en bas du fichier), masqué sur desktop où le panneau est toujours
-   visible. */
-.btn-panneau-mobile {
-  display: none;
+/* Bouton de fermeture du panneau de sélection (desktop et mobile) : le
+   panneau s'ouvre déjà tout seul dès qu'il y a quelque chose à montrer (voir
+   afficherSelection en JS), ce bouton sert juste à le refermer sans avoir à
+   cliquer ailleurs sur la carte. */
+.btn-fermer-panneau {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  background: none;
+  border: none;
+  color: var(--texte-att);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.btn-fermer-panneau:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--texte);
 }
 
 .confirmation-boutons {
@@ -884,29 +900,10 @@ main {
   .controles-zoom button { padding: 0.35rem 0.7rem; font-size: 1.05rem; touch-action: manipulation; }
 
   /* Panneau latéral : replié par défaut (tiroir masqué hors écran), pour
-     laisser toute la carte visible ; s'ouvre via le bouton ☰ ou dès qu'une
-     sélection a quelque chose à montrer (voir ouvrirPanneauMobile en JS).
-     Le bouton reste hors du panneau (donc jamais emporté par son glissement
-     transform) mais est ancré juste au-dessus de son bord haut plutôt qu'en
-     haut d'écran, pour rester visuellement au niveau du tiroir qu'il
-     contrôle — voir .panneau plus bas pour la valeur de hauteur reprise ici. */
-  .btn-panneau-mobile {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    bottom: calc(min(48vh, 420px) + 10px);
-    right: 10px;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: rgba(10, 14, 24, 0.75);
-    border: 1px solid var(--bordure);
-    color: var(--texte);
-    font-size: 1.15rem;
-    z-index: 9;
-    touch-action: manipulation;
-  }
+     laisser toute la carte visible ; s'ouvre automatiquement dès qu'il y a
+     quelque chose à montrer et se referme dès qu'il n'y a plus rien (voir
+     afficherSelection en JS) — le bouton ✕ du panneau (.btn-fermer-panneau)
+     permet de le refermer manuellement sans désélectionner autrement. */
 
   /* En tiroir latéral, le panneau masquait presque toute la carte sur un
      écran de téléphone (elle ne restait visible que sur une mince bande).
@@ -933,6 +930,7 @@ main {
     box-shadow: 0 -10px 26px rgba(0, 0, 0, 0.45);
   }
   .panneau.ouvert { transform: translateY(0); }
+  .btn-fermer-panneau { font-size: 1.2rem; padding: 6px 9px; touch-action: manipulation; }
 
   /* Contenu de la fiche le plus condensé possible : c'est ce qui occupe le
      tiroir sur mobile, donc chaque rem gagné ici rend d'autant plus de

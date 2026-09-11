@@ -2787,19 +2787,12 @@
   });
 
   // Sur mobile, le panneau latéral est replié par défaut (pour laisser toute
-  // la place à la carte) et s'ouvre en tiroir via le bouton ☰, qui devient
-  // alors une croix pour le refermer.
+  // la place à la carte) et glisse en tiroir depuis le bas — ouvert/fermé
+  // en phase avec la sélection (voir afficherSelection), sauf override
+  // ponctuel (ex. fermeture forcée au lancement d'une construction).
   function definirPanneauMobileOuvert(ouvert) {
     const panneau = document.querySelector('.panneau');
-    const bouton = document.getElementById('btnPanneauMobile');
     if (panneau) panneau.classList.toggle('ouvert', ouvert);
-    if (bouton) bouton.textContent = ouvert ? '✕' : '☰';
-  }
-
-  // L'ouvrir automatiquement dès qu'une sélection a quelque chose à montrer
-  // évite un aller-retour vers le bouton ☰.
-  function ouvrirPanneauMobile() {
-    definirPanneauMobileOuvert(true);
   }
 
   // Seules les cases d'eau côtières ont leur propre nœud de pêche (voir
@@ -2863,10 +2856,6 @@
       creatureSelectionneeId = null;
       caseSelectionnee = null;
       afficherSelection();
-      // Pas d'ouverture automatique du tiroir ici : sur mobile il masquerait
-      // la moitié de la carte juste avant le tap suivant, qui sert
-      // justement à choisir où l'envoyer (voir plus bas, une fois l'ordre
-      // donné, le tiroir s'ouvre alors normalement).
       return;
     }
 
@@ -2898,7 +2887,6 @@
       villageoisSelectionnes.clear();
       caseSelectionnee = null;
       afficherSelection();
-      ouvrirPanneauMobile();
       return;
     }
 
@@ -2922,7 +2910,6 @@
         creatureSelectionneeId = null;
         caseSelectionnee = { col: noeudProche.col, row: noeudProche.row, verrouillee: false };
         afficherSelection();
-        ouvrirPanneauMobile();
         return;
       }
     }
@@ -2930,17 +2917,11 @@
     // Pas de déplacement manuel dirigé sur la carte extérieure : cliquer
     // une case y désélectionne simplement pour en afficher les infos (voir
     // plus bas). Cet ordre de déplacement au clic reste réservé à
-    // l'intérieur des grottes (voir gererClicInterieur). Le tiroir mobile ne
-    // s'ouvre que s'il y a effectivement quelque chose à montrer (voir
-    // afficherSelection : une case vide/verrouillée referme le panneau).
+    // l'intérieur des grottes (voir gererClicInterieur).
     villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
-    // afficherSelection referme le panneau (caseSelectionnee redevient null)
-    // s'il n'y avait rien d'actionnable sur cette case — le tiroir mobile ne
-    // s'ouvre donc que quand il reste effectivement quelque chose à montrer.
-    if (caseSelectionnee) ouvrirPanneauMobile();
   }
 
   // Gère les clics sur la vue intérieure d'une grotte : sélection d'un
@@ -2962,8 +2943,6 @@
       if (!villageoisSelectionnes.delete(cible.id)) villageoisSelectionnes.add(cible.id);
       creatureSelectionneeId = null;
       afficherSelection();
-      // Idem qu'à l'extérieur : pas d'ouverture automatique, pour laisser la
-      // salle libre au tap suivant qui choisit la destination.
       return;
     }
 
@@ -2992,7 +2971,6 @@
       creatureSelectionneeId = cibleCreature.id;
       villageoisSelectionnes.clear();
       afficherSelection();
-      ouvrirPanneauMobile();
       return;
     }
 
@@ -3019,7 +2997,6 @@
           v.combatCibleId = null;
         });
         afficherSelection();
-        ouvrirPanneauMobile();
         return;
       }
     }
@@ -3771,6 +3748,10 @@
     // quelque chose à montrer — pas de fiche vide avec juste une astuce.
     const rienSelectionne = villageoisSelectionnes.size === 0 && creatureSelectionneeId === null && !caseSelectionnee;
     if (panneau) panneau.hidden = rienSelectionne;
+    // Le tiroir mobile suit toujours l'état de la sélection : s'ouvre dès
+    // qu'il y a quelque chose à montrer, se referme sinon (voir aussi le
+    // bouton ✕ du panneau, qui vide simplement la sélection).
+    definirPanneauMobileOuvert(!rienSelectionne);
     if (rienSelectionne) return;
     if (villageoisSelectionnes.size === 1) {
       afficherSelectionVillageois(conteneur);
@@ -3790,6 +3771,7 @@
       // déjà en survol sur la carte (voir survolerCarte) — pas de panneau.
       caseSelectionnee = null;
       if (panneau) panneau.hidden = true;
+      definirPanneauMobileOuvert(false);
       return;
     }
     const biome = etat.tuiles[row][col];
@@ -3859,6 +3841,7 @@
       // survol sur la carte (voir survolerCarte) — pas de panneau non plus.
       caseSelectionnee = null;
       if (panneau) panneau.hidden = true;
+      definirPanneauMobileOuvert(false);
       return;
     }
 
@@ -4611,14 +4594,14 @@
   document.getElementById('btnZoomPlus').addEventListener('click', () => definirZoom(zoom * 1.3));
   document.getElementById('btnZoomMoins').addEventListener('click', () => definirZoom(zoom / 1.3));
 
-  // Tiroir du panneau latéral sur mobile (masqué par défaut via CSS, voir ouvrirPanneauMobile).
-  // Le bouton ☰ ouvre toujours le menu général (Mode + astuce par défaut),
-  // Le panneau ne contient plus que la fiche de sélection (le mode
-  // Explorer/Construire flotte désormais à part, au-dessus de la carte) et
-  // ne s'affiche que lorsqu'il y a quelque chose à montrer : ☰ se contente
-  // donc de replier/déplier le tiroir, sans toucher à la sélection.
-  document.getElementById('btnPanneauMobile').addEventListener('click', () => {
-    definirPanneauMobileOuvert(!document.querySelector('.panneau').classList.contains('ouvert'));
+  // Tiroir du panneau latéral sur mobile : s'ouvre/se referme tout seul en
+  // phase avec la sélection (voir afficherSelection) ; le bouton ✕ du
+  // panneau se contente de vider la sélection pour le refermer.
+  document.getElementById('fermerPanneauLateral').addEventListener('click', () => {
+    villageoisSelectionnes.clear();
+    creatureSelectionneeId = null;
+    caseSelectionnee = null;
+    afficherSelection();
   });
 
   // ============================================================
