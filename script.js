@@ -45,6 +45,14 @@
   const DUREE_ENFANCE = 3000;
   const DUREE_ADOLESCENCE = 3000;
   const DUREE_GESTATION_JOURS = 10; // jours de grossesse avant la naissance (voir DUREE_JOUR)
+  // Avant de pouvoir concevoir, un couple fraîchement formé doit d'abord
+  // attendre 2 jours (valeur codée en dur, DUREE_JOUR = 300s -> 600s, voir
+  // DUREE_ENFANCE), puis se rendre ensemble dans une maison (ou au feu de
+  // camp à défaut) et y rester un moment avant que la conception ait lieu
+  // (voir le déclenchement dans tick() et le trajet dans mettreAJourVillageois).
+  const DELAI_COUPLE_AVANT_ENFANT = 600;
+  const DUREE_MIN_AU_FOYER = 5;
+  const DUREE_MAX_AU_FOYER = 40;
   const PV_VILLAGEOIS = 100;
   const PV_REGEN_PAR_SEC = 8; // vitesse de soin autour du feu de camp, en sortant d'une grotte
   const RAYON_SOIN_FEU = TAILLE_TUILE * 3.5; // portée de l'aura passive de soin du feu de camp
@@ -1139,6 +1147,7 @@
       outils: new Set(),
       tempsRecolte: 0,
       partenaireId: null,
+      tempsCouple: 0,
       estEnfant: false,
       estAdolescent: false,
       age: 0,
@@ -1147,6 +1156,12 @@
       enceinte: false,
       grossesseRestante: 0,
       pereId: null,
+      enRouteMaison: false,
+      maisonCibleX: undefined,
+      maisonCibleY: undefined,
+      arriveAuFoyer: false,
+      tempsAuFoyer: 0,
+      dureeAuFoyerCible: 0,
       pv: PV_VILLAGEOIS,
       pvMax: PV_VILLAGEOIS,
       grotteAssignee: null,
@@ -1192,6 +1207,21 @@
       return { x: col * TAILLE_TUILE + TAILLE_TUILE / 2, y: row * TAILLE_TUILE + TAILLE_TUILE / 2 };
     }
     return { x: Math.round(COLONNES / 2) * TAILLE_TUILE, y: Math.round(LIGNES / 2) * TAILLE_TUILE };
+  }
+
+  // Lieu où un couple se rend pour concevoir : la maison la plus proche du
+  // couple si le joueur en a déjà construit une, sinon le feu de camp.
+  function trouverMaisonPourCouple(v) {
+    let meilleure = null, meilleureDist = Infinity;
+    for (const [cle, type] of etat.batiments.entries()) {
+      if (type !== 'maison') continue;
+      const [col, row] = cle.split(',').map(Number);
+      const x = col * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const y = row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const d = Math.hypot(v.x - x, v.y - y);
+      if (d < meilleureDist) { meilleureDist = d; meilleure = { x, y }; }
+    }
+    return meilleure || trouverBase();
   }
 
   function choisirNouvelleCibleErrance(v) {
@@ -1316,6 +1346,12 @@
       }
     }
 
+    // Temps passé en couple : condition d'ancienneté avant de pouvoir
+    // concevoir (voir DELAI_COUPLE_AVANT_ENFANT et le déclenchement dans tick()).
+    for (const v of etat.villageois) {
+      if (v.partenaireId) v.tempsCouple += dt;
+    }
+
     for (const v of etat.villageois) {
       if (!v.enceinte) continue;
       v.grossesseRestante -= dt;
@@ -1330,6 +1366,41 @@
         const pere = etat.villageois.find(p => p.id === v.pereId);
         notifier('👶 ' + v.prenom + (pere ? ' et ' + pere.prenom : '') + ' ont eu un enfant : ' + enfant.prenom + ' !');
         v.pereId = null;
+      }
+    }
+
+    // Rendez-vous à la maison : une fois que les deux partenaires sont bel
+    // et bien arrivés ensemble (position vérifiée pour ignorer un flag
+    // périmé si l'un des deux a été détourné entre-temps, ex. fuite ou
+    // combat), le temps passé ensemble s'accumule jusqu'à la durée cible
+    // tirée au sort (voir DUREE_MIN_AU_FOYER / DUREE_MAX_AU_FOYER), puis la
+    // conception a lieu.
+    const vusFoyer = new Set();
+    for (const v of etat.villageois) {
+      if (!v.enRouteMaison || vusFoyer.has(v.id)) continue;
+      const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
+      if (!partenaire || !partenaire.enRouteMaison) continue;
+      vusFoyer.add(v.id);
+      vusFoyer.add(partenaire.id);
+      const dV = Math.hypot(v.x - v.maisonCibleX, v.y - v.maisonCibleY);
+      const dP = Math.hypot(partenaire.x - partenaire.maisonCibleX, partenaire.y - partenaire.maisonCibleY);
+      if (!v.arriveAuFoyer || !partenaire.arriveAuFoyer || dV > TAILLE_TUILE || dP > TAILLE_TUILE) continue;
+      v.tempsAuFoyer += dt;
+      if (v.tempsAuFoyer >= v.dureeAuFoyerCible) {
+        const mere = v.genre === 'f' ? v : partenaire;
+        const pere = mere === v ? partenaire : v;
+        etat.ressources.nourriture = Math.max(0, etat.ressources.nourriture - 10);
+        mere.enceinte = true;
+        mere.grossesseRestante = DUREE_GESTATION_JOURS * DUREE_JOUR;
+        mere.pereId = pere.id;
+        notifier('🤰 ' + mere.prenom + ' attend un heureux événement avec ' + pere.prenom + '.');
+        for (const p of [v, partenaire]) {
+          p.enRouteMaison = false;
+          p.arriveAuFoyer = false;
+          p.tempsAuFoyer = 0;
+          p.mode = 'attente';
+          p.pause = aleatoire(0.5, 1.5);
+        }
       }
     }
 
@@ -1419,6 +1490,19 @@
             v.pause = aleatoire(0.3, 1);
           }
         }
+        continue;
+      }
+
+      // Rendez-vous à la maison en vue d'une conception : marche jusqu'à la
+      // maison choisie (ou au feu de camp à défaut, voir trouverMaisonPourCouple)
+      // puis y patiente avec son ou sa partenaire — la conception elle-même
+      // est finalisée par la boucle de synchronisation du couple plus haut,
+      // une fois que les deux sont arrivés et y sont restés assez longtemps.
+      if (v.enRouteMaison) {
+        const arrive = avancerVersCible(v, v.maisonCibleX, v.maisonCibleY, v.vitesseBase, dt);
+        v.enMouvement = !arrive;
+        v.travaille = false;
+        v.arriveAuFoyer = arrive;
         continue;
       }
 
@@ -3563,6 +3647,7 @@
     if (v.attenteGrotte) html += '<p>⏳ Attend le reste du groupe pour entrer.</p>';
     if (v.dansGrotte) html += '<p>🕳️ Explore l\'intérieur d\'une grotte.</p>';
     if (v.commandeManuelle) html += '<p>🖐️ Se dirige vers l\'endroit indiqué.</p>';
+    if (v.enRouteMaison) html += v.arriveAuFoyer ? '<p>🏠 Passe un moment avec son/sa partenaire...</p>' : '<p>🏠 Se rend à la maison...</p>';
     if (v.expeditionZone !== null) html += '<p>🧭 En expédition — retour dans ' + Math.max(0, Math.ceil(v.expeditionTempsRestant)) + ' s.</p>';
 
     if (v.estEnfant) {
@@ -3951,23 +4036,33 @@
 
     evoluerCouples(m);
 
-    // Grossesse : réservée aux couples formés dont personne n'est déjà
-    // enceinte ; la naissance elle-même arrive DUREE_GESTATION_JOURS jours
-    // plus tard (voir mettreAJourVillageois). Peut être coupée via
-    // l'interrupteur de naissances du bandeau du haut.
+    // Conception : réservée aux couples formés depuis au moins
+    // DELAI_COUPLE_AVANT_ENFANT (2 jours), dont personne n'est déjà enceinte
+    // ni déjà en route vers une maison. Le couple choisi se rend ensuite
+    // ensemble dans une maison (voir trouverMaisonPourCouple) ; la grossesse
+    // ne démarre qu'une fois les deux arrivés et restés un moment ensemble
+    // (voir la boucle de synchronisation dans mettreAJourVillageois), et la
+    // naissance elle-même arrive DUREE_GESTATION_JOURS jours après. Peut
+    // être coupée via l'interrupteur de naissances du bandeau du haut.
     if (!etat.naissancesBloquees && etat.ressources.nourriture >= 15 && nbPopulation() < etat.capacitePopulation) {
-      const couples = couplesFormes().filter(([a, b]) => !a.enceinte && !b.enceinte);
+      const couples = couplesFormes().filter(([a, b]) =>
+        !a.enceinte && !b.enceinte && !a.enRouteMaison && !b.enRouteMaison &&
+        Math.min(a.tempsCouple, b.tempsCouple) >= DELAI_COUPLE_AVANT_ENFANT);
       if (couples.length > 0) {
         const chance = 0.15 * m.natalite;
         if (Math.random() < chance) {
-          etat.ressources.nourriture -= 10;
           const [a, b] = couples[Math.floor(Math.random() * couples.length)];
-          const mere = a.genre === 'f' ? a : b;
-          const pere = mere === a ? b : a;
-          mere.enceinte = true;
-          mere.grossesseRestante = DUREE_GESTATION_JOURS * DUREE_JOUR;
-          mere.pereId = pere.id;
-          notifier('🤰 ' + mere.prenom + ' attend un heureux événement avec ' + pere.prenom + '.');
+          const maison = trouverMaisonPourCouple(a);
+          const dureeCible = aleatoire(DUREE_MIN_AU_FOYER, DUREE_MAX_AU_FOYER);
+          for (const p of [a, b]) {
+            p.enRouteMaison = true;
+            p.maisonCibleX = maison.x;
+            p.maisonCibleY = maison.y;
+            p.arriveAuFoyer = false;
+            p.tempsAuFoyer = 0;
+            p.dureeAuFoyerCible = dureeCible;
+          }
+          notifier('🏠 ' + a.prenom + ' et ' + b.prenom + ' se rendent à la maison...');
         }
       }
     }
@@ -4006,6 +4101,8 @@
         if (Math.random() < 0.12 * m.coupleChance) {
           a.partenaireId = b.id;
           b.partenaireId = a.id;
+          a.tempsCouple = 0;
+          b.tempsCouple = 0;
           notifier('💞 ' + a.prenom + ' et ' + b.prenom + ' se sont mis en couple.');
         }
         break;
