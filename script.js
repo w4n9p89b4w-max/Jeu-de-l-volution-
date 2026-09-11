@@ -37,8 +37,14 @@
   const RESSOURCE_EMOJI = { bois: '🪵', pierre: '🪨', nourriture: '🍖' };
   const GAIN_PAR_VOYAGE = 4; // ressources rapportées à chaque aller-retour complet
   const DUREE_RECOLTE = 3;   // secondes passées sur la ressource avant de repartir
-  const DUREE_ENFANCE = 60;  // secondes avant qu'un enfant devienne adulte et puisse travailler
-  const DUREE_GESTATION_JOURS = 30; // jours de grossesse avant la naissance (voir DUREE_JOUR)
+  // Croissance en deux temps (10 jours chacun ; DUREE_JOUR = 300s, donc
+  // 3000s par étape — valeur codée en dur car DUREE_JOUR n'est déclarée que
+  // plus bas dans le fichier) : enfant (ne peut rien faire) puis adolescent
+  // (peut tout faire, mais récolte deux fois moins, voir le calcul de gain
+  // dans mettreAJourVillageois) avant de devenir adulte.
+  const DUREE_ENFANCE = 3000;
+  const DUREE_ADOLESCENCE = 3000;
+  const DUREE_GESTATION_JOURS = 10; // jours de grossesse avant la naissance (voir DUREE_JOUR)
   const PV_VILLAGEOIS = 100;
   const PV_REGEN_PAR_SEC = 8; // vitesse de soin autour du feu de camp, en sortant d'une grotte
   const RAYON_SOIN_FEU = TAILLE_TUILE * 3.5; // portée de l'aura passive de soin du feu de camp
@@ -1134,6 +1140,7 @@
       tempsRecolte: 0,
       partenaireId: null,
       estEnfant: false,
+      estAdolescent: false,
       age: 0,
       parentA: null,
       parentB: null,
@@ -1297,11 +1304,15 @@
 
   function mettreAJourVillageois(dt) {
     for (const v of etat.villageois) {
-      if (!v.estEnfant) continue;
+      if (!v.estEnfant && !v.estAdolescent) continue;
       v.age += dt;
-      if (v.age >= DUREE_ENFANCE) {
+      if (v.estEnfant && v.age >= DUREE_ENFANCE) {
         v.estEnfant = false;
-        notifier('🧑 ' + v.prenom + ' a grandi et peut désormais travailler.');
+        v.estAdolescent = true;
+        notifier('🧑 ' + v.prenom + ' est devenu(e) adolescent(e) et peut désormais travailler (récolte réduite).');
+      } else if (v.estAdolescent && v.age >= DUREE_ENFANCE + DUREE_ADOLESCENCE) {
+        v.estAdolescent = false;
+        notifier('🧑 ' + v.prenom + ' est devenu(e) adulte.');
       }
     }
 
@@ -1499,7 +1510,9 @@
               const def = TYPES_RESSOURCE_NOEUD[noeudAssigne.type];
               let gain = GAIN_PAR_VOYAGE;
               if (outilsTravailDe(v).some(id => OUTILS[id].noeudCible === noeudAssigne.type)) gain += Math.round(1 * etat.multiplicateurs.bonusMetier);
-              gain = Math.round(gain * etat.multiplicateurs[def.ressource]);
+              // Un adolescent travaille normalement mais récolte deux fois
+              // moins qu'un adulte (voir la croissance en deux temps).
+              gain = Math.round(gain * etat.multiplicateurs[def.ressource] * (v.estAdolescent ? 0.5 : 1));
               v.charge = gain;
               v.ressourceType = def.ressource;
               v.mode = 'rapporte';
@@ -3132,7 +3145,7 @@
 
   function carteVillageoisHtml(v) {
     const icone = v.genre === 'f' ? '👩' : '🧑';
-    const metier = v.estEnfant ? 'Enfant' : metierTexte(v);
+    const metier = v.estEnfant ? 'Enfant' : v.estAdolescent ? metierTexte(v) + ' (Ado)' : metierTexte(v);
     let statut;
     if (v.estEnfant) statut = 'Grandit encore ' + Math.max(0, Math.ceil(DUREE_ENFANCE - v.age)) + ' s';
     else if (v.enFuite) statut = '🏃 En fuite';
@@ -3540,7 +3553,8 @@
     const icone = v.genre === 'f' ? '👩' : '🧑';
     const genreTxt = v.genre === 'f' ? 'Femme' : 'Homme';
     const metier = metierTexte(v);
-    let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${v.estEnfant ? ' · Enfant' : ''}<br>Métier : <b>${metier}</b></p>`;
+    const etapeVie = v.estEnfant ? ' · Enfant' : v.estAdolescent ? ' · Adolescent(e)' : '';
+    let html = `<h3>${icone} ${v.prenom}</h3><p>${genreTxt}${etapeVie}<br>Métier : <b>${metier}</b></p>`;
     if (v.pv < v.pvMax) html += `<p>❤️ PV : ${Math.max(0, Math.round(v.pv))} / ${v.pvMax}</p>`;
     if (v.enFuite) html += v.dansGrotte ? '<p>🏃 En fuite — court vers la sortie de la grotte.</p>' : '<p>🏃 En fuite — court se réfugier au campement.</p>';
     if (v.combatCibleId !== null) html += '<p>⚔️ Attaque une créature hostile.</p>';
@@ -3555,6 +3569,10 @@
       const restant = Math.max(0, Math.ceil(DUREE_ENFANCE - v.age));
       html += `<p class="astuce">Grandit encore ${restant} s avant de pouvoir travailler.</p>`;
     } else {
+      if (v.estAdolescent) {
+        const restant = Math.max(0, Math.ceil(DUREE_ENFANCE + DUREE_ADOLESCENCE - v.age));
+        html += `<p class="astuce">🌱 Adolescent(e) — récolte moitié moins qu'un adulte. Devient adulte dans ${restant} s.</p>`;
+      }
       if (v.partenaireId) {
         const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
         html += `<p>💞 En couple avec <b>${partenaire ? partenaire.prenom : '???'}</b></p>`;
