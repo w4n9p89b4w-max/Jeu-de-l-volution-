@@ -885,13 +885,17 @@ main {
 
   /* Panneau latéral : replié par défaut (tiroir masqué hors écran), pour
      laisser toute la carte visible ; s'ouvre via le bouton ☰ ou dès qu'une
-     sélection a quelque chose à montrer (voir ouvrirPanneauMobile en JS). */
+     sélection a quelque chose à montrer (voir ouvrirPanneauMobile en JS).
+     Le bouton reste hors du panneau (donc jamais emporté par son glissement
+     transform) mais est ancré juste au-dessus de son bord haut plutôt qu'en
+     haut d'écran, pour rester visuellement au niveau du tiroir qu'il
+     contrôle — voir .panneau plus bas pour la valeur de hauteur reprise ici. */
   .btn-panneau-mobile {
     display: flex;
     align-items: center;
     justify-content: center;
     position: absolute;
-    top: 10px;
+    bottom: calc(min(48vh, 420px) + 10px);
     right: 10px;
     width: 40px;
     height: 40px;
