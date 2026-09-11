@@ -883,10 +883,11 @@ main {
     top: 14px;
     left: 232px;
     right: auto;
+    gap: 0.25rem;
     flex-wrap: wrap;
-    max-width: calc(100vw - 242px);
+    max-width: calc(100vw - 236px);
   }
-  #blocMode button { padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+  #blocMode button { padding: 0.3rem 0.35rem; font-size: 0.62rem; white-space: nowrap; }
   .barre-xp { width: 64px; }
   .jour-compteur { font-size: 0.78rem; }
   .barre-jour { width: 44px; }
