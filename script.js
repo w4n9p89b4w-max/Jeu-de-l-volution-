@@ -1349,7 +1349,7 @@
     // Temps passé en couple : condition d'ancienneté avant de pouvoir
     // concevoir (voir DELAI_COUPLE_AVANT_ENFANT et le déclenchement dans tick()).
     for (const v of etat.villageois) {
-      if (v.partenaireId) v.tempsCouple += dt;
+      if (v.partenaireId !== null) v.tempsCouple += dt;
     }
 
     for (const v of etat.villageois) {
@@ -2039,9 +2039,11 @@
       v.recupereAuFeu = false;
       v.commandeManuelle = null;
       notifier('🏃 ' + v.prenom + ' fuit un(e) ' + TYPES_CREATURES[creature.type].nom.toLowerCase() + ' !');
-    } else if (!v.enFuite && v.combatCibleId !== creature.id) {
+    } else if (!v.enFuite && !v.estAdolescent && v.combatCibleId !== creature.id) {
       // Riposte automatique : un villageois attaqué se défend avec l'outil
       // qu'il a en main (l'épée reste plus efficace, voir DEGATS_GARDE).
+      // Un adolescent ne se bat pas (voir estAdolescent) : il encaisse sans
+      // riposter, sauf s'il fuit (condition ci-dessus, indépendante de l'âge).
       v.combatCibleId = creature.id;
       v.commandeManuelle = null;
     }
@@ -2051,7 +2053,7 @@
   // partagé entre les différentes causes de décès (créature, famine...),
   // seul le message de notification diffère.
   function retirerVillageoisMort(v) {
-    if (v.partenaireId) {
+    if (v.partenaireId !== null) {
       const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
       if (partenaire) partenaire.partenaireId = null;
     }
@@ -2110,7 +2112,7 @@
           if (c.tempsAttaque >= DUREE_ATTAQUE_CREATURE) {
             c.tempsAttaque = 0;
             infligerDegatsVillageois(cible, def.degats, c);
-            if (cible.outils.has('epee') && c.pv > 0) {
+            if (cible.outils.has('epee') && !cible.estAdolescent && c.pv > 0) {
               c.pv -= DEGATS_GARDE;
               if (c.pv <= 0) tuerCreature(c, cible);
             }
@@ -2968,7 +2970,7 @@
       // créature ciblée.
       let attaquants = 0;
       for (const id of villageoisSelectionnes) {
-        const attaquant = etat.villageois.find(x => x.id === id && !x.dansGrotte && !x.estEnfant);
+        const attaquant = etat.villageois.find(x => x.id === id && !x.dansGrotte && !x.estEnfant && !x.estAdolescent);
         if (!attaquant) continue;
         attaquant.combatCibleId = cibleCreature.id;
         attaquant.commandeManuelle = null;
@@ -3053,7 +3055,7 @@
     if (cibleCreature) {
       let attaquants = 0;
       for (const id of villageoisSelectionnes) {
-        const attaquant = etat.villageois.find(x => x.id === id && x.dansGrotte === etat.grotteActive);
+        const attaquant = etat.villageois.find(x => x.id === id && x.dansGrotte === etat.grotteActive && !x.estAdolescent);
         if (!attaquant) continue;
         attaquant.combatCibleId = cibleCreature.id;
         attaquant.commandeManuelle = null;
@@ -3658,7 +3660,7 @@
         const restant = Math.max(0, Math.ceil(DUREE_ENFANCE + DUREE_ADOLESCENCE - v.age));
         html += `<p class="astuce">🌱 Adolescent(e) — récolte moitié moins qu'un adulte. Devient adulte dans ${restant} s.</p>`;
       }
-      if (v.partenaireId) {
+      if (v.partenaireId !== null) {
         const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
         html += `<p>💞 En couple avec <b>${partenaire ? partenaire.prenom : '???'}</b></p>`;
       } else {
@@ -4076,7 +4078,7 @@
     const couples = [];
     const vus = new Set();
     for (const v of etat.villageois) {
-      if (v.estEnfant || !v.partenaireId || vus.has(v.id)) continue;
+      if (v.estEnfant || v.partenaireId === null || vus.has(v.id)) continue;
       const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
       if (!partenaire) continue;
       vus.add(v.id);
@@ -4087,15 +4089,17 @@
   }
 
   // Formation spontanée de nouveaux couples parmi les adultes célibataires
-  // suffisamment proches les uns des autres.
+  // suffisamment proches les uns des autres. Les enfants et les adolescents
+  // ne peuvent pas encore tomber amoureux (voir aussi estAdolescent pour le
+  // combat, exclu de la même façon dans mettreAJourVillageois).
   function evoluerCouples(m) {
-    const celibataires = etat.villageois.filter(v => !v.estEnfant && !v.partenaireId);
+    const celibataires = etat.villageois.filter(v => !v.estEnfant && !v.estAdolescent && v.partenaireId === null);
     for (let i = 0; i < celibataires.length; i++) {
       const a = celibataires[i];
-      if (a.partenaireId) continue;
+      if (a.partenaireId !== null) continue;
       for (let j = i + 1; j < celibataires.length; j++) {
         const b = celibataires[j];
-        if (b.partenaireId || a.genre === b.genre) continue;
+        if (b.partenaireId !== null || a.genre === b.genre) continue;
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         if (dist > TAILLE_TUILE * 6) continue;
         if (Math.random() < 0.12 * m.coupleChance) {
@@ -4234,7 +4238,7 @@
     const tirage = Math.random();
     if (tirage < RISQUE_MORT_EXPEDITION) {
       notifier('💀 ' + v.prenom + ' n\'est jamais revenu(e) de son expédition vers « ' + (NOMS_ZONES[zoneId] || '?') + ' »...');
-      if (v.partenaireId) {
+      if (v.partenaireId !== null) {
         const partenaire = etat.villageois.find(p => p.id === v.partenaireId);
         if (partenaire) partenaire.partenaireId = null;
       }
