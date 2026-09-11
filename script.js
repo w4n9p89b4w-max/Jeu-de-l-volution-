@@ -2566,13 +2566,13 @@
       if (caseSelectionnee.verrouillee) {
         tuilesAContourer = [caseSelectionnee];
       } else {
-        const noeudSel = etat.noeuds.get(caseSelectionnee.col + ',' + caseSelectionnee.row);
-        // Une zone de pêche couvre tout un littoral (parfois l'essentiel de
-        // la carte, voir placerZonesPeche) : le contourer entièrement en
-        // jaune serait illisible, donc pas de surbrillance pour ce type de
-        // zone plutôt qu'un contour qui engloberait la moitié de la carte.
-        if (!noeudSel || noeudSel.type !== 'poisson') {
-          tuilesAContourer = noeudSel ? noeudsDeLaZone(noeudSel.zoneId) : [caseSelectionnee];
+        const cleSel = caseSelectionnee.col + ',' + caseSelectionnee.row;
+        // Ni les ressources (une zone de pêche peut couvrir tout un
+        // littoral, voir placerZonesPeche) ni les bâtiments n'ont de contour
+        // jaune : le panneau de sélection suffit déjà à montrer ce qui est
+        // sélectionné, sans surcharger la carte.
+        if (!etat.noeuds.get(cleSel) && !etat.batiments.get(cleSel)) {
+          tuilesAContourer = [caseSelectionnee];
         }
       }
       if (tuilesAContourer) {
