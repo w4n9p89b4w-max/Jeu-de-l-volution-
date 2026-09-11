@@ -273,6 +273,22 @@ main {
   border-radius: 6px;
 }
 
+/* Étiquette du nom de biome qui suit la souris au survol de la carte (voir
+   survolerCarte) : positionnée en fixed pour suivre le curseur à l'écran
+   sans être bornée par l'overflow:hidden de .stage. */
+.info-biome-survol {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--texte);
+  background: rgba(10, 14, 24, 0.8);
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
 /* Tiroir mobile : ce bouton ne sert qu'en dessous de 720px (voir le media
    query en bas du fichier), masqué sur desktop où le panneau est toujours
    visible. */

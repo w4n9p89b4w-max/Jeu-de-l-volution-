@@ -2400,7 +2400,15 @@
   }
 
   function dessinerCarte(temps) {
-    if (etat.grotteActive) { dessinerVueInterieure(temps); return; }
+    if (etat.grotteActive) {
+      // Pas de nom de biome à l'intérieur d'une grotte : évite qu'une
+      // étiquette reste affichée par erreur après l'entrée dans une grotte
+      // sans nouveau mouvement de souris (voir survolerCarte).
+      const tooltip = document.getElementById('infoBiomeSurvol');
+      if (tooltip) tooltip.hidden = true;
+      dessinerVueInterieure(temps);
+      return;
+    }
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000';
@@ -2638,6 +2646,25 @@
   const pointeursActifs = new Map(); // pointerId -> {x, y} en coordonnées écran, pour le pincement à deux doigts
   let modePincement = null; // {distance, milieuX, milieuY} entre les deux doigts actifs
 
+  // Étiquette flottante du nom de biome sous le curseur (souris uniquement —
+  // pas de notion de survol persistant au tactile). Purement informatif :
+  // ne remplace pas le clic, qui reste utile pour assigner une ressource,
+  // démolir un bâtiment ou entrer dans une grotte (voir gererClicCarte).
+  function survolerCarte(clientX, clientY) {
+    const tooltip = document.getElementById('infoBiomeSurvol');
+    if (!tooltip) return;
+    if (etat.grotteActive) { tooltip.hidden = true; return; }
+    const rect = canvas.getBoundingClientRect();
+    const px = clientX - rect.left, py = clientY - rect.top;
+    const col = Math.floor((px / zoom + camera.x) / TAILLE_TUILE);
+    const row = Math.floor((py / zoom + camera.y) / TAILLE_TUILE);
+    if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) { tooltip.hidden = true; return; }
+    tooltip.textContent = BIOMES[etat.tuiles[row][col]].nom;
+    tooltip.style.left = (clientX + 14) + 'px';
+    tooltip.style.top = (clientY + 14) + 'px';
+    tooltip.hidden = false;
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* pointeur déjà relâché, sans conséquence */ }
     pointeursActifs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2659,6 +2686,7 @@
     }
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'mouse') survolerCarte(e.clientX, e.clientY);
     if (modeConstruction && !propositionConstruction) {
       const rect = canvas.getBoundingClientRect();
       const px = e.clientX - rect.left, py = e.clientY - rect.top;
@@ -2729,7 +2757,11 @@
   }
   canvas.addEventListener('pointerup', terminerGlisser);
   canvas.addEventListener('pointercancel', terminerGlisser);
-  canvas.addEventListener('pointerleave', () => { caseSurvolee = null; });
+  canvas.addEventListener('pointerleave', () => {
+    caseSurvolee = null;
+    const tooltip = document.getElementById('infoBiomeSurvol');
+    if (tooltip) tooltip.hidden = true;
+  });
 
   minicarte.addEventListener('click', (e) => {
     const rect = minicarte.getBoundingClientRect();
@@ -2795,11 +2827,14 @@
 
     const zoneOk = etat.zonesDebloquees.has(zoneDeCase(col, row));
     if (!zoneOk) {
+      // Rien d'actionnable sur une zone verrouillée (son nom apparaît déjà
+      // en survol, voir survolerCarte) : un clic désélectionne simplement
+      // plutôt que d'ouvrir un panneau (voir le early-return correspondant
+      // dans afficherSelection).
       villageoisSelectionnes.clear();
       creatureSelectionneeId = null;
       caseSelectionnee = { col, row, verrouillee: true };
       afficherSelection();
-      ouvrirPanneauMobile();
       return;
     }
 
@@ -2895,12 +2930,17 @@
     // Pas de déplacement manuel dirigé sur la carte extérieure : cliquer
     // une case y désélectionne simplement pour en afficher les infos (voir
     // plus bas). Cet ordre de déplacement au clic reste réservé à
-    // l'intérieur des grottes (voir gererClicInterieur).
+    // l'intérieur des grottes (voir gererClicInterieur). Le tiroir mobile ne
+    // s'ouvre que s'il y a effectivement quelque chose à montrer (voir
+    // afficherSelection : une case vide/verrouillée referme le panneau).
     villageoisSelectionnes.clear();
     creatureSelectionneeId = null;
     caseSelectionnee = { col, row, verrouillee: false };
     afficherSelection();
-    ouvrirPanneauMobile();
+    // afficherSelection referme le panneau (caseSelectionnee redevient null)
+    // s'il n'y avait rien d'actionnable sur cette case — le tiroir mobile ne
+    // s'ouvre donc que quand il reste effectivement quelque chose à montrer.
+    if (caseSelectionnee) ouvrirPanneauMobile();
   }
 
   // Gère les clics sur la vue intérieure d'une grotte : sélection d'un
@@ -3746,8 +3786,10 @@
     }
     const { col, row, verrouillee } = caseSelectionnee;
     if (verrouillee) {
-      const zone = zoneDeCase(col, row);
-      conteneur.innerHTML = `<h3>🔒 Zone verrouillée</h3><p>La zone « ${NOMS_ZONES[zone]} » n'est pas encore explorée. Débloquez-la dans l'arbre technologique.</p>`;
+      // Zone verrouillée : rien d'actionnable à sa case, son nom apparaît
+      // déjà en survol sur la carte (voir survolerCarte) — pas de panneau.
+      caseSelectionnee = null;
+      if (panneau) panneau.hidden = true;
       return;
     }
     const biome = etat.tuiles[row][col];
@@ -3813,7 +3855,11 @@
         html += '<p class="astuce">Aucun villageois libre n\'a l\'outil adapté à cette ressource.</p>';
       }
     } else {
-      html += '<p class="astuce">Case libre. Passez en mode Construire pour y bâtir quelque chose.</p>';
+      // Case vide sans rien d'actionnable : son biome apparaît déjà en
+      // survol sur la carte (voir survolerCarte) — pas de panneau non plus.
+      caseSelectionnee = null;
+      if (panneau) panneau.hidden = true;
+      return;
     }
 
     conteneur.innerHTML = html;
