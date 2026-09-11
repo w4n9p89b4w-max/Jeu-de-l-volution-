@@ -2554,28 +2554,36 @@
 
     // Sélection
     if (caseSelectionnee) {
-      let tuilesAContourer;
+      let tuilesAContourer = null;
       if (caseSelectionnee.verrouillee) {
         tuilesAContourer = [caseSelectionnee];
       } else {
         const noeudSel = etat.noeuds.get(caseSelectionnee.col + ',' + caseSelectionnee.row);
-        tuilesAContourer = noeudSel ? noeudsDeLaZone(noeudSel.zoneId) : [caseSelectionnee];
+        // Une zone de pêche couvre tout un littoral (parfois l'essentiel de
+        // la carte, voir placerZonesPeche) : le contourer entièrement en
+        // jaune serait illisible, donc pas de surbrillance pour ce type de
+        // zone plutôt qu'un contour qui engloberait la moitié de la carte.
+        if (!noeudSel || noeudSel.type !== 'poisson') {
+          tuilesAContourer = noeudSel ? noeudsDeLaZone(noeudSel.zoneId) : [caseSelectionnee];
+        }
       }
-      // Un seul contour fusionné autour de toute la zone plutôt qu'un
-      // quadrillage de petits carrés : on ne trace que les arêtes de bord,
-      // là où la case voisine ne fait pas partie de la même zone.
-      const zoneSet = new Set(tuilesAContourer.map(t => t.col + ',' + t.row));
-      ctx.strokeStyle = '#ffd93d';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (const t of tuilesAContourer) {
-        const x = t.col * TAILLE_TUILE, y = t.row * TAILLE_TUILE;
-        if (!zoneSet.has(t.col + ',' + (t.row - 1))) { ctx.moveTo(x, y); ctx.lineTo(x + TAILLE_TUILE, y); }
-        if (!zoneSet.has(t.col + ',' + (t.row + 1))) { ctx.moveTo(x, y + TAILLE_TUILE); ctx.lineTo(x + TAILLE_TUILE, y + TAILLE_TUILE); }
-        if (!zoneSet.has((t.col - 1) + ',' + t.row)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TAILLE_TUILE); }
-        if (!zoneSet.has((t.col + 1) + ',' + t.row)) { ctx.moveTo(x + TAILLE_TUILE, y); ctx.lineTo(x + TAILLE_TUILE, y + TAILLE_TUILE); }
+      if (tuilesAContourer) {
+        // Un seul contour fusionné autour de toute la zone plutôt qu'un
+        // quadrillage de petits carrés : on ne trace que les arêtes de bord,
+        // là où la case voisine ne fait pas partie de la même zone.
+        const zoneSet = new Set(tuilesAContourer.map(t => t.col + ',' + t.row));
+        ctx.strokeStyle = '#ffd93d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (const t of tuilesAContourer) {
+          const x = t.col * TAILLE_TUILE, y = t.row * TAILLE_TUILE;
+          if (!zoneSet.has(t.col + ',' + (t.row - 1))) { ctx.moveTo(x, y); ctx.lineTo(x + TAILLE_TUILE, y); }
+          if (!zoneSet.has(t.col + ',' + (t.row + 1))) { ctx.moveTo(x, y + TAILLE_TUILE); ctx.lineTo(x + TAILLE_TUILE, y + TAILLE_TUILE); }
+          if (!zoneSet.has((t.col - 1) + ',' + t.row)) { ctx.moveTo(x, y); ctx.lineTo(x, y + TAILLE_TUILE); }
+          if (!zoneSet.has((t.col + 1) + ',' + t.row)) { ctx.moveTo(x + TAILLE_TUILE, y); ctx.lineTo(x + TAILLE_TUILE, y + TAILLE_TUILE); }
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     }
 
     dessinerObscurite();
@@ -2762,6 +2770,22 @@
     definirPanneauMobileOuvert(true);
   }
 
+  // Seules les cases d'eau côtières ont leur propre nœud de pêche (voir
+  // placerZonesPeche) ; cliquer plus loin sur l'eau retombe donc sur le
+  // nœud de pêche débloqué le plus proche, pour proposer l'assignation dès
+  // qu'on clique sur l'eau plutôt que seulement pile sur le bord.
+  function noeudPecheLePlusProche(wx, wy) {
+    let meilleur = null, meilleureDist = Infinity;
+    for (const n of etat.noeuds.values()) {
+      if (n.type !== 'poisson') continue;
+      if (!etat.zonesDebloquees.has(zoneDeCase(n.col, n.row))) continue;
+      const nx = n.col * TAILLE_TUILE + TAILLE_TUILE / 2, ny = n.row * TAILLE_TUILE + TAILLE_TUILE / 2;
+      const d = Math.hypot(nx - wx, ny - wy);
+      if (d < meilleureDist) { meilleureDist = d; meilleur = n; }
+    }
+    return meilleur;
+  }
+
   function gererClicCarte(px, py) {
     if (etat.grotteActive) { gererClicInterieur(px, py); return; }
 
@@ -2849,6 +2873,23 @@
     if (grotteClic) {
       ouvrirPopupGrotte(grotteClic);
       return;
+    }
+
+    // Sur l'eau, retomber sur le nœud de pêche le plus proche s'il n'y en a
+    // pas pile sous le clic (voir noeudPecheLePlusProche) : sinon un clic en
+    // plein milieu d'un lac ou du large affichait juste « case libre » au
+    // lieu de proposer d'assigner un pêcheur.
+    const biomeClic = etat.tuiles[row][col];
+    if ((biomeClic === 'ocean' || biomeClic === 'lac') && !etat.noeuds.get(col + ',' + row)) {
+      const noeudProche = noeudPecheLePlusProche(wx, wy);
+      if (noeudProche) {
+        villageoisSelectionnes.clear();
+        creatureSelectionneeId = null;
+        caseSelectionnee = { col: noeudProche.col, row: noeudProche.row, verrouillee: false };
+        afficherSelection();
+        ouvrirPanneauMobile();
+        return;
+      }
     }
 
     // Pas de déplacement manuel dirigé sur la carte extérieure : cliquer
