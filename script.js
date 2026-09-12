@@ -4092,9 +4092,9 @@
   }
 
   // Envoie un villageois libre déjà équipé (torche + épée/arc) explorer une
-  // zone accessible, s'il y en a une et si quelqu'un peut y aller. Ne
-  // fabrique et n'équipe pas d'outils automatiquement : ne se déclenche que
-  // si l'équipement nécessaire est déjà en place.
+  // zone accessible, s'il y en a une et si quelqu'un peut y aller (voir
+  // iaPreparerExplorateur pour l'équipement, tenté juste avant dans
+  // executerIA).
   function iaEnvoyerExpedition() {
     const zonesDispo = TECHS.filter(t => t.branche === 'exploration' && !etat.techsAcquises.has(t.id) && techDisponible(t));
     if (!zonesDispo.length) return;
@@ -4102,13 +4102,105 @@
     if (v) envoyerExpeditionZone(v.id, zonesDispo[0]);
   }
 
+  // S'assure qu'au moins un exemplaire de l'outil est en stock — le
+  // fabrique si besoin et si les ressources le permettent — puis renvoie
+  // vrai si un exemplaire est bien disponible à équiper.
+  function iaObtenirOutil(id) {
+    if ((etat.outilsStock[id] || 0) <= 0) fabriquerOutil(id);
+    return (etat.outilsStock[id] || 0) > 0;
+  }
+
+  // Équipe un outil déjà en stock sur un villageois qui ne l'a pas encore
+  // (même geste que la popup de choix d'outil, sans passer par l'UI).
+  function iaEquiper(v, id) {
+    if ((etat.outilsStock[id] || 0) <= 0 || v.outils.has(id)) return false;
+    etat.outilsStock[id]--;
+    v.outils.add(id);
+    notifier('🤖 ' + v.prenom + ' s\'équipe de ' + OUTILS[id].nom.toLowerCase() + '.');
+    return true;
+  }
+
+  // Équipe l'outil de métier correspondant sur les villageois déjà affectés
+  // à une ressource, pour profiter du bonus de récolte (voir le calcul de
+  // gain dans mettreAJourVillageois) — jamais sur un(e) villageois(e) sans
+  // affectation, sans quoi l'outil le/la enfermerait sur cette ressource
+  // pour rien (voir outilCompatibleAvecNoeud).
+  function iaGererOutilsMetier() {
+    for (const v of etat.villageois) {
+      if (v.estEnfant || !v.assigneA) continue;
+      const noeud = etat.noeuds.get(v.assigneA);
+      if (!noeud) continue;
+      const idOutil = Object.keys(OUTILS).find(id => OUTILS[id].noeudCible === noeud.type);
+      if (!idOutil || v.outils.has(idOutil)) continue;
+      if (iaObtenirOutil(idOutil)) iaEquiper(v, idOutil);
+    }
+  }
+
+  // Prépare un(e) explorateur(trice) : équipe (en fabriquant si besoin)
+  // torche + épée sur un(e) villageois(e) libre, pour qu'iaEnvoyerExpedition
+  // puisse ensuite l'envoyer. Torche et épée n'ont pas de noeudCible, donc
+  // les équiper ne restreint jamais la récolte (contrairement aux outils de
+  // métier, voir iaGererOutilsMetier) : c'est sans risque de le faire sur
+  // n'importe quel(le) villageois(e) libre.
+  function iaPreparerExplorateur() {
+    const zonesDispo = TECHS.filter(t => t.branche === 'exploration' && !etat.techsAcquises.has(t.id) && techDisponible(t));
+    if (!zonesDispo.length) return;
+    if (etat.villageois.some(v => estVillageoisLibre(v) && !v.estEnfant && !v.estAdolescent && !v.enRouteMaison && peutPartirExpedition(v))) return;
+    const v = etat.villageois.find(x => estVillageoisLibre(x) && !x.estEnfant && !x.estAdolescent && !x.enRouteMaison);
+    if (!v) return;
+    // Équipe les deux objets dans le même passage (plutôt qu'un par appel) :
+    // sans quoi iaAssignerVillageoisLibres, juste après dans executerIA,
+    // récupérerait ce/cette même villageois(e) pour la récolte dès qu'il/elle
+    // n'a plus qu'un objet en attente, et l'équipement resterait à moitié fait.
+    if (!v.outils.has('torche') && iaObtenirOutil('torche')) iaEquiper(v, 'torche');
+    if (!v.outils.has('epee') && !v.outils.has('arc') && iaObtenirOutil('epee')) iaEquiper(v, 'epee');
+  }
+
+  // La grotte la plus proche du campement qui vaut encore la peine d'y
+  // retourner (gisements non épuisés, ou jamais visitée).
+  function iaChoisirGrotte() {
+    const base = trouverBase();
+    let meilleure = null, meilleureDist = Infinity;
+    for (const grotte of etat.grottes.values()) {
+      if (grotte.interieur && grotte.interieur.noeuds.every(n => n.quantite <= 0)) continue;
+      const d = Math.hypot(grotte.col * TAILLE_TUILE - base.x, grotte.row * TAILLE_TUILE - base.y);
+      if (d < meilleureDist) { meilleureDist = d; meilleure = grotte; }
+    }
+    return meilleure;
+  }
+
+  // Envoie ensemble, vers la grotte la plus proche encore utile, les
+  // villageois adultes qui n'ont vraiment plus rien à faire (aucune
+  // ressource disponible à récolter — voir l'ordre d'appel dans executerIA,
+  // après iaAssignerVillageoisLibres — et pas en route pour concevoir).
+  // Toujours à au moins deux, comme le suggère la popup de grotte du joueur.
+  function iaEnvoyerVersGrotte() {
+    const libres = etat.villageois.filter(v => estVillageoisLibre(v) && !v.estEnfant && !v.estAdolescent && !v.enRouteMaison);
+    if (libres.length < 2) return;
+    const grotte = iaChoisirGrotte();
+    if (!grotte) return;
+    const cle = grotte.col + ',' + grotte.row;
+    const groupeId = ++grotteGroupeIdCompteur;
+    for (const v of libres) {
+      v.grotteAssignee = cle;
+      v.grotteGroupeId = groupeId;
+      v.mode = 'grotte';
+    }
+    notifier('🤖 ' + libres.length + ' villageois partent explorer une grotte...');
+  }
+
   function executerIA() {
     // L'expédition passe avant l'assignation aux ressources : un(e)
-    // villageois(e) déjà équipé(e) pour explorer (torche + épée/arc) est
-    // plus utile en éclaireur qu'en récolteur de plus, sans quoi
+    // villageois(e) déjà équipé(e) (ou qu'on vient d'équiper) pour explorer
+    // est plus utile en éclaireur qu'en récolteur de plus, sans quoi
     // iaAssignerVillageoisLibres l'aurait déjà affecté(e) à une ressource.
+    iaPreparerExplorateur();
     iaEnvoyerExpedition();
     iaAssignerVillageoisLibres();
+    // La grotte vient après l'assignation : n'y envoyer que celles et ceux
+    // qui n'ont vraiment plus aucune ressource disponible à récolter.
+    iaEnvoyerVersGrotte();
+    iaGererOutilsMetier();
     iaConstruire();
     iaAcheterTechs();
   }
