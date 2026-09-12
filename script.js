@@ -313,6 +313,10 @@
       naissancesBloquees: false,
       outilsStock: Object.fromEntries(Object.keys(OUTILS).map(id => [id, 0])),
       enFamine: false,
+      // Jeu automatique (phase de test), voir executerIA : activé/désactivé
+      // via le bouton 🤖, décide à chaque tick() (donc plus souvent si la
+      // simulation est accélérée, comme le reste de la logique de tick()).
+      iaActive: false,
     };
   }
 
@@ -2365,6 +2369,7 @@
     const btnNaissances = document.getElementById('btnNaissances');
     btnNaissances.textContent = '👶';
     btnNaissances.classList.remove('mode-actif');
+    document.getElementById('btnIA').classList.remove('mode-actif');
   }
 
   function centrerCameraSurLeDepart() {
@@ -3982,6 +3987,133 @@
   }
 
   // ============================================================
+  // Jeu automatique (phase de test) : un pilotage à base de règles simples,
+  // pour laisser une partie tourner seule sans intervention manuelle (utile
+  // pour tester la simulation sur la durée). Activé/désactivé via le bouton
+  // 🤖 (etat.iaActive) ; n'appelle que des actions déjà accessibles au
+  // joueur (assignation, construction, technologies, expéditions), ne
+  // contourne aucune règle du jeu.
+  // ============================================================
+
+  // Classe les types de nœuds récoltables du plus urgent au moins urgent :
+  // priorité à la ressource la plus proche de zéro (relativement au plafond
+  // de stockage), avec un coup de pouce à la nourriture si la famine menace.
+  function iaOrdreRessources() {
+    const cap = capaciteStockage();
+    const scores = TYPES_ASSIGNATION_RAPIDE.map(([type]) => {
+      const ressource = TYPES_RESSOURCE_NOEUD[type].ressource;
+      let score = etat.ressources[ressource] / cap;
+      if (ressource === 'nourriture' && etat.ressources.nourriture < nbPopulation() * 3) score -= 1;
+      return { type, score };
+    });
+    scores.sort((a, b) => a.score - b.score);
+    return scores.map(s => s.type);
+  }
+
+  // Assigne chaque villageois libre (adulte ou adolescent, hors rendez-vous
+  // à la maison) à la ressource la plus urgente qu'il peut récolter.
+  function iaAssignerVillageoisLibres() {
+    const ordre = iaOrdreRessources();
+    for (const v of etat.villageois) {
+      if (!estVillageoisLibre(v) || v.estEnfant || v.enRouteMaison) continue;
+      for (const type of ordre) {
+        if (!outilCompatibleAvecNoeud(v, type)) continue;
+        const noeud = noeudLibrePlusProche(v, type);
+        if (!noeud) continue;
+        v.assigneA = noeud.col + ',' + noeud.row;
+        break;
+      }
+    }
+  }
+
+  // Cherche, en s'éloignant en anneaux depuis le campement, la première case
+  // où un bâtiment du type donné peut être posé.
+  function iaChercherEmplacement(type) {
+    const base = trouverBase();
+    const bc = Math.round(base.x / TAILLE_TUILE), br = Math.round(base.y / TAILLE_TUILE);
+    for (let rayon = 1; rayon <= 16; rayon++) {
+      for (let dr = -rayon; dr <= rayon; dr++) {
+        for (let dc = -rayon; dc <= rayon; dc++) {
+          if (Math.max(Math.abs(dr), Math.abs(dc)) !== rayon) continue;
+          const col = bc + dc, row = br + dr;
+          if (col < 0 || row < 0 || col >= COLONNES || row >= LIGNES) continue;
+          const { valide } = verifierEmplacementConstruction(type, col, row);
+          if (valide) return { col, row };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Lance la construction automatique d'un bâtiment si les ressources et un
+  // emplacement libre sont disponibles. Renvoie vrai en cas de succès.
+  function iaTenterConstruction(type) {
+    const def = BATIMENTS[type];
+    if (!def || def.nonConstructible) return false;
+    if (def.requiert && !etat.techsAcquises.has(def.requiert)) return false;
+    const cout = coutBatiment(def);
+    if (etat.ressources.bois < cout.bois || etat.ressources.pierre < cout.pierre) return false;
+    const emplacement = iaChercherEmplacement(type);
+    if (!emplacement) return false;
+    const { valide, cases } = verifierEmplacementConstruction(type, emplacement.col, emplacement.row);
+    if (!valide) return false;
+    etat.ressources.bois -= cout.bois;
+    etat.ressources.pierre -= cout.pierre;
+    const duree = def.duree * etat.multiplicateurs.dureeConstruction;
+    etat.chantiers.push({ type, cases, tempsRestant: duree, dureeTotale: duree });
+    notifier('🤖 Construction automatique : ' + def.nom.toLowerCase() + '...');
+    return true;
+  }
+
+  // Priorités de construction : logement (éviter de bloquer la population),
+  // stockage (éviter le gaspillage), puis nourriture si le stock est bas.
+  // Un seul chantier automatique à la fois pour ne pas vider les réserves.
+  function iaConstruire() {
+    if (etat.chantiers.length > 0) return;
+    const pop = nbPopulation();
+    if (pop >= etat.capacitePopulation - 1 && iaTenterConstruction('maison')) return;
+    const cap = capaciteStockage();
+    if ((etat.ressources.bois >= cap * 0.85 || etat.ressources.pierre >= cap * 0.85) && iaTenterConstruction('entrepot')) return;
+    if (etat.ressources.nourriture < pop * 5) {
+      if (iaTenterConstruction('enclos')) return;
+      if (iaTenterConstruction('champ')) return;
+    }
+  }
+
+  // Dépense les points de technologie disponibles sur la tech la moins
+  // chère déjà accessible (hors branche Exploration, gérée à part par
+  // iaEnvoyerExpedition puisqu'elle nécessite un trajet, pas juste des points).
+  function iaAcheterTechs() {
+    if (etat.pointsTech <= 0) return;
+    const candidates = TECHS
+      .filter(t => t.branche !== 'exploration' && !etat.techsAcquises.has(t.id) && techDisponible(t) && etat.pointsTech >= t.cout)
+      .sort((a, b) => a.cout - b.cout);
+    if (candidates.length) acquerirTech(candidates[0]);
+  }
+
+  // Envoie un villageois libre déjà équipé (torche + épée/arc) explorer une
+  // zone accessible, s'il y en a une et si quelqu'un peut y aller. Ne
+  // fabrique et n'équipe pas d'outils automatiquement : ne se déclenche que
+  // si l'équipement nécessaire est déjà en place.
+  function iaEnvoyerExpedition() {
+    const zonesDispo = TECHS.filter(t => t.branche === 'exploration' && !etat.techsAcquises.has(t.id) && techDisponible(t));
+    if (!zonesDispo.length) return;
+    const v = etat.villageois.find(x => estVillageoisLibre(x) && !x.estEnfant && !x.estAdolescent && !x.enRouteMaison && peutPartirExpedition(x));
+    if (v) envoyerExpeditionZone(v.id, zonesDispo[0]);
+  }
+
+  function executerIA() {
+    // L'expédition passe avant l'assignation aux ressources : un(e)
+    // villageois(e) déjà équipé(e) pour explorer (torche + épée/arc) est
+    // plus utile en éclaireur qu'en récolteur de plus, sans quoi
+    // iaAssignerVillageoisLibres l'aurait déjà affecté(e) à une ressource.
+    iaEnvoyerExpedition();
+    iaAssignerVillageoisLibres();
+    iaConstruire();
+    iaAcheterTechs();
+  }
+
+  // ============================================================
   // Boucle de simulation (tick)
   // ============================================================
 
@@ -4071,6 +4203,8 @@
 
     const xpPassif = (gainPassif.bois + gainPassif.pierre + gainPassif.nourriture) * 0.4;
     if (xpPassif > 0) gagnerXp(xpPassif);
+
+    if (etat.iaActive) executerIA();
   }
 
   // Renvoie les paires de villageois formant un couple, un seul exemplaire par paire.
@@ -4647,6 +4781,12 @@
     notifier(etat.naissancesBloquees ? '🚫 Les naissances sont désormais bloquées.' : '👶 Les naissances sont de nouveau autorisées.');
   });
   document.getElementById('btnNouvellePartie').addEventListener('click', nouvellePartie);
+  document.getElementById('btnIA').addEventListener('click', (e) => {
+    etat.iaActive = !etat.iaActive;
+    e.target.classList.toggle('mode-actif', etat.iaActive);
+    e.target.title = etat.iaActive ? 'Jeu automatique activé — cliquer pour reprendre la main' : 'Jeu automatique (phase de test)';
+    notifier(etat.iaActive ? '🤖 Jeu automatique activé : la partie se joue seule.' : '🤖 Jeu automatique désactivé.');
+  });
 
   document.getElementById('btnModeExplorer').addEventListener('click', () => {
     modeConstruction = null;

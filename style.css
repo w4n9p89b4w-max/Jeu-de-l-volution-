@@ -881,11 +881,11 @@ main {
      tient pas sur un écran très étroit. */
   #blocMode {
     top: 14px;
-    left: 252px;
+    left: 288px;
     right: auto;
     gap: 0.25rem;
     flex-wrap: wrap;
-    max-width: calc(100vw - 256px);
+    max-width: calc(100vw - 292px);
   }
   /* Icônes seules sur mobile (le libellé texte disparaît) : même en
      resserrant au maximum, les deux boutons texte tenaient tout juste à
