@@ -77,6 +77,7 @@
   // points de technologie, il faut envoyer un villageois en expédition. Les
   // points de technologie restent utiles en accélérateur d'une expédition en
   // cours. Un incident est possible au retour (blessure, rarement la mort).
+  const NIVEAU_MIN_EXPEDITION = 10; // niveau du village requis avant de pouvoir explorer une zone
   const DUREE_EXPEDITION_ZONE = { 1: 25, 2: 45 }; // secondes, selon le palier de la zone
   const ACCEL_EXPEDITION_PAR_POINT = 8; // secondes gagnées par point de technologie dépensé
   const RISQUE_MORT_EXPEDITION = 0.05;
@@ -237,6 +238,7 @@
       zone: i,
       branche: 'exploration',
       palier: bord ? 1 : 2,
+      niveauRequis: NIVEAU_MIN_EXPEDITION,
       effet: () => {},
     });
   }
@@ -4361,6 +4363,7 @@
   // sauf au palier 1, si TOUT le palier précédent de sa branche est acquis :
   // impossible de sauter un palier, même sans prérequis direct.
   function techDisponible(t) {
+    if (t.niveauRequis && etat.niveau < t.niveauRequis) return false;
     if (!t.prerequis.every(p => etat.techsAcquises.has(p))) return false;
     const palier = t.palier || 1;
     if (palier <= 1) return true;
@@ -4557,6 +4560,7 @@
           let sousTitre;
           if (acquise) sousTitre = 'Acquise';
           else if (!estExploration) sousTitre = 'Coût : ' + t.cout + ' pt(s)';
+          else if (t.niveauRequis && etat.niveau < t.niveauRequis) sousTitre = '🔒 Niveau ' + t.niveauRequis + ' requis';
           else if (enExpedition) sousTitre = '🧭 En expédition — ' + Math.max(0, Math.ceil(enExpedition.expeditionTempsRestant)) + ' s';
           else sousTitre = 'Envoi d\'un aventurier';
           div.innerHTML = `<h3>${acquise ? '✅' : (dispo ? '🔓' : '🔒')} ${t.nom}</h3>
