@@ -149,6 +149,8 @@
     if (state.pop > lastPop) { hp.classList.remove('bump'); void hp.offsetWidth; hp.classList.add('bump'); }
     lastPop = state.pop;
     $('hName').textContent = state.name;
+    if (state.forest > state.pop) state.forest = state.pop;
+    $('forestN').textContent = state.forest;
     const era = E.ERAS[state.era];
     $('hEra').textContent = `${era.name} · ${era.year}`;
     const d = (v) => v > 0 ? `<i class="up">+${v}</i>` : v < 0 ? `<i class="down">${v}</i>` : '';
@@ -326,6 +328,37 @@
     });
   }
 
+  /* ---------- Les habitants en forêt ---------- */
+  function openForest() {
+    if (!state || busy) return;
+    modal({
+      icon: '🌲', title: 'Envoyer en forêt',
+      html: `<p>Combien d'habitants partent couper du bois ?</p>
+        <div class="stepper"><button class="round" id="fMinus" aria-label="Moins">−</button><b id="fVal"></b><button class="round" id="fPlus" aria-label="Plus">+</button></div>
+        <input type="range" id="fRange" min="0" step="1">
+        <p id="fInfo" class="finfo"></p>`,
+      buttons: [{ label: 'C\'est parti !', value: true, primary: true }],
+    }).then(() => { save(); map.syncPeople(); });
+    const range = $('fRange');
+    const refresh = () => {
+      const f = E.forecast(state);
+      range.max = state.pop; range.value = state.forest;
+      $('fVal').textContent = `${state.forest} / ${state.pop} 👤`;
+      $('fInfo').innerHTML = `<span class="g">+${f.wood} 🪵/jour</span> (${String(f.perWorker).replace('.', ',')} 🪵 par bûcheron)<br>
+        <span class="b">Les bûcherons ne rapportent ni 💰, ni 🪨, ni 💡.</span><br>
+        Reste au village : ${state.pop - state.forest} 👤 → ${f.gold} 💰 · ${f.stone} 🪨 · ${f.sci} 💡 par jour`;
+      $('forestN').textContent = state.forest;
+      updateHUD();
+      map.syncPeople();
+    };
+    $('fMinus').onclick = () => { E.setForest(state, state.forest - 1); refresh(); };
+    $('fPlus').onclick = () => { E.setForest(state, state.forest + 1); refresh(); };
+    range.oninput = () => { E.setForest(state, +range.value); refresh(); };
+    refresh();
+  }
+  $('bForest').onclick = openForest;
+  $('res').addEventListener('click', (e) => { if (e.target.closest('[title="Bois"]')) openForest(); });
+
   $('bRest').onclick = () => choisir('rest');
   $('bLog').onclick = () => {
     if (!state) return;
@@ -425,7 +458,7 @@
       save();
       caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('PREMIÈRE IDÉE :<br>DU <em>BOIS</em> ET DU <em>GIBIER</em> 🪓🏹', 2600);
+      if (!busy) caption('BESOIN DE <em>BOIS</em> ?<small>Touchez 🌲 pour envoyer des habitants en forêt</small>', 3000);
     };
   });
 

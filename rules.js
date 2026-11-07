@@ -45,12 +45,15 @@
     parts.push(sec('res', '🪵 Les ressources', `
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
       <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, chasse, champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
-      <tr><td>🪵</td><td>Bois</td><td>Base 2/jour + 1 pour 15 habitants, bûcherons, scierie, usine.</td></tr>
-      <tr><td>🪨</td><td>Pierre</td><td>1 pour 15 habitants, carrière (après <i>Outils en pierre</i>), tailleurs de pierre, gare.</td></tr>
+      <tr><td>🪵</td><td>Bois</td><td>Les <b>habitants envoyés en forêt</b> (bouton 🌲 en bas) : 1,5 🪵 chacun par jour, +0,5 avec les <i>Outils en pierre</i>, +0,5 avec la <i>Métallurgie du fer</i>, +1 avec la <i>Machine à vapeur</i>. Puis la scierie et les usines.</td></tr>
+      <tr><td>🪨</td><td>Pierre</td><td>1 pour 15 habitants restés au village, carrière (après <i>Outils en pierre</i>), tailleurs de pierre, gare.</td></tr>
       <tr><td>🔩</td><td>Fer</td><td>À partir du <b>Moyen Âge</b> : mine de fer (après <i>Métallurgie du fer</i>), haut-fourneau, recyclage.</td></tr>
       <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
-      <tr><td>💰</td><td>Or</td><td>1 pour 12 habitants, marchés, banques, gares, lois.</td></tr>
-      <tr><td>💡</td><td>Savoir</td><td>Base 1/jour + 1 pour 20 habitants, feu, temples, bibliothèques, universités…</td></tr></table>
+      <tr><td>💰</td><td>Or</td><td>1 pour 12 habitants restés au village, marchés, banques, gares, lois.</td></tr>
+      <tr><td>💡</td><td>Savoir</td><td>Base 1/jour + 1 pour 20 habitants restés au village, feu, temples, bibliothèques, universités…</td></tr></table>
+      <h4>🌲 Envoyer des habitants en forêt</h4>
+      <p>Il n'y a pas de camp de bûcherons : touchez <b>🌲</b> en bas de l'écran (ou la pastille 🪵) et choisissez combien d'habitants partent couper du bois. Ce n'est pas le choix du jour : vous pouvez le changer à tout moment. Sur la carte, on les voit partir vers la forêt, la hache sur l'épaule.</p>
+      <p><span class="g">Bonus</span> : du bois chaque jour. <span class="b">Malus</span> : les bûcherons ne rapportent plus d'or, de pierre ni de savoir.</p>
       <p>Carrières et mines s'installent au pied des montagnes.</p>`));
 
     parts.push(sec('peuple', '👤 Population et bonheur', `

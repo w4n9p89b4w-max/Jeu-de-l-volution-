@@ -33,7 +33,6 @@
     // Préhistoire
     { id: 'hutte', era: 0, name: 'Hutte', icon: '🛖', arch: 'hut', cost: { wood: 6 }, eff: { cap: 6 }, desc: 'Un abri de branches et de peaux.' },
     { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 5 }, eff: { food: 4 }, desc: 'Les chasseurs ramènent du gibier.' },
-    { id: 'bucheron', era: 0, name: 'Camp de bûcherons', icon: '🪓', arch: 'lumber', cost: { wood: 4 }, eff: { wood: 4 }, desc: 'Abattre les arbres de la vallée.' },
     { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Tailler la pierre au pied de la montagne.' },
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
@@ -137,7 +136,7 @@
   function newState(name, flag) {
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
-      day: 1, era: 0, pop: 5, happy: 60, army: 0, fort: 0, peaceUntil: 0,
+      day: 1, era: 0, pop: 5, forest: 2, happy: 60, army: 0, fort: 0, peaceUntil: 0,
       res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 },
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
@@ -147,6 +146,12 @@
   // Mettre à jour une ancienne sauvegarde (version « matériaux »)
   function migrate(s) {
     if (!s) return s;
+    if (s.forest == null) {
+      // le camp de bûcherons n'existe plus : ses ouvriers partent en forêt
+      const camps = s.buildings.filter((b) => b.id === 'bucheron').length;
+      s.buildings = s.buildings.filter((b) => b.id !== 'bucheron');
+      s.forest = Math.min(s.pop, 2 + camps * 2);
+    }
     if (s.v === 2) return s;
     const mat = s.res.mat || 0;
     s.res = { food: s.res.food || 0, wood: Math.round(mat * 0.6), stone: Math.round(mat * 0.4), iron: s.era >= 2 ? 10 : 0, coal: s.era >= 3 ? 10 : 0, gold: s.res.gold || 0, sci: s.res.sci || 0 };
@@ -197,6 +202,18 @@
     return Object.keys(cost).filter((r) => (s.res[r] || 0) < cost[r]).map((r) => RES_NAMES[r].toLowerCase());
   }
 
+  /* ---------- Les habitants en forêt ---------- */
+  // Chaque habitant envoyé en forêt rapporte du bois, mais ne rapporte
+  // plus d'or, de pierre ni de savoir.
+  function woodPerWorker(s) {
+    return 1.5 + (s.disc.includes('outils') ? 0.5 : 0) + (s.disc.includes('metal') ? 0.5 : 0) + (s.disc.includes('vapeur') ? 1 : 0);
+  }
+  const foresters = (s) => Math.max(0, Math.min(s.forest || 0, s.pop));
+  function setForest(s, n) {
+    s.forest = Math.max(0, Math.min(s.pop, Math.round(n)));
+    return s.forest;
+  }
+
   /* ---------- Prévisions de la journée ---------- */
   function forecast(s) {
     const t = totals(s);
@@ -205,15 +222,17 @@
     const prod = (base, v) => Math.round((base + v) * (base + v > 0 ? mult : 1));
     const foodProd = Math.round((3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
     const foodCons = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4);
+    const fo = foresters(s), free = s.pop - fo;
     const f = {
       food: foodProd - foodCons, foodProd, foodCons,
-      wood: prod(2 + Math.floor(s.pop / 15), t.wood),
-      stone: prod(Math.floor(s.pop / 15), t.stone),
+      wood: prod(fo * woodPerWorker(s), t.wood),
+      stone: prod(Math.floor(free / 15), t.stone),
       iron: prod(0, t.iron),
       coal: prod(0, t.coal),
-      gold: prod(Math.floor(s.pop / 12) + (lake ? 2 : 0), t.gold),
-      sci: prod(1 + Math.floor(s.pop / 20), t.sci),
+      gold: prod(Math.floor(free / 12) + (lake ? 2 : 0), t.gold),
+      sci: prod(1 + Math.floor(free / 20), t.sci),
     };
+    f.forest = fo; f.perWorker = woodPerWorker(s);
     f.cap = 5 + t.cap;
     let target = 50 + t.happy;
     if (s.pop >= f.cap) target -= 5;
@@ -616,7 +635,7 @@
   const api = {
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
-    known, dilemmaView, choose,
+    known, dilemmaView, choose, setForest, woodPerWorker,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Engine = api;

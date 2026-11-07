@@ -609,18 +609,36 @@
 
     /* --- habitants --- */
     const COLORS = ['#f0a030', '#2ab3a3', '#e8c23a', '#9b59d0', '#e35d6a', '#3d8fe0', '#f2f2f2', '#7ccf5a'];
+    // Les arbres de la forêt les plus proches du village : là où vont les bûcherons
+    function forestSpots() {
+      const o = SITES[state.site];
+      return trees.filter((t) => t.alive && vnorm(t.x, t.y) > 0.78 && vnorm(t.x, t.y) < 1.0)
+        .sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y)).slice(0, 36);
+    }
     function syncPeople() {
       if (!state || !state.site) { people = []; return; }
       const want = Math.min(state.pop, 140);
       const homes = state.buildings.filter((b) => b.x != null);
       const pick = () => { const h = homes.length ? homes[Math.floor(Math.random() * homes.length)] : SITES[state.site]; return { x: h.x + (Math.random() - 0.5) * 50, y: h.y + 8 + (Math.random() - 0.5) * 40 }; };
+      const spots = forestSpots();
+      const woodPick = () => {
+        if (!spots.length || Math.random() < 0.25) return pick();       // ramener le bois au village
+        const t = spots[Math.floor(Math.random() * spots.length)];
+        return { x: t.x + (Math.random() - 0.5) * 8, y: t.y + 4 };
+      };
       while (people.length < want) {
         const p = pick();
         if (isWater(p.x, p.y, 2)) continue;
         people.push({ x: p.x, y: p.y, tx: p.x, ty: p.y, c: COLORS[Math.floor(Math.random() * COLORS.length)], wait: Math.random() * 3000, pick });
       }
       if (people.length > want) people.length = want;
-      for (const p of people) p.pick = pick;
+      const nWood = state.pop ? Math.round(Math.min(state.forest || 0, state.pop) * want / state.pop) : 0;
+      people.forEach((p, i) => {
+        const wasLumber = p.lumber;
+        p.lumber = i < nWood;
+        p.pick = p.lumber ? woodPick : pick;
+        if (p.lumber !== wasLumber) { const n = p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 400; }
+      });
     }
     function updatePeople(dt) {
       for (const p of people) {
@@ -628,8 +646,8 @@
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
         if (d < 1) {
           const n = p.pick();
-          if (!isWater(n.x, n.y, 2) && vnorm(n.x, n.y) < 0.9) { p.tx = n.x; p.ty = n.y; }
-          p.wait = 500 + Math.random() * 3500;
+          if (!isWater(n.x, n.y, 2) && vnorm(n.x, n.y) < (p.lumber ? 1.02 : 0.9)) { p.tx = n.x; p.ty = n.y; }
+          p.wait = (p.lumber ? 1200 : 500) + Math.random() * 3500;
           continue;
         }
         const sp = 0.012 * dt;
@@ -642,6 +660,11 @@
       ctx.fillStyle = p.c;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x - 1.6, p.y - 5, 3.2, 5, 1.5) : ctx.rect(p.x - 1.6, p.y - 5, 3.2, 5); ctx.fill();
       ctx.beginPath(); ctx.arc(p.x, p.y - 6.2, 1.5, 0, Math.PI * 2); ctx.fill();
+      if (p.lumber) {
+        ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(p.x + 1.2, p.y - 3); ctx.lineTo(p.x + 3.4, p.y - 7.4); ctx.stroke();
+        ctx.fillStyle = '#9aa3ad'; ctx.fillRect(p.x + 2.6, p.y - 8.2, 2, 1.6);
+      }
     }
 
     /* --- drapeau planté au point de fondation --- */
