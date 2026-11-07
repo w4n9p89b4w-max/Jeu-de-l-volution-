@@ -179,6 +179,7 @@
   };
   function openSheet(cat) {
     if (busy || !state) return;
+    if (state.chosen) { toast(`Choix du jour déjà fait. Prochain jour dans ${secondsLeft()} s`); return; }
     const c = CAT[cat];
     $('sheetTitle').textContent = c.title;
     let sub = c.sub;
@@ -212,8 +213,10 @@
   /* ---------- Le choix du jour ---------- */
   async function choisir(cat, id) {
     if (busy) return;
+    if (state.chosen) { toast(`Choix du jour déjà fait. Prochain jour dans ${secondsLeft()} s`); return; }
     const r = E.act(state, cat, id);
     if (!r.ok) return;
+    state.chosen = true;
     busy = true;
     $('dock').classList.add('busy');
     if (r.built) {
@@ -238,9 +241,49 @@
     }
     if (r.proposeQuarry) await proposeQuarry();
     if (r.newEra != null) await newEra(r.newEra);
-    await endOfDay();
+    save();
     busy = false; $('dock').classList.remove('busy');
+    updateClock();
   }
+
+  /* ---------- Le temps : chaque jour dure un temps fixe ---------- */
+  const DAY_MS = 40000;                 // 40 secondes par jour à vitesse ×1
+  const SPEEDS = [1, 2, 4];
+  let speed = 1, paused = false, lastTick = performance.now();
+  const secondsLeft = () => Math.max(0, Math.ceil((DAY_MS - (state.dayTime || 0)) / 1000 / speed));
+  // le temps s'arrête quand une fenêtre ou un écran est ouvert
+  const blocked = () => !state || !state.site || busy || state.won || state.lost
+    || !$('modal').classList.contains('hidden') || !$('rules').hidden || !$('people').hidden
+    || !$('hud').offsetParent || document.hidden;
+  function updateClock() {
+    if (!state) return;
+    const k = Math.min(1, (state.dayTime || 0) / DAY_MS);
+    $('dayBar').style.width = `${k * 100}%`;
+    $('bPause').textContent = paused ? '▶️' : '⏸️';
+    $('bPause').setAttribute('aria-label', paused ? 'Reprendre' : 'Pause');
+    $('bSpeed').textContent = `×${speed}`;
+    const stopped = paused || blocked();
+    $('clockTxt').textContent = paused ? 'En pause' : `${secondsLeft()} s`;
+    $('clock').classList.toggle('stopped', stopped);
+    $('dock').classList.toggle('done', !!state.chosen);
+    $('dockTitle').innerHTML = state.chosen
+      ? `CHOIX DU JOUR <em>FAIT ✔</em> <small>prochain jour dans ${secondsLeft()} s</small>`
+      : 'CHAQUE JOUR <em>VOUS CHOISISSEZ</em>';
+  }
+  setInterval(() => {
+    const now = performance.now(), dt = Math.min(500, now - lastTick);
+    lastTick = now;
+    if (!state || paused || blocked()) { updateClock(); return; }
+    state.dayTime = (state.dayTime || 0) + dt * speed;
+    if (state.dayTime >= DAY_MS) {
+      busy = true; $('dock').classList.add('busy');
+      closeSheet();
+      endOfDay().finally(() => { busy = false; $('dock').classList.remove('busy'); updateClock(); });
+    }
+    updateClock();
+  }, 200);
+  $('bPause').onclick = () => { paused = !paused; updateClock(); };
+  $('bSpeed').onclick = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; updateClock(); };
 
   async function endOfDay() {
     hideCaption();
@@ -248,6 +291,7 @@
     $('nightText').textContent = `JOUR ${state.day + 1}`;
     await wait(900);
     const rep = E.endDay(state);
+    state.chosen = false; state.dayTime = 0;
     map.syncPeople();
     map.redraw();
     $('night').classList.remove('on');
@@ -279,7 +323,7 @@
     if (f.food < 0) caption('ATTENTION : <em>FAMINE</em> EN VUE !<small>Construisez de quoi manger</small>', 2600);
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
-    else if (state.day === 2) caption('CHAQUE JOUR<br><em>VOUS CHOISISSEZ</em>', 2200);
+    else if (state.day === 2) caption('UN JOUR DURE <em>40 SECONDES</em><small>Un seul choix par jour · ⏸️ pause et ×2 / ×4 en haut</small>', 3000);
     else if (state.day === 4) caption('FAITES DES <em>DÉCOUVERTES</em><small>pour changer d\'ère</small>', 2400);
   }
 

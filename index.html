@@ -17,9 +17,10 @@
   <!-- HUD : jour, population, nom du pays -->
   <header id="hud" class="hidden">
     <div class="hud-row">
-      <div class="pill day"><small>JOUR</small><b id="hDay">1</b></div>
+      <div class="pill day"><small>JOUR</small><b id="hDay">1</b><span class="daybar"><span id="dayBar"></span></span></div>
       <div class="pill pop"><span class="ico">👤</span><div><small>POPULATION</small><b id="hPop">0</b></div></div>
     </div>
+    <div class="clock" id="clock"><button id="bPause" aria-label="Pause">⏸️</button><span id="clockTxt">40 s</span><button id="bSpeed" aria-label="Vitesse">×1</button></div>
     <button class="country" id="hCountry"><canvas id="hFlag" width="60" height="40"></canvas><span id="hName">PAYS SANS NOM</span></button>
     <div class="era" id="hEra">Préhistoire</div>
     <div id="res"></div>
@@ -32,7 +33,7 @@
 
   <!-- Le choix du jour -->
   <footer id="dock" class="hidden">
-    <div class="dock-title">CHAQUE JOUR <em>VOUS CHOISISSEZ</em></div>
+    <div class="dock-title" id="dockTitle">CHAQUE JOUR <em>VOUS CHOISISSEZ</em></div>
     <div class="tiles">
       <button class="tile" data-cat="build"><span class="tile-ico">🏠</span><span>CONSTRUCTIONS</span><i class="badge"></i></button>
       <button class="tile" data-cat="law"><span class="tile-ico">📜</span><span>LOIS</span><i class="badge"></i></button>

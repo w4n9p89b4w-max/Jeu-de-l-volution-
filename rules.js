@@ -29,11 +29,11 @@
         <li><b>B · Au bord du lac</b> : +3 🍖 et +2 💰 par jour.</li></ul></li></ol>`));
 
     parts.push(sec('jour', '📅 Une journée', `
-      <ol><li>En bas de l'écran, 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> et <b>💡 Découvertes</b>. La pastille rouge indique combien de choix sont possibles.</li>
-      <li>Ouvrez une case et touchez un choix. Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Vous ne faites <b>qu'un choix par jour</b>.</li>
-      <li>Rien ne vous plaît ? <b>😴 Repos</b> passe la journée (+4 😊).</li>
-      <li>La nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
-      <p>Un choix grisé indique ce qui manque (« Manque : fer »…).</p>`));
+      <ol><li><b>Un jour dure 40 secondes</b> (à vitesse ×1). La barre sous « JOUR » se remplit et un compte à rebours s'affiche en haut.</li>
+      <li>Pendant la journée, vous faites <b>un seul choix</b> dans les 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> ou <b>💡 Découvertes</b> (ou <b>😴 Repos</b>, +4 😊). Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Une fois le choix fait, les cases se grisent jusqu'au lendemain.</li>
+      <li>Si vous ne choisissez rien, la journée passe quand même.</li>
+      <li>À la fin du temps, la nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
+      <p><b>⏸️</b> met le jeu en pause, <b>×1 / ×2 / ×4</b> accélère le temps. Le temps s'arrête tout seul quand une fenêtre est ouverte (villageois, règles, événement…). Donner des tâches aux villageois ne compte pas comme le choix du jour.</p>`));
 
     parts.push(sec('cartes', '🗳️ Les 4 catégories', `
       <table><tr><th>Catégorie</th><th>Bonus</th><th>Malus</th></tr>

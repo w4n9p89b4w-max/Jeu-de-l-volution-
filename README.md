@@ -10,7 +10,7 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
 2. **Premier choix : où fonde-t-on le pays ?**
    - **A — au bord de la rivière** : de l'eau et des terres fertiles (+25 % de nourriture).
    - **B — au bord du lac** : la pêche et un port (+3 🍖 et +2 💰 par jour).
-3. **Chaque jour, vous choisissez** une seule action :
+3. **Chaque jour dure 40 secondes** (⏸️ pause, vitesse ×1 / ×2 / ×4). Pendant la journée, vous faites **un seul choix** :
    - 🏠 **Constructions** : huttes, champs, temples, châteaux, usines, gratte-ciel…
    - 📜 **Lois** : partage du gibier, impôt, suffrage universel, transition écologique…
    - ⚔️ **Guerres** : recruter, attaquer les voisins, fortifier, signer la paix.

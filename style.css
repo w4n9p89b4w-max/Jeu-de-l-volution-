@@ -350,3 +350,14 @@ em { font-style: normal; color: var(--yellow); }
 .idleN { font-size: 22px; min-width: 40px; text-align: center; }
 .tstep .qb:disabled { opacity: .35; }
 #bAuto { align-self: center; }
+
+/* ---------- Le temps ---------- */
+.pill.day { position: relative; overflow: hidden; }
+.daybar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #ece6d9; }
+#dayBar { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffc93c, #f08a24); transition: width .2s linear; }
+.clock { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,.95); border-radius: 999px; padding: 2px 4px; box-shadow: 0 2px 0 rgba(0,0,0,.12); font-weight: 900; font-size: 12px; }
+.clock button { min-width: 30px; height: 26px; border-radius: 999px; background: #efeadf; font-weight: 900; font-size: 13px; padding: 0 6px; }
+.clock #clockTxt { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.clock.stopped #clockTxt { color: var(--muted); }
+.dock-title small { display: block; font-size: 12px; text-align: center; -webkit-text-stroke: 0; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+#dock.done .tiles { opacity: .45; }
