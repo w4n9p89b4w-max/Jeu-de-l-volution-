@@ -29,20 +29,18 @@
         <li><b>B · Au bord du lac</b> : +3 🍖 et +2 💰 par jour.</li></ul></li></ol>`));
 
     parts.push(sec('jour', '📅 Une journée', `
-      <ol><li>Vous recevez <b>4 cartes</b> (A, B, C, D). Chaque carte a un <span class="g">bonus</span> et un <span class="b">malus</span>.</li>
-      <li>Touchez une carte, puis le bouton jaune <b>Choisir</b>. Vous ne jouez <b>qu'une carte par jour</b>.</li>
-      <li>Aucune carte ne vous plaît ? <b>😴 Repos</b> passe la journée (+4 😊).</li>
-      <li>La nuit tombe : production, consommation, croissance, puis parfois un événement.</li>
-      <li>Le lendemain, 4 nouvelles cartes sont tirées.</li></ol>
-      <p>Une carte grisée coûte plus que ce que vous avez. Le tirage s'adapte : plus de logements quand le pays est plein, plus de nourriture en cas de famine, plus de cartes de guerre quand les voisins sont menaçants, et la prochaine découverte dès que vous avez assez de 💡.</p>`));
+      <ol><li>En bas de l'écran, 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> et <b>💡 Découvertes</b>. La pastille rouge indique combien de choix sont possibles.</li>
+      <li>Ouvrez une case et touchez un choix. Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Vous ne faites <b>qu'un choix par jour</b>.</li>
+      <li>Rien ne vous plaît ? <b>😴 Repos</b> passe la journée (+4 😊).</li>
+      <li>La nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
+      <p>Un choix grisé indique ce qui manque (« Manque : fer »…).</p>`));
 
-    parts.push(sec('cartes', '🃏 Les types de cartes', `
-      <table><tr><th>Carte</th><th>Bonus</th><th>Malus</th></tr>
-      <tr><td><span class="tag t-build">Construction</span></td><td>Production chaque jour, logements, défense…</td><td>Le prix à payer. Il augmente de 25 % à chaque exemplaire déjà construit.</td></tr>
-      <tr><td><span class="tag t-law">Loi</span></td><td>Un effet permanent</td><td>Parfois un prix en 💰 ou un effet négatif permanent</td></tr>
-      <tr><td><span class="tag t-tech">Découverte</span></td><td>Un effet permanent et un pas vers l'ère suivante</td><td>Du savoir 💡</td></tr>
-      <tr><td><span class="tag t-war">Guerre</span></td><td>Soldats, défense, paix ou butin</td><td>Ressources, ou le risque de perdre la bataille</td></tr>
-      <tr><td><span class="tag t-trade">Ressources</span></td><td>Une ressource tout de suite</td><td>Une autre ressource ou du bonheur</td></tr></table>`));
+    parts.push(sec('cartes', '🗳️ Les 4 catégories', `
+      <table><tr><th>Catégorie</th><th>Bonus</th><th>Malus</th></tr>
+      <tr><td>🏠 <b>Constructions</b></td><td>Production chaque jour, logements, défense…</td><td>Le prix à payer. Il augmente de 25 % à chaque exemplaire déjà construit. Certains bâtiments polluent ou consomment du charbon.</td></tr>
+      <tr><td>📜 <b>Lois</b></td><td>Un effet permanent</td><td>Parfois un prix en 💰 ou un effet négatif permanent. Une loi ne s'adopte qu'une fois.</td></tr>
+      <tr><td>⚔️ <b>Guerres</b></td><td>Soldats, défense, paix ou butin</td><td>Ressources, ou le risque de perdre la bataille</td></tr>
+      <tr><td>💡 <b>Découvertes</b></td><td>Un effet permanent et un pas vers l'ère suivante</td><td>Du savoir 💡</td></tr></table>`));
 
     parts.push(sec('res', '🪵 Les ressources', `
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
@@ -63,29 +61,28 @@
       <li><b>Manif</b> 📢 : sous 30 % de bonheur, le peuple descend souvent dans la rue (−30 % 💰 et −20 % 🪵).</li></ul>`));
 
     parts.push(sec('eres', '⏳ Les ères et les découvertes', `
-      <p>Chaque ère a <b>3 découvertes</b>. Quand les 3 sont faites, on passe à l'ère suivante et de nouvelles cartes apparaissent. L'objectif 🎯 en haut de l'écran montre la prochaine découverte et le savoir qui manque.</p>
+      <p>Chaque ère a <b>3 découvertes</b>. Quand les 3 sont faites, on passe à l'ère suivante et de nouveaux bâtiments, lois et découvertes apparaissent. La case 💡 Découvertes indique combien il en reste avant l'ère suivante.</p>
       <table><tr><th>Ère</th><th>Découvertes (coût en 💡)</th></tr>
       ${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} <b>${er.name}</b><br><small>${er.year}</small></td><td>${E.DISCOVERIES.filter((d) => d.era === i).map((d) => `${d.icon} ${d.name} <small>(${d.cost} 💡)</small> ${fmtEff(d.eff)}<br><small>${d.desc}</small>`).join('<br>')}</td></tr>`).join('')}
       </table>`));
 
     parts.push(sec('guerre', '⚔️ La guerre', `
       <h4>À qui déclarer la guerre ?</h4>
-      <p>Il y a un voisin par ère. La carte <b>Attaquer</b> vise toujours le voisin de votre ère actuelle :</p>
+      <p>Il y a un voisin par ère. Le choix <b>Attaquer</b> vise toujours le voisin de votre ère actuelle :</p>
       <table>${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} ${er.name}</td><td>${er.enemy}</td></tr>`).join('')}</table>
       <h4>Votre puissance</h4>
       <p><b>Puissance ⚔️ = soldats × (1 + 0,5 par ère) + défense 🛡️.</b> La défense vient des remparts, du château, de certaines lois et de la métallurgie. La force de l'ennemi augmente <b>chaque jour</b> et à chaque ère.</p>
-      <h4>Les cartes de guerre</h4>
+      <h4>Les choix de guerre</h4>
       <ul><li><b>🪖 Recruter</b> : ajoute des soldats. Ça coûte de la nourriture, puis de l'or, puis du fer à partir du Moyen Âge.</li>
       <li><b>🧱 Fortifier</b> : ajoute de la défense pour toujours (palissade en bois, puis remparts de pierre, puis défenses en acier).</li>
-      <li><b>🕊️ Traité de paix</b> : aucune invasion pendant 12 jours, et +3 😊. Il apparaît à partir du jour 9.</li>
-      <li><b>⚔️ Attaquer</b> : la carte affiche vos chances de gagner. Elle n'apparaît que si vous avez des soldats.</li>
-      <li><b>Lever une milice</b> (carte ressources) : quelques soldats contre un peu de bonheur.</li></ul>
+      <li><b>🕊️ Traité de paix</b> : aucune invasion pendant 12 jours, et +3 😊.</li>
+      <li><b>⚔️ Attaquer</b> : affiche vos chances de gagner. Il faut au moins un soldat.</li></ul>
       <h4>Victoire ou défaite</h4>
       <table><tr><th>Si vous gagnez 🏆</th><th>Si vous perdez 💀</th></tr>
       <tr><td>Butin en 🍖 🪵 🪨, plus 💰 et 🔩 dans les ères avancées. <b>2 + ère</b> habitants rejoignent votre pays. +4 😊. Vous perdez 10 % de vos soldats.</td>
       <td>Vous perdez <b>40 % des soldats</b>, <b>1 + ère</b> habitants et 8 😊.</td></tr></table>
       <h4>Peut-on retenter après une défaite ?</h4>
-      <p><b>Oui.</b> Une défaite ne termine pas la partie. Il faut attendre que la carte <b>Attaquer</b> revienne dans le tirage (dès le lendemain si elle est tirée) et qu'il vous reste des soldats. Comme l'ennemi devient plus fort chaque jour, recrutez ou fortifiez d'abord, et visez au moins 60-70 % de chances.</p>
+      <p><b>Oui.</b> Une défaite ne termine pas la partie. Vous pouvez réattaquer dès le lendemain (un choix par jour), tant qu'il vous reste des soldats. Comme l'ennemi devient plus fort chaque jour, recrutez ou fortifiez d'abord, et visez au moins 60-70 % de chances.</p>
       <h4>Les invasions</h4>
       <p>À partir du jour 11, chaque nuit, il y a environ <b>7 % de risque</b> (+1 % par ère) qu'un voisin vous attaque, sauf pendant une paix. Si votre puissance est au moins égale à la sienne, l'invasion est repoussée (+5 😊). Sinon, c'est le pillage : 12 % des habitants, 30 % des réserves et la moitié de l'armée sont perdus.</p>`));
 
@@ -111,7 +108,7 @@
       <li>📖 <b>Journal</b> : l'histoire de votre pays jour après jour (vous pouvez aussi toucher le nom du pays).</li>
       <li>⚙️ : recommencer une partie. La partie est sauvegardée automatiquement chaque nuit, dans ce navigateur.</li></ul>`));
 
-    const nav = [['but', 'But'], ['jour', 'Journée'], ['cartes', 'Cartes'], ['res', 'Ressources'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
+    const nav = [['but', 'But'], ['jour', 'Journée'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
     return { nav, html: parts.join('') };
   }
 

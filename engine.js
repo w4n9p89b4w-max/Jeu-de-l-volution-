@@ -139,7 +139,7 @@
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
       day: 1, era: 0, pop: 5, happy: 60, army: 0, fort: 0, peaceUntil: 0,
       res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 },
-      buildings: [], disc: [], laws: [], log: [], pending: null, hand: null,
+      buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
     };
   }
@@ -273,7 +273,38 @@
       const peace = s.peaceUntil > s.day;
       out.push({ id: 'paix', icon: '🕊️', name: 'Traité de paix', desc: peace ? `En paix jusqu'au jour ${s.peaceUntil}.` : 'Aucune invasion pendant 12 jours.', cost: fmtCost(w.peace), eff: '+3 😊', can: !peace && canPay(s, w.peace), why: peace ? 'Déjà en paix' : whyNot(s, w.peace) });
     }
+    for (const o of out) Object.assign(o, bonusMalus(s, cat, o.id));
     return out;
+  }
+
+  // Bonus (vert) et malus (rouge) de chaque choix
+  const ico = (r) => RES_ICONS[r] || '';
+  const sgn = (v) => (v > 0 ? '+' : '−') + Math.abs(v);
+  const unit = (r) => (r === 'cap' || r === 'def' || r === 'happy' ? '' : '/j');
+  const posEff = (e) => Object.keys(e).filter((r) => e[r] > 0).map((r) => `${sgn(e[r])} ${ico(r)}${unit(r)}`);
+  const negEff = (e) => Object.keys(e).filter((r) => e[r] < 0).map((r) => `${sgn(e[r])} ${ico(r)}${unit(r)}`);
+  const costL = (c) => Object.keys(c).filter((r) => c[r]).map((r) => `−${c[r]} ${ico(r)}`);
+  function bonusMalus(s, cat, id) {
+    if (cat === 'build') { const b = B[id]; return { plus: id === 'fusee' ? ['🏆 VICTOIRE'] : posEff(b.eff), minus: costL(buildCost(s, b)).concat(negEff(b.eff)) }; }
+    if (cat === 'law') { const l = L[id]; return { plus: posEff(l.eff), minus: costL(l.cost).concat(negEff(l.eff)) }; }
+    if (cat === 'tech') {
+      const d = D[id];
+      const plus = posEff(d.eff);
+      const left = DISCOVERIES.filter((x) => x.era === s.era && !s.disc.includes(x.id)).length;
+      if (left === 1 && s.era < ERAS.length - 1) plus.push(`⏳ ${ERAS[s.era + 1].name}`);
+      if (d.id === 'outils') plus.push('débloque 🪨 Carrière');
+      if (d.id === 'metal') plus.push('débloque ⛏️ Mine de fer');
+      if (d.id === 'espace') plus.push('débloque 🚀 Base spatiale');
+      return { plus, minus: [`−${d.cost} 💡`] };
+    }
+    if (cat === 'war') {
+      const w = warCosts(s);
+      if (id === 'recruter') return { plus: [`+${w.recruitN} 🪖`], minus: costL(w.recruit) };
+      if (id === 'fortifier') return { plus: [`+${w.fortN} 🛡️`], minus: costL(w.fort) };
+      if (id === 'paix') return { plus: ['🕊️ 12 jours sans invasion', '+3 😊'], minus: costL(w.peace) };
+      if (id === 'attaquer') { const ch = Math.round(attackChance(s) * 100); return { plus: [`${ch}% : butin et nouveaux habitants`], minus: [`${100 - ch}% : −40% 🪖, −${1 + s.era} 👤`] }; }
+    }
+    return { plus: [], minus: [] };
   }
 
   function warCosts(s) {
@@ -382,22 +413,6 @@
         log(s, `⚔️ Défaite contre ${enemy}`);
         return { ok: true, title: 'Défaite…', text: `${cap1(enemy)} vous repousse. Vous perdez ${lostArmy} soldats et ${lostPop} habitants.`, icon: '💀', good: false };
       }
-    }
-    if (cat === 'trade') {
-      const t = TRADES_BY_ID[id];
-      const card = (s.hand || []).find((c) => c.kind === 'trade' && c.id === id) || (t && tradeCard(s, t));
-      if (!card || !playable(s, card)) return { ok: false };
-      pay(s, card.cost);
-      if (card.loss.happy) s.happy = Math.max(0, s.happy + card.loss.happy);
-      for (const r in card.gain) {
-        const v = card.gain[r];
-        if (r === 'happy') s.happy = Math.min(100, s.happy + v);
-        else if (r === 'pop') s.pop = Math.min(capacity(s), s.pop + v);
-        else if (r === 'army') s.army += v;
-        else s.res[r] = (s.res[r] || 0) + v;
-      }
-      log(s, `${card.icon} ${card.title}`);
-      return { ok: true, title: card.title, text: card.desc, icon: card.icon, good: true };
     }
     if (cat === 'rest') {
       s.happy = Math.min(100, s.happy + 4);
@@ -550,12 +565,12 @@
         log(s, '📢 Manifestation');
       } else {
         const roll = rng();
-        if (roll < 0.08) {
+        if (roll < 0.22) {
           const pool = DILEMMAS.filter((d) => d.ok(s));
           const d = pickWeighted(pool, rng);
           s.pending = d.id;
           report.events.push({ dilemma: dilemmaView(s, d.id) });
-        } else if (roll < 0.33) {
+        } else if (roll < 0.45) {
           const pool = EVENTS.filter((e) => e.ok(s));
           const e = pickWeighted(pool, rng);
           const [title, text, icon, good] = e.run(s);
@@ -568,7 +583,6 @@
 
     if (s.pop <= 0) { s.pop = 0; s.lost = true; }
     s.day++;
-    s.hand = s.lost ? null : deal(s, rng);
     report.popDelta = s.pop - report.pop0;
     return report;
   }
@@ -599,171 +613,10 @@
     if (s.log.length > 150) s.log.length = 150;
   }
 
-
-  /* ==========================================================================
-     LES CARTES DU JOUR : chaque jour, 4 cartes avec un bonus et un malus
-     ========================================================================== */
-  const k = (s) => 1 + s.era;
-  // Cartes « ressources » : on gagne quelque chose, on en perd une autre
-  const TRADES = [
-    { id: 'chasse', icon: '🦌', title: 'Grande chasse', ok: (s) => s.era <= 1, gain: (s) => ({ food: 12 * k(s) }), loss: () => ({ happy: -4 }), desc: 'Tous les bras partent chasser.' },
-    { id: 'cueillette', icon: '🫐', title: 'Cueillette', ok: (s) => s.era === 0, gain: () => ({ food: 8, sci: 1 }), loss: () => ({ wood: 3 }), desc: 'Baies, racines et champignons.' },
-    { id: 'peche', icon: '🎣', title: 'Pêche au lac', ok: (s) => s.site === 'lac', gain: (s) => ({ food: 14 * k(s) }), loss: (s) => ({ wood: 5 * k(s) }), desc: 'On construit des barques pour pêcher plus loin.' },
-    { id: 'recolte', icon: '🌾', title: 'Récolte forcée', ok: (s) => s.era >= 1, gain: (s) => ({ food: 15 * k(s) }), loss: () => ({ happy: -6 }), desc: 'Travailler aux champs jour et nuit.' },
-    { id: 'foret', icon: '🌲', title: 'Couper la forêt', ok: () => true, gain: (s) => ({ wood: 12 * k(s) }), loss: () => ({ happy: -5 }), desc: 'Les anciens aimaient ces arbres…' },
-    { id: 'carriere', icon: '🪨', title: 'Corvée à la carrière', ok: () => true, gain: (s) => ({ stone: 8 * k(s) }), loss: (s) => ({ food: 6 * k(s) }), desc: 'Casser des cailloux donne faim.' },
-    { id: 'montagne', icon: '⛰️', title: 'Fouiller la montagne', ok: (s) => s.era >= 2, gain: (s) => ({ iron: 6 * k(s) }), loss: (s) => ({ wood: 8 * k(s) }), desc: 'Étayer des galeries demande beaucoup de bois.' },
-    { id: 'veine', icon: '⚫', title: 'Creuser une veine de charbon', ok: (s) => s.era >= 3, gain: (s) => ({ coal: 6 * k(s) }), loss: (s) => ({ food: 5 * k(s), happy: -4 }), desc: 'Un travail noir et dangereux.' },
-    { id: 'venteBois', icon: '🪵', title: 'Vendre du bois', ok: (s) => s.era >= 1, gain: (s) => ({ gold: 8 * k(s) }), loss: (s) => ({ wood: 12 * k(s) }), desc: 'Des marchands achètent vos troncs.' },
-    { id: 'venteVivres', icon: '🧺', title: 'Vendre des vivres', ok: (s) => s.era >= 1, gain: (s) => ({ gold: 8 * k(s) }), loss: (s) => ({ food: 15 * k(s) }), desc: 'Les greniers se vident, la bourse se remplit.' },
-    { id: 'achatFer', icon: '🔩', title: 'Acheter du fer', ok: (s) => s.era >= 2, gain: (s) => ({ iron: 5 * k(s) }), loss: (s) => ({ gold: 8 * k(s) }), desc: 'Importer du minerai étranger.' },
-    { id: 'impotExc', icon: '💰', title: 'Impôt exceptionnel', ok: (s) => s.era >= 1, gain: (s) => ({ gold: 10 * k(s) }), loss: () => ({ happy: -8 }), desc: 'Le peuple grogne en payant.' },
-    { id: 'explorateurs', icon: '🧭', title: 'Envoyer des explorateurs', ok: () => true, gain: (s) => ({ sci: 5 * k(s) }), loss: (s) => ({ food: 8 * k(s) }), desc: 'Découvrir ce qu\'il y a derrière les montagnes.' },
-    { id: 'savants', icon: '🧪', title: 'Payer des savants', ok: (s) => s.era >= 1, gain: (s) => ({ sci: 8 * k(s) }), loss: (s) => ({ gold: 8 * k(s) }), desc: 'Le savoir a un prix.' },
-    { id: 'fete', icon: '🎉', title: 'Grande fête', ok: () => true, gain: () => ({ happy: 10 }), loss: (s) => ({ food: 10 * k(s) }), desc: 'Musique et festin toute la nuit.' },
-    { id: 'tournoi', icon: '🏇', title: 'Tournoi', ok: (s) => s.era >= 2, gain: () => ({ happy: 9 }), loss: (s) => ({ gold: 8 * k(s) }), desc: 'Chevaliers, jeux et spectacles.' },
-    { id: 'nomades', icon: '🧳', title: 'Accueillir des nomades', ok: (s) => s.pop + 2 <= capacity(s), gain: (s) => ({ pop: Math.min(capacity(s) - s.pop, 2 + s.era * 2) }), loss: (s) => ({ food: 8 * k(s) }), desc: 'De nouvelles familles s\'installent.' },
-    { id: 'milice', icon: '🪖', title: 'Lever une milice', ok: () => true, gain: (s) => ({ army: 2 + s.era }), loss: () => ({ happy: -5 }), desc: 'Des volontaires… plus ou moins volontaires.' },
-  ];
-  const TRADES_BY_ID = byId(TRADES);
-  const UNIT = { pop: '👤', army: '🪖' };
-  const icon = (r) => RES_ICONS[r] || UNIT[r] || '';
-  const sign = (v) => (v > 0 ? '+' : '−') + Math.abs(v);
-
-  function tradeCard(s, t) {
-    const g = t.gain(s), l = t.loss(s);
-    const cost = {};
-    for (const r in l) if (r !== 'happy') cost[r] = l[r];
-    return {
-      kind: 'trade', id: t.id, icon: t.icon, title: t.title, tag: 'Ressources', desc: t.desc,
-      gain: g, loss: l, cost,
-      plus: Object.keys(g).map((r) => `${sign(g[r])} ${icon(r)}`),
-      minus: Object.keys(l).map((r) => `${sign(r === 'happy' ? l[r] : -l[r])} ${icon(r)}`),
-    };
-  }
-  const perDay = (eff) => Object.keys(eff).filter((r) => eff[r] > 0).map((r) => `${sign(eff[r])} ${icon(r)}${r === 'cap' || r === 'def' || r === 'happy' ? '' : '/j'}`);
-  const negDay = (eff) => Object.keys(eff).filter((r) => eff[r] < 0).map((r) => `${sign(eff[r])} ${icon(r)}${r === 'happy' ? '' : '/j'}`);
-  const costLines = (c) => Object.keys(c).filter((r) => c[r]).map((r) => `−${c[r]} ${icon(r)}`);
-
-  function buildCard(s, b) {
-    const c = buildCost(s, b), n = count(s, b.id);
-    return { kind: 'build', id: b.id, icon: b.icon, title: b.name + (n ? ` (${n + 1}e)` : ''), tag: 'Construction', desc: b.desc, cost: c,
-      plus: b.id === 'fusee' ? ['🏆 VICTOIRE'] : perDay(b.eff), minus: costLines(c).concat(negDay(b.eff)) };
-  }
-  function lawCard(s, l) {
-    return { kind: 'law', id: l.id, icon: l.icon, title: l.name, tag: 'Loi', desc: l.desc, cost: l.cost, plus: perDay(l.eff), minus: costLines(l.cost).concat(negDay(l.eff)) };
-  }
-  function techCard(s, d) {
-    const last = DISCOVERIES.filter((x) => x.era === s.era && !s.disc.includes(x.id)).length === 1 && s.era < ERAS.length - 1;
-    const plus = perDay(d.eff);
-    if (last) plus.push(`⏳ ${ERAS[s.era + 1].name}`);
-    if (d.id === 'espace') plus.push('🚀 Base spatiale');
-    if (d.id === 'outils') plus.push('🪨 Carrière');
-    if (d.id === 'metal') plus.push('⛏️ Mine de fer');
-    return { kind: 'tech', id: d.id, icon: d.icon, title: d.name, tag: 'Découverte', desc: d.desc, cost: { sci: d.cost }, plus, minus: [`−${d.cost} 💡`] };
-  }
-  function warCards(s) {
-    const w = warCosts(s), out = [];
-    out.push({ kind: 'war', id: 'recruter', icon: '🪖', title: s.era === 0 ? 'Former des guerriers' : 'Recruter des soldats', tag: 'Guerre', desc: `Puissance actuelle : ${power(s)} ⚔️`, cost: w.recruit, plus: [`+${w.recruitN} 🪖`], minus: costLines(w.recruit) });
-    out.push({ kind: 'war', id: 'fortifier', icon: '🧱', title: s.era < 2 ? 'Palissade en bois' : s.era < 4 ? 'Remparts de pierre' : 'Défenses en acier', tag: 'Guerre', desc: 'Protège contre les invasions.', cost: w.fort, plus: [`+${w.fortN} 🛡️`], minus: costLines(w.fort) });
-    if (s.peaceUntil <= s.day && s.day > 8) out.push({ kind: 'war', id: 'paix', icon: '🕊️', title: 'Traité de paix', tag: 'Guerre', desc: 'Aucune invasion pendant 12 jours.', cost: w.peace, plus: ['🕊️ 12 jours', '+3 😊'], minus: costLines(w.peace) });
-    if (s.army > 0) {
-      const ch = Math.round(attackChance(s) * 100);
-      out.push({ kind: 'war', id: 'attaquer', icon: '⚔️', title: `Attaquer ${ERAS[s.era].enemy}`, tag: 'Guerre', desc: `${ch}% de chances de victoire.`, cost: {}, plus: [`${ch}% : butin + 👤`], minus: [`${100 - ch}% : −🪖 −👤`] });
-    }
-    return out;
-  }
-
-  function playable(s, c) {
-    if (!canPay(s, c.cost || {})) return false;
-    if (c.kind === 'build') { const b = B[c.id]; return b.era <= s.era && (!b.req || s.disc.includes(b.req)) && !(b.unique && count(s, b.id)); }
-    if (c.kind === 'law') return !s.laws.includes(c.id);
-    if (c.kind === 'tech') return !s.disc.includes(c.id) && D[c.id].era === s.era;
-    if (c.kind === 'war' && c.id === 'attaquer') return s.army > 0;
-    if (c.kind === 'war' && c.id === 'paix') return s.peaceUntil <= s.day;
-    if (c.kind === 'trade') { const t = TRADES_BY_ID[c.id]; return !!t && t.ok(s); }
-    return true;
-  }
-
-  function pickW(list, rng) {
-    if (!list.length) return null;
-    const tot = list.reduce((a, e) => a + e.w, 0);
-    let r = rng() * tot;
-    for (const e of list) { if ((r -= e.w) <= 0) return e; }
-    return list[list.length - 1];
-  }
-
-  function buildWeight(s, b, f) {
-    let w = b.era === s.era ? 3 : b.era === s.era - 1 ? 1.5 : 0.5;
-    const e = b.eff;
-    if (e.cap > 0 && s.pop >= f.cap * 0.8) w *= 4;
-    if (e.food > 0 && f.food < 3) w *= 4;
-    const want = { wood: 4 + s.era * 3, stone: 3 + s.era * 4, iron: s.era >= 2 ? 3 + s.era * 4 : 0, coal: s.era >= 3 ? 3 + s.era * 3 : 0 };
-    for (const r in want) if (e[r] > 0 && f[r] < want[r]) w *= 3;
-    if (e.happy > 0 && s.happy < 45) w *= 3;
-    if (e.sci > 0) w *= 1.5;
-    if (e.def > 0 && power(s) < enemyStrength(s) * 0.7) w *= 2;
-    return w;
-  }
-
-  // Distribue les 4 cartes du jour
-  function deal(s, rng) {
-    rng = rng || Math.random;
-    const f = forecast(s);
-    const hand = [];
-    const has = (c) => hand.some((h) => h.kind === c.kind && h.id === c.id);
-    const add = (c) => { if (c && !has(c)) { hand.push(c); return true; } return false; };
-
-    const builds = BUILDINGS.filter((b) => b.id !== 'fusee').map((b) => buildCard(s, b)).filter((c) => playable(s, c))
-      .map((c) => ({ c, w: buildWeight(s, B[c.id], f) }));
-    const takeBuild = () => { const pool = builds.filter((x) => !has(x.c)); const p = pickW(pool, rng); return p ? add(p.c) : false; };
-
-    // A : l'objectif (fusée, découverte) sinon la construction la plus utile
-    const fusee = buildCard(s, B.fusee);
-    const tech = DISCOVERIES.filter((d) => d.era === s.era && !s.disc.includes(d.id)).map((d) => techCard(s, d)).filter((c) => playable(s, c)).sort((a, b) => a.cost.sci - b.cost.sci)[0];
-    if (!(playable(s, fusee) && add(fusee)) && !(tech && add(tech))) takeBuild();
-    // B : une construction
-    takeBuild();
-    // C : loi, guerre ou construction
-    const danger = s.day > 8 && s.peaceUntil <= s.day && power(s) < enemyStrength(s) * 0.7;
-    const roll = rng();
-    const laws = LAWS.filter((l) => l.era <= s.era).map((l) => lawCard(s, l)).filter((c) => playable(s, c));
-    const wars = warCards(s).filter((c) => playable(s, c));
-    if (roll < (danger ? 0.6 : 0.2) && wars.length) add(wars[Math.floor(rng() * wars.length)]);
-    else if (roll < 0.5 && laws.length) add(laws[Math.floor(rng() * laws.length)]);
-    else if (!takeBuild() && laws.length) add(laws[Math.floor(rng() * laws.length)]);
-    // D (et cases vides) : une carte ressources
-    const trades = TRADES.filter((t) => t.ok(s)).map((t) => tradeCard(s, t)).filter((c) => playable(s, c));
-    let guard = 0;
-    while (hand.length < 4 && guard++ < 20) {
-      const pool = trades.filter((c) => !has(c));
-      if (!pool.length) break;
-      add(pool[Math.floor(rng() * pool.length)]);
-    }
-    return hand.slice(0, 4);
-  }
-  function ensureHand(s, rng) {
-    if (!s.hand || !s.hand.length) s.hand = deal(s, rng);
-    return s.hand;
-  }
-  function play(s, i, rng) {
-    const c = s.hand && s.hand[i];
-    if (!c || !playable(s, c)) return { ok: false };
-    const r = act(s, c.kind, c.id, rng);
-    if (r.ok) s.hand = null;
-    return r;
-  }
-  function nextGoal(s) {
-    if (s.disc.includes('espace') && !count(s, 'fusee')) return { icon: '🚀', text: 'Base spatiale', need: fmtCost(buildCost(s, B.fusee)) };
-    const d = DISCOVERIES.filter((x) => x.era === s.era && !s.disc.includes(x.id)).sort((a, b) => a.cost - b.cost)[0];
-    if (d) return { icon: d.icon, text: d.name, need: `${Math.min(s.res.sci, d.cost)}/${d.cost} 💡` };
-    return null;
-  }
-
   const api = {
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
-    known, dilemmaView, choose, deal, ensureHand, play, playable, nextGoal,
+    known, dilemmaView, choose,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Engine = api;
