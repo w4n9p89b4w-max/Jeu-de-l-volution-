@@ -2,196 +2,113 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jeu de l'Évolution — Civilisation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#4f8f30">
+  <title>L'Évolution — de la Préhistoire au monde moderne</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="barre-haut">
-    <h1>🏕️ Jeu de l'Évolution</h1>
+<div id="app">
+  <canvas id="map" aria-label="La vallée"></canvas>
 
-    <div class="progression">
-      <span class="niveau">Niveau <b id="stNiveau">1</b></span>
-      <div class="barre-xp"><div id="barreXpRemplie" class="barre-xp-remplie"></div></div>
-      <span class="points-tech">🔬 <b id="stPoints">0</b> pts</span>
-      <button id="btnTech">Technologies</button>
-      <button id="btnAtelier">🛠️ Atelier</button>
-      <button id="btnVillage">👥 Village</button>
+  <!-- HUD : jour, population, nom du pays -->
+  <header id="hud" class="hidden">
+    <div class="hud-row">
+      <div class="pill day"><small>JOUR</small><b id="hDay">1</b></div>
+      <div class="pill pop"><span class="ico">👤</span><div><small>POPULATION</small><b id="hPop">0</b></div></div>
     </div>
-
-    <div class="jour-compteur" title="Jour actuel — la barre se remplit jusqu'au prochain jour">
-      <span>📅 Jour <b id="stJour">1</b></span>
-      <div class="barre-jour"><div id="barreJourRemplie" class="barre-jour-remplie"></div></div>
-    </div>
-
-    <span id="stAmbiance" class="ambiance" title="Heure et météo">☀️ Jour</span>
+    <button class="country" id="hCountry"><canvas id="hFlag" width="60" height="40"></canvas><span id="hName">PAYS SANS NOM</span></button>
+    <div class="era" id="hEra">Préhistoire</div>
+    <div id="res"></div>
   </header>
 
-  <main>
-    <div class="stage">
-      <canvas id="carte"></canvas>
-      <canvas id="minicarte" title="Cliquez pour naviguer"></canvas>
-      <div class="ressources">
-        <span class="ress" title="Bois">🪵 <b id="stBois">0</b>/<span id="stBoisCap">0</span></span>
-        <span class="ress" title="Pierre">🪨 <b id="stPierre">0</b>/<span id="stPierreCap">0</span></span>
-        <span class="ress" title="Nourriture">🍖 <b id="stNourriture">0</b>/<span id="stNourritureCap">0</span></span>
-        <span class="ress" title="Population">👥 <b id="stPopulation">0</b>/<span id="stCapacite">0</span></span>
-      </div>
-      <div class="vitesse">
-        <button id="btnPause" title="Mettre en pause">⏸</button>
-        <button id="btnNaissances" title="Autoriser ou bloquer les nouvelles naissances">👶</button>
-        <button id="btnSortirGrotte" hidden title="Sortir de la grotte">🚪</button>
-        <button id="btnNouvellePartie" title="Nouvelle carte">↺</button>
-      </div>
-      <div class="controles" id="blocMode">
-        <button id="btnModeExplorer" class="mode-actif">🔍 Explorer</button>
-        <button id="btnModeConstruire">🏗️ Construire</button>
-      </div>
-      <button id="btnPanneauMobile" class="btn-panneau-mobile" title="Afficher le panneau">☰</button>
-      <div class="controles-zoom">
-        <button id="btnZoomPlus" title="Zoomer">+</button>
-        <span id="valeurZoom">100%</span>
-        <button id="btnZoomMoins" title="Dézoomer">−</button>
-      </div>
-      <div class="aide-navigation">🖐️ Glisser pour déplacer la caméra · Flèches / ZQSD pour naviguer · Molette ou pincement à deux doigts pour zoomer</div>
+  <button id="recenter" class="round hidden" title="Recentrer">🎯</button>
 
-      <div id="boutonsConstruction" class="confirmation-boutons" hidden style="display:none">
-        <button id="btnValiderConstruction" class="btn-valider" title="Valider la construction">✓ Valider</button>
-        <button id="btnRefuserConstruction" class="btn-refuser" title="Annuler la construction">✕ Refuser</button>
-      </div>
-      <svg id="dpadConstruction" class="confirmation-dpad" viewBox="0 0 100 100" hidden style="display:none">
-        <circle cx="50" cy="50" r="49" fill="rgba(8,12,10,0.6)" stroke="rgba(255,255,255,0.35)" stroke-width="1"></circle>
-        <g class="dpad-btn" data-dir="haut">
-          <title>Déplacer vers le haut</title>
-          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
-          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="50" y1="50" x2="50" y2="16"/>
-            <polyline points="38,28 50,15 62,28"/>
-          </g>
-        </g>
-        <g class="dpad-btn" data-dir="droite" transform="rotate(90 50 50)">
-          <title>Déplacer vers la droite</title>
-          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
-          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="50" y1="50" x2="50" y2="16"/>
-            <polyline points="38,28 50,15 62,28"/>
-          </g>
-        </g>
-        <g class="dpad-btn" data-dir="bas" transform="rotate(180 50 50)">
-          <title>Déplacer vers le bas</title>
-          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
-          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="50" y1="50" x2="50" y2="16"/>
-            <polyline points="38,28 50,15 62,28"/>
-          </g>
-        </g>
-        <g class="dpad-btn" data-dir="gauche" transform="rotate(270 50 50)">
-          <title>Déplacer vers la gauche</title>
-          <path class="dpad-hit" d="M50,50 L0,0 L100,0 Z" fill="transparent"></path>
-          <g class="dpad-art" fill="none" stroke="#f4f6f0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="50" y1="50" x2="50" y2="16"/>
-            <polyline points="38,28 50,15 62,28"/>
-          </g>
-        </g>
-      </svg>
+  <!-- Grande légende façon vidéo -->
+  <div id="caption"></div>
+
+  <!-- Le vote du jour -->
+  <footer id="dock" class="hidden">
+    <div class="dock-title">CHAQUE JOUR <em>VOUS VOTEZ</em></div>
+    <div class="tiles">
+      <button class="tile" data-cat="build"><span class="tile-ico">🏠</span><span>CONSTRUCTIONS</span><i class="badge"></i></button>
+      <button class="tile" data-cat="law"><span class="tile-ico">📜</span><span>LOIS</span><i class="badge"></i></button>
+      <button class="tile" data-cat="war"><span class="tile-ico">⚔️</span><span>GUERRES</span><i class="badge"></i></button>
+      <button class="tile" data-cat="tech"><span class="tile-ico">💡</span><span>DÉCOUVERTES</span><i class="badge"></i></button>
     </div>
-
-    <aside class="panneau" id="panneauLateral" hidden>
-      <section class="bloc">
-        <div id="contenuSelection" class="selection"></div>
-      </section>
-    </aside>
-  </main>
-
-  <div id="modalConstruction" class="modal" hidden>
-    <div class="modal-contenu">
-      <div class="modal-entete">
-        <h2>📖 Livre de construction</h2>
-        <button id="fermerConstruction">✕</button>
-      </div>
-      <p class="astuce">Choisissez un bâtiment, puis cliquez sur la carte pour proposer son emplacement.</p>
-      <div id="livreConstruction" class="livre-construction"></div>
+    <div class="dock-row">
+      <button class="small" id="bRest">😴 Repos</button>
+      <button class="small" id="bLog">📖 Journal</button>
+      <button class="small" id="bHelp">❔ Aide</button>
+      <button class="small" id="bMenu">⚙️</button>
     </div>
+  </footer>
+
+  <!-- Liste des choix d'une catégorie -->
+  <div id="sheet" class="sheet">
+    <div class="sheet-head"><h2 id="sheetTitle"></h2><button class="round" id="sheetClose">✕</button></div>
+    <p id="sheetSub"></p>
+    <div id="sheetList"></div>
   </div>
 
-  <div id="modalTech" class="modal" hidden>
-    <div class="modal-contenu modal-tech-contenu">
-      <div class="modal-entete">
-        <h2>🔬 Arbre technologique</h2>
-        <button id="fermerTech">✕</button>
+  <!-- Écran titre -->
+  <section id="title" class="screen">
+    <div class="big">ET SI ON CRÉAIT<br>UN <em>PAYS</em>…</div>
+    <div class="big sub">DE LA <em>PRÉHISTOIRE</em><br>AU <em>MONDE MODERNE</em> ?</div>
+    <div class="screen-actions">
+      <button class="btn primary" id="bNew">Nouvelle partie</button>
+      <button class="btn" id="bContinue">Continuer</button>
+    </div>
+    <p class="hint">Une vallée immense entourée de montagnes. Pour l'instant… il n'y a <em>rien</em>.</p>
+  </section>
+
+  <!-- Nom & drapeau -->
+  <section id="setup" class="screen hidden">
+    <div class="big">LE PAYS A BESOIN D'UN<br><em>NOM</em> ET D'UN <em>DRAPEAU</em></div>
+    <div class="card setup-card">
+      <label class="step"><span class="num">1</span> Nom du pays</label>
+      <input id="iName" maxlength="22" placeholder="Prairilande" autocomplete="off">
+      <label class="step"><span class="num orange">2</span> Le drapeau</label>
+      <div class="flag-edit">
+        <canvas id="flagPreview" width="180" height="120"></canvas>
+        <div class="flag-tools">
+          <div class="row" id="fPatterns"></div>
+          <div class="row colors"><span>Couleurs</span><button class="swatch" data-i="0"></button><button class="swatch" data-i="1"></button><button class="swatch" data-i="2"></button></div>
+          <div class="row" id="fPalette"></div>
+          <div class="row" id="fSymbols"></div>
+        </div>
       </div>
-      <p class="astuce">Dépensez vos points de technologie (gagnés en montant de niveau) pour débloquer des améliorations. Chaque palier doit être entièrement débloqué avant d'accéder au suivant.</p>
-      <div id="arbreTechConteneur" class="arbre-tech-conteneur">
-        <svg id="arbreTechLiens" class="arbre-tech-liens"></svg>
-        <div id="grilleTech" class="arbre-tech-grille"></div>
-      </div>
+      <button class="btn primary wide" id="bSetupOk">Valider</button>
+    </div>
+  </section>
+
+  <!-- Vote de fondation -->
+  <section id="found" class="screen hidden transparent">
+    <div class="big">PREMIER VOTE<br>OÙ <em>FONDE</em>-T-ON LE PAYS ?</div>
+    <div class="found-cards">
+      <button class="card found" data-site="riviere"><span class="mk blue">A</span><b>AU BORD DE LA RIVIÈRE</b><small>De l'eau et des terres fertiles<br>+25% de nourriture</small></button>
+      <button class="card found" data-site="lac"><span class="mk orange">B</span><b>AU BORD DU LAC</b><small>La pêche et un port<br>+3 🍖 et +2 💰 par jour</small></button>
+    </div>
+  </section>
+
+  <div id="night"><span id="nightText"></span></div>
+  <div id="toast"></div>
+
+  <div id="modal" class="hidden">
+    <div class="modal-card">
+      <div class="modal-ico" id="mIco"></div>
+      <h2 id="mTitle"></h2>
+      <div id="mText"></div>
+      <div class="modal-actions" id="mActions"></div>
     </div>
   </div>
+</div>
 
-  <div id="modalAtelier" class="modal" hidden>
-    <div class="modal-contenu">
-      <div class="modal-entete">
-        <h2>🛠️ Atelier</h2>
-        <button id="fermerAtelier">✕</button>
-      </div>
-      <p class="astuce">Fabriquez des outils à l'avance ; équipez-les ensuite gratuitement depuis la fiche d'un villageois.</p>
-      <div id="atelierListe" class="atelier-liste"></div>
-    </div>
-  </div>
-
-  <div id="modalVillage" class="modal" hidden>
-    <div class="modal-contenu">
-      <div class="modal-entete">
-        <h2>👥 Village</h2>
-        <button id="fermerVillage">✕</button>
-      </div>
-      <div class="onglets-village">
-        <button id="ongletHabitants" class="onglet-actif">Habitants</button>
-        <button id="ongletAssignations">Assignations</button>
-      </div>
-      <div id="contenuVillage" class="liste-village"></div>
-    </div>
-  </div>
-
-  <div id="modalGrotte" class="modal" hidden>
-    <div class="modal-contenu modal-grotte-contenu">
-      <div class="modal-entete">
-        <h2>🕳️ Grotte</h2>
-        <button id="fermerGrotte">✕</button>
-      </div>
-      <p id="grotteInfo" class="astuce"></p>
-      <div id="grotteVillageoisListe" class="grotte-villageois-liste"></div>
-      <div class="ligne-action">
-        <span id="grotteSelectionCompte" class="astuce"></span>
-        <button id="btnEntrerGrotte" disabled>🚪 Entrer</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalExpedition" class="modal" hidden>
-    <div class="modal-contenu modal-grotte-contenu">
-      <div class="modal-entete">
-        <h2>🧭 Expédition</h2>
-        <button id="fermerExpedition">✕</button>
-      </div>
-      <p id="expeditionInfo" class="astuce"></p>
-      <div id="expeditionVillageoisListe" class="grotte-villageois-liste"></div>
-    </div>
-  </div>
-
-  <div id="modalChoixOutil" class="modal" hidden>
-    <div class="modal-contenu modal-grotte-contenu">
-      <div class="modal-entete">
-        <h2>🧰 Choisir un outil</h2>
-        <button id="fermerChoixOutil">✕</button>
-      </div>
-      <p id="choixOutilInfo" class="astuce"></p>
-      <div id="choixOutilListe" class="outils-liste"></div>
-    </div>
-  </div>
-
-  <div id="notifications" class="notifications"></div>
-
-  <script src="script.js"></script>
+<script src="engine.js"></script>
+<script src="map.js"></script>
+<script src="main.js"></script>
 </body>
 </html>

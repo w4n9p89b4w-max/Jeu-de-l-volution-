@@ -1,30 +1,41 @@
-# Jeu de l'Évolution — Civilisation
+# L'Évolution — de la Préhistoire au monde moderne
 
-Un jeu de gestion de civilisation jouable directement dans le navigateur, sans installation. Incarnez une civilisation naissante : récoltez des matières premières, construisez des bâtiments, faites grandir votre population et débloquez des technologies pour explorer une carte composée de plusieurs biomes.
+Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, en format portrait).
 
-## Principe
+> *Et si on créait un pays… ?* Une vallée immense entourée de montagnes. Pour l'instant, il n'y a **rien**.
 
-- **Récolte** : envoyez vos villageois récolter du **bois** (forêts), de la **pierre** (carrières / montagnes) et de la **nourriture** (gibier, poisson) directement sur la carte.
-- **Construction** : bâtissez des **maisons** (capacité de population), des **entrepôts** (capacité de stockage), des **champs** et des **enclos à animaux** (production passive de nourriture). Chaque bâtiment doit être placé sur un biome compatible.
-- **Population** : si vous avez assez de nourriture en réserve et de la place dans vos maisons, la population se reproduit automatiquement.
-- **Expérience et niveaux** : chaque récolte et chaque construction rapporte de l'expérience. Monter de niveau octroie des **points de technologie**.
-- **Technologies** : dépensez vos points dans l'arbre technologique pour améliorer vos rendements, réduire les coûts de construction, débloquer l'élevage… et surtout **débloquer de nouvelles zones de récolte** sur la carte.
-- **Carte et biomes** : la carte est générée aléatoirement à chaque nouvelle partie et contient 7 biomes (**forêt, carrière, plaine, rivière, plage, océan, montagne**). Elle est bien plus grande que l'écran : un système de navigation (glisser-déposer, flèches/ZQSD, mini-carte cliquable) permet de s'y déplacer.
+## Déroulement
 
-## Contrôles
+1. **Nom et drapeau** : donnez un nom à votre pays et dessinez son drapeau (motif, couleurs, symbole).
+2. **Premier vote : où fonde-t-on le pays ?**
+   - **A — au bord de la rivière** : de l'eau et des terres fertiles (+25 % de nourriture).
+   - **B — au bord du lac** : la pêche et un port (+3 🍖 et +2 💰 par jour).
+3. **Chaque jour, vous votez** une seule action :
+   - 🏠 **Constructions** : huttes, champs, temples, châteaux, usines, gratte-ciel…
+   - 📜 **Lois** : partage du gibier, impôt, suffrage universel, transition écologique…
+   - ⚔️ **Guerres** : recruter, attaquer les voisins, fortifier, signer la paix.
+   - 💡 **Découvertes** : les 3 découvertes d'une ère font passer à la suivante.
+4. La nuit tombe, la production tombe, la population grandit… et des événements surviennent (récoltes, épidémies, invasions, manifs !).
 
-- **Glisser la souris** sur la carte, ou **flèches / ZQSD** : déplace la caméra.
-- **Mini-carte** (coin supérieur droit de la carte) : cliquer dessus recentre la caméra à cet endroit.
-- **Mode Explorer** : cliquez sur une case pour l'inspecter (biome, ressource, bâtiment) et assigner/retirer des travailleurs sur les gisements de ressources.
-- **Mode Construire** : choisissez un bâtiment dans la palette puis cliquez sur une case valide de la carte pour le construire.
-- **Technologies** : ouvre l'arbre technologique pour dépenser vos points.
-- **Pause / Nouvelle carte** : met la simulation en pause, ou régénère une toute nouvelle carte et recommence la partie.
+**Les 6 ères** : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.
+
+**But** : découvrir la conquête spatiale et lancer la première fusée du pays 🚀.
+
+La vallée évolue sous vos yeux : les bâtiments de chaque époque apparaissent, les chemins deviennent des routes, les habitants se promènent.
+La partie est sauvegardée automatiquement dans le navigateur.
 
 ## Lancer le jeu
 
-Aucune installation n'est nécessaire : ouvrez simplement `index.html` dans un navigateur, ou servez le dossier avec un serveur statique (par exemple GitHub Pages).
+Aucune installation : ouvrez `index.html`, ou servez le dossier (GitHub Pages fonctionne aussi).
 
 ```bash
 python3 -m http.server 8000
-# puis ouvrez http://localhost:8000
+# puis http://localhost:8000
 ```
+
+## Fichiers
+
+- `engine.js` — règles, données (ères, constructions, lois, découvertes, événements) et simulation, sans DOM.
+- `map.js` — rendu de la vallée sur canvas (montagnes, rivière, lac, arbres, bâtiments, habitants).
+- `main.js` — interface : écrans de départ, HUD, vote du jour, modales, sauvegarde.
+- `style.css`, `index.html`.
