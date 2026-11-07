@@ -337,6 +337,7 @@
     const born = (rep.born || []).map((b) => b.name);
     toast(`${born.length ? `Bienvenue à ${born.slice(0, 3).join(', ')}${born.length > 3 ? ` et ${born.length - 3} autres` : ''} ! Touchez 👷 pour leur donner une tâche.<br>` : ''}Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
     save();
+    for (const pr of rep.proposals || []) { await wait(350); await proposeBuilding(pr); }
     for (const ev of rep.events) {
       await wait(350);
       if (ev.dilemma) await dilemma(ev.dilemma);
@@ -517,27 +518,38 @@
   $('peopleClose').onclick = closePeople;
 
   // Après les Outils en pierre : proposer d'ouvrir une carrière
-  async function proposeQuarry() {
-    const b = E.B.carriere;
+  // Propositions A/B : carrière, appâts, camp de chasse (ne comptent pas comme le choix du jour)
+  const PROPOSE = {
+    carriere: { icon: '🪨', title: 'Ouvrir une carrière ?', done: '🪨 CARRIÈRE <em>OUVERTE</em> !', a: 'Ouvrir la carrière',
+      text: 'Avec les outils en pierre, vos ramasseurs ont repéré un bon filon au pied de la montagne. Une vraie carrière produirait bien plus que les cailloux ramassés à la main.', plus: '+4 🪨/jour pour toujours' },
+    appats: { icon: '🪤', title: 'Poser des appâts ?', done: '🪤 APPÂTS <em>POSÉS</em> !', a: 'Poser appâts et pièges',
+      text: 'Vos chasseurs connaissent maintenant bien la forêt. Avec des appâts et des pièges, ils attraperaient beaucoup plus de gibier.', plus: '+50 % de nourriture pour chaque chasseur' },
+    chasse: { icon: '🏹', title: 'Construire un camp de chasse ?', done: '🏹 CAMP DE CHASSE <em>CONSTRUIT</em> !', a: 'Construire le camp',
+      text: 'Les pièges marchent bien ! Un camp à l\'orée de la forêt permettrait de fumer la viande et de la garder plus longtemps.', plus: '+4 🍖/jour pour toujours' },
+  };
+  async function proposeBuilding(id) {
+    const P = PROPOSE[id], b = E.B[id];
+    if (!P || !b) return;
     const cost = E.buildCost(state, b);
     const ok = E.canPay(state, cost);
+    const price = Object.keys(cost).map((r) => `−${cost[r]} ${E.RES_ICONS[r]}`).join(' ');
     const v = await modal({
-      icon: '🪨', title: 'Ouvrir une carrière ?',
-      html: `<p>Avec les outils en pierre, vos ramasseurs ont repéré un bon filon au pied de la montagne. Une vraie carrière produirait bien plus que les cailloux ramassés à la main.</p>
-        <p class="finfo"><span class="g">+4 🪨/jour</span> pour toujours<br><span class="b">−${cost.wood} 🪵</span></p>`,
+      icon: P.icon, title: P.title,
+      html: `<p>${P.text}</p><p class="finfo"><span class="g">${P.plus}</span><br><span class="b">${price}</span></p>`,
       buttons: [
-        { label: ok ? 'A · Ouvrir la carrière' : 'A · Pas assez de bois…', hint: ok ? `−${cost.wood} 🪵, +4 🪨/jour` : 'Elle reste disponible dans Constructions', value: ok ? 'open' : 'later', primary: true, cls: 'choice-a' },
-        { label: 'B · Plus tard', hint: 'Elle reste disponible dans Constructions', value: 'later', cls: 'choice-b' },
+        { label: ok ? `A · ${P.a}` : 'A · Pas assez de ressources…', hint: ok ? `${price} · ${P.plus}` : 'Reste disponible dans Constructions', value: ok ? 'yes' : 'later', primary: true, cls: 'choice-a' },
+        { label: 'B · Plus tard', hint: 'Reste disponible dans Constructions', value: 'later', cls: 'choice-b' },
       ],
     });
-    if (v !== 'open') return;
-    const r = E.act(state, 'build', 'carriere');
+    if (v !== 'yes') return;
+    const r = E.act(state, 'build', id);
     if (r.ok) {
       map.place(r.built); map.syncPeople(); updateHUD(); save();
-      caption('🪨 CARRIÈRE <em>OUVERTE</em> !', 1800);
+      caption(P.done, 1800);
       await wait(1200);
     }
   }
+  const proposeQuarry = () => proposeBuilding('carriere');
   $('bForest').onclick = openForest;
 
   $('bRest').onclick = () => choisir('rest');

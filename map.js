@@ -412,13 +412,25 @@
       ell(ctx, x + 8, y - 6, 3, 3, '#ff8a1f'); ell(ctx, x + 8, y - 6, 1.5, 1.5, '#ffe08a');
       windows(ctx, x - 14, y - 10, 18, 6, 1, 3, '#f2a64a');
     },
+    traps(ctx, x, y) {
+      // deux pièges à lacet et un appât au pied des arbres
+      for (const [dx, dy] of [[-8, 2], [7, -3]]) {
+        const tx = x + dx, ty = y + dy;
+        ell(ctx, tx, ty + 1, 6, 2.5, 'rgba(60,40,20,.25)');
+        ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(tx - 4, ty); ctx.lineTo(tx, ty - 9); ctx.lineTo(tx + 4, ty); ctx.stroke();
+        ctx.strokeStyle = '#d9c39a'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.arc(tx, ty - 2, 2.6, 0, Math.PI * 2); ctx.stroke();
+      }
+      ell(ctx, x, y + 5, 3, 2, '#c0392b'); ell(ctx, x - 0.8, y + 4.4, 1, 0.7, '#f5b7b1');
+    },
     recycle(ctx, x, y) {
       block(ctx, x, y, 26, 9, 12, '#d8e8d2', '#4c9a5b');
       ctx.fillStyle = '#2e7d32'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♻', x, y - 6);
       rect(ctx, x + 14, y - 5, 6, 5, '#8a9099');
     },
   });
-  const EDGE = { quarry: 1, mine: 1, coalmine: 1 };
+  const EDGE = { quarry: 1, mine: 1, coalmine: 1, traps: 1 };
   const DYNAMIC = { mill: 1, wind: 1, rocket: 1 };
 
   /* ---------- Le décor statique ---------- */

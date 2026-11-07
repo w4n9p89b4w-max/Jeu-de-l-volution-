@@ -44,13 +44,18 @@
 
     parts.push(sec('res', '🪵 Les ressources', `
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
-      <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, villageois à la <b>chasse</b> 🏹, camp de chasse, champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
+      <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, villageois à la <b>chasse</b> 🏹 (voir plus bas), champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
       <tr><td>🪵</td><td>Bois</td><td>Les villageois <b>bûcherons</b> 🌲, puis la scierie et les usines.</td></tr>
       <tr><td>🪨</td><td>Pierre</td><td>Les villageois aux <b>pierres</b> 🪨, puis la carrière, les tailleurs de pierre et la gare.</td></tr>
       <tr><td>🔩</td><td>Fer</td><td>À partir du <b>Moyen Âge</b> : villageois <b>mineurs de fer</b> ⛏️, mine de fer (après <i>Métallurgie du fer</i>), haut-fourneau, recyclage.</td></tr>
       <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : villageois <b>mineurs de charbon</b> ⚫, mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
       <tr><td>💰</td><td>Or</td><td>Villageois <b>marchands</b> 💰, 1 pour 12 villageois sans tâche, marchés, banques, gares, lois.</td></tr>
       <tr><td>💡</td><td>Savoir</td><td>Base 1/jour, villageois <b>savants</b> 💡, 1 pour 20 villageois sans tâche, feu, temples, bibliothèques, universités…</td></tr></table>
+      <h4>🏹 La chasse, étape par étape</h4>
+      <ol><li><b>Au début</b>, pas de bâtiment : envoyez des villageois à la <b>Chasse et cueillette</b> (👷 Villageois). Chacun rapporte du gibier de la forêt.</li>
+      <li><b>Après ${E.HUNT_APPATS} journées de chasse</b> (une journée par chasseur et par jour), le jeu propose de <b>poser des appâts et des pièges</b> en forêt (A : les poser, B : plus tard). Les chasseurs rapportent alors <b>50 % de plus</b>.</li>
+      <li><b>Une fois les appâts posés, après ${E.HUNT_CAMP} journées de chasse</b>, le jeu propose de <b>construire un camp de chasse</b> : +4 🍖 par jour. Vous pouvez ensuite en construire d'autres.</li></ol>
+      <p>Si vous répondez « plus tard », la construction reste disponible dans 🏠 Constructions. Ces propositions ne comptent pas comme le choix du jour.</p>
       <h4>🪨 Ouvrir une carrière</h4>
       <p>Quand vous découvrez les <b>Outils en pierre</b>, le jeu vous propose d'ouvrir une carrière (A : l'ouvrir tout de suite pour du bois, B : plus tard). Elle produit +4 🪨/jour en plus des ramasseurs. Si vous dites « plus tard », elle reste disponible dans 🏠 Constructions.</p>
       <p>Carrières et mines s'installent au pied des montagnes.</p>`));

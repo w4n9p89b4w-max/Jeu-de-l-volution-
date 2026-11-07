@@ -32,7 +32,8 @@
   const BUILDINGS = [
     // Préhistoire
     { id: 'hutte', era: 0, name: 'Hutte', icon: '🛖', arch: 'hut', cost: { wood: 6 }, eff: { cap: 6 }, desc: 'Un abri de branches et de peaux.' },
-    { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 5 }, eff: { food: 4 }, desc: 'Les chasseurs ramènent du gibier.' },
+    { id: 'appats', era: 0, name: 'Appâts et pièges', icon: '🪤', arch: 'traps', cost: { wood: 6 }, eff: {}, unlock: 'appats', unique: true, desc: 'Des pièges et des appâts en forêt : les chasseurs rapportent 50 % de plus.' },
+    { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 8 }, eff: { food: 4 }, unlock: 'camp', desc: 'Les chasseurs ramènent du gibier.' },
     { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Une vraie carrière : bien plus efficace que ramasser des cailloux.' },
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
@@ -137,7 +138,7 @@
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
       day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, troops: [], fort: 0, peaceUntil: 0,
-      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 },
+      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0,
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
     };
@@ -147,6 +148,11 @@
   function migrate(s) {
     if (!s) return s;
     s.buildings = s.buildings.filter((b) => b.id !== 'bucheron');   // le camp de bûcherons n'existe plus
+    if (!s.unlocks) {
+      s.unlocks = [];
+      s.huntDays = 0;
+      if (s.buildings.some((b) => b.id === 'chasse')) { s.unlocks = ['appats', 'camp']; s.huntDays = HUNT_CAMP; s.buildings.push({ id: 'appats', day: s.day }); }
+    }
     if (!s.villagers) {
       // ancienne sauvegarde : on crée les villageois et on les répartit
       s.villagers = []; s.nextId = 1;
@@ -177,6 +183,23 @@
   }
 
   const count = (s, id) => s.buildings.filter((b) => b.id === id).length;
+  /* ---------- La chasse se débloque peu à peu ----------
+     1. Les villageois chassent en forêt.
+     2. Après 8 « journées de chasseur » : on peut poser des appâts et des pièges.
+     3. Appâts posés et 25 journées de chasseur : on peut construire un camp de chasse. */
+  const HUNT_APPATS = 8, HUNT_CAMP = 25;
+  const UNLOCK_HINT = {
+    appats: `Se débloque après ${HUNT_APPATS} journées de chasse en forêt`,
+    camp: `Se débloque quand les appâts sont posés et après ${HUNT_CAMP} journées de chasse`,
+  };
+  const unlocked = (s, k) => (s.unlocks || []).includes(k);
+  function checkUnlocks(s) {
+    s.unlocks = s.unlocks || [];
+    const news = [];
+    if (!unlocked(s, 'appats') && (s.huntDays || 0) >= HUNT_APPATS) { s.unlocks.push('appats'); news.push('appats'); }
+    if (!unlocked(s, 'camp') && count(s, 'appats') && (s.huntDays || 0) >= HUNT_CAMP) { s.unlocks.push('camp'); news.push('chasse'); }
+    return news;
+  }
   const capacity = (s) => 5 + totals(s).cap;
   /* ---------- L'armée : des unités différentes à chaque époque ----------
      Chaque soldat garde les armes de l'époque où il a été recruté ou réarmé. */
@@ -314,7 +337,7 @@
   function jobBase(s, j) {
     const d = (x) => s.disc.includes(x);
     const b = JB[j].base || 0;
-    if (j === 'hunt') return b + (d('feu') ? 0.5 : 0);
+    if (j === 'hunt') return (b + (d('feu') ? 0.5 : 0)) * (count(s, 'appats') ? 1.5 : 1);
     if (j === 'wood') return b + (d('outils') ? 0.5 : 0) + (d('metal') ? 0.5 : 0) + (d('vapeur') ? 1 : 0);
     if (j === 'stone') return b + (d('outils') ? 0.25 : 0) + (d('metal') ? 0.25 : 0) + (d('vapeur') ? 0.5 : 0);
     if (j === 'iron' || j === 'coal') return b + (d('vapeur') ? 0.6 : 0) + (d('electricite') ? 0.4 : 0);
@@ -497,6 +520,10 @@
       for (const b of BUILDINGS) {
         if (b.era > s.era) continue;
         if (b.unique && count(s, b.id)) continue;
+        if (b.unlock && !unlocked(s, b.unlock)) {
+          out.push({ id: b.id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: fmtEff(b.eff), can: false, why: UNLOCK_HINT[b.unlock], era: b.era });
+          continue;
+        }
         if (b.req && !s.disc.includes(b.req)) {
           if (b.era === s.era || b.id === 'carriere') out.push({ id: b.id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: fmtEff(b.eff), can: false, why: `Nécessite : ${D[b.req].name}`, era: b.era });
           continue;
@@ -554,7 +581,7 @@
   const negEff = (e) => Object.keys(e).filter((r) => e[r] < 0).map((r) => `${sgn(e[r])} ${ico(r)}${unit(r)}`);
   const costL = (c) => Object.keys(c).filter((r) => c[r]).map((r) => `−${c[r]} ${ico(r)}`);
   function bonusMalus(s, cat, id) {
-    if (cat === 'build') { const b = B[id]; return { plus: id === 'fusee' ? ['🏆 VICTOIRE'] : posEff(b.eff), minus: costL(buildCost(s, b)).concat(negEff(b.eff)) }; }
+    if (cat === 'build') { const b = B[id]; return { plus: id === 'fusee' ? ['🏆 VICTOIRE'] : id === 'appats' ? ['+50 % 🍖 pour chaque chasseur'] : posEff(b.eff), minus: costL(buildCost(s, b)).concat(negEff(b.eff)) }; }
     if (cat === 'law') { const l = L[id]; return { plus: posEff(l.eff), minus: costL(l.cost).concat(negEff(l.eff)) }; }
     if (cat === 'tech') {
       const d = D[id];
@@ -606,7 +633,7 @@
       const b = B[id];
       if (!b) return { ok: false };
       const c = buildCost(s, b);
-      if (b.era > s.era || !canPay(s, c) || (b.req && !s.disc.includes(b.req)) || (b.unique && count(s, b.id))) return { ok: false };
+      if (b.era > s.era || !canPay(s, c) || (b.req && !s.disc.includes(b.req)) || (b.unlock && !unlocked(s, b.unlock)) || (b.unique && count(s, b.id))) return { ok: false };
       pay(s, c);
       const inst = { id: b.id, day: s.day };
       s.buildings.push(inst);
@@ -927,7 +954,7 @@
     known, dilemmaView, choose, buildCost, canPay,
     UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
-    prefOf, setPref, setQuota, applyQuotas, recommendQuotas,
+    prefOf, setPref, setQuota, applyQuotas, recommendQuotas, unlocked, HUNT_APPATS, HUNT_CAMP,
   };
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };
@@ -935,8 +962,10 @@
   api.endDay = (s, rng) => {
     syncVillagers(s, rng);
     for (const v of s.villagers) if (v.job !== 'idle') { v.xp[v.job] = Math.min(XP_MAX / XP_DAY, (v.xp[v.job] || 0) + 1); }
+    s.huntDays = (s.huntDays || 0) + s.villagers.filter((v) => v.job === 'hunt').length;
     const rep = endDay(s, rng);
     rep.born = syncVillagers(s, rng).map((v) => ({ name: v.name, job: v.job }));
+    rep.proposals = checkUnlocks(s);
     return rep;
   };
   api.newState = (...a) => { const st = newState(...a); syncVillagers(st); autoAssign(st); return st; };
