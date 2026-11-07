@@ -136,7 +136,7 @@
   function newState(name, flag) {
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
-      day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, fort: 0, peaceUntil: 0,
+      day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, troops: [], fort: 0, peaceUntil: 0,
       res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 },
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
@@ -178,7 +178,50 @@
 
   const count = (s, id) => s.buildings.filter((b) => b.id === id).length;
   const capacity = (s) => 5 + totals(s).cap;
-  const power = (s) => Math.round(s.army * (1 + s.era * 0.5) + totals(s).def + jobOutput(s).def);
+  /* ---------- L'armée : des unités différentes à chaque époque ----------
+     Chaque soldat garde les armes de l'époque où il a été recruté ou réarmé. */
+  const UNITS = [
+    { era: 0, verb: 'Former des guerriers', name: 'Guerriers', one: 'guerrier', icon: '🪓', weapon: 'lances et massues', power: 1, cost: { food: 8, wood: 3 }, n: 3 },
+    { era: 1, verb: 'Recruter des légionnaires', name: 'Légionnaires', one: 'légionnaire', icon: '🛡️', weapon: 'épées courtes et boucliers', power: 1.5, cost: { food: 5, gold: 14, wood: 5 }, n: 5 },
+    { era: 2, verb: 'Adouber chevaliers et archers', name: 'Chevaliers et archers', one: 'chevalier', icon: '🏇', weapon: 'épées, arcs et armures', power: 2, cost: { food: 5, gold: 20, iron: 6 }, n: 7 },
+    { era: 3, verb: 'Recruter des mousquetaires', name: 'Mousquetaires', one: 'mousquetaire', icon: '💥', weapon: 'mousquets et canons', power: 2.5, cost: { food: 5, gold: 26, iron: 8, coal: 4 }, n: 9 },
+    { era: 4, verb: 'Recruter des fusiliers', name: 'Fusiliers', one: 'fusilier', icon: '🎖️', weapon: 'fusils et artillerie', power: 3, cost: { food: 5, gold: 32, iron: 10, coal: 6 }, n: 11 },
+    { era: 5, verb: 'Former des unités modernes', name: 'Armée moderne', one: 'soldat moderne', icon: '🚁', weapon: 'blindés et hélicoptères', power: 3.5, cost: { food: 5, gold: 38, iron: 12, coal: 8 }, n: 13 },
+  ];
+  // les anciennes sauvegardes n'avaient qu'un nombre de soldats
+  function troopsOf(s) {
+    if (!s.troops) s.troops = s.army ? [{ era: s.era, n: s.army }] : [];
+    return s.troops;
+  }
+  function recount(s) {
+    s.troops = troopsOf(s).filter((t) => t.n > 0).sort((a, b) => a.era - b.era);
+    s.army = s.troops.reduce((a, t) => a + t.n, 0);
+  }
+  function addTroops(s, era, n) {
+    const t = troopsOf(s).find((x) => x.era === era);
+    if (t) t.n += n; else s.troops.push({ era, n });
+    recount(s);
+  }
+  // les pertes touchent d'abord les soldats les plus mal armés
+  function loseTroops(s, n) {
+    troopsOf(s).sort((a, b) => a.era - b.era);
+    for (const t of s.troops) { const k = Math.min(t.n, n); t.n -= k; n -= k; if (n <= 0) break; }
+    recount(s);
+  }
+  const armyPower = (s) => troopsOf(s).reduce((a, t) => a + t.n * UNITS[t.era].power, 0);
+  const outdated = (s) => troopsOf(s).filter((t) => t.era < s.era).reduce((a, t) => a + t.n, 0);
+  // réarmer : par soldat, environ 60 % du prix d'une recrue de l'époque
+  function rearmCost(s, k) {
+    const u = UNITS[s.era], c = {};
+    for (const r in u.cost) if (r !== 'food') c[r] = Math.ceil(u.cost[r] / u.n * 0.6 * k);
+    return c;
+  }
+  function rearmMax(s) {
+    let k = outdated(s);
+    while (k > 0 && !canPay(s, rearmCost(s, k))) k--;
+    return k;
+  }
+  const power = (s) => Math.round(armyPower(s) + totals(s).def + jobOutput(s).def);
   const enemyStrength = (s) => Math.round(4 + s.day * 0.6 * (1 + s.era * 0.6));
 
   // Les ressources visibles dans l'interface
@@ -451,7 +494,13 @@
       const w = warCosts(s);
       const p = power(s), e = enemyStrength(s);
       const chance = Math.round(100 * attackChance(s));
-      out.push({ id: 'recruter', icon: '🪖', name: s.era === 0 ? 'Former des guerriers' : 'Recruter des soldats', desc: `Votre puissance : ${p} ⚔️${s.era >= 2 ? ' — les armes demandent du fer' : ''}`, cost: fmtCost(w.recruit), eff: `+${w.recruitN} soldats`, can: canPay(s, w.recruit), why: whyNot(s, w.recruit) });
+      const u = UNITS[s.era];
+      out.push({ id: 'recruter', icon: u.icon, name: u.verb, desc: `Armés de ${u.weapon}. Chacun vaut ${String(u.power).replace('.', ',')} ⚔️. Votre armée : ${armyText(s)}.`, cost: fmtCost(w.recruit), eff: `+${w.recruitN}`, can: canPay(s, w.recruit), why: whyNot(s, w.recruit) });
+      const old = outdated(s);
+      if (old > 0) {
+        const k = rearmMax(s);
+        out.push({ id: 'rearmer', icon: '⚒️', name: `Réarmer les anciens soldats`, desc: `${old} soldat${old > 1 ? 's ont' : ' a'} des armes d'une ancienne époque. Ils reçoivent ${u.weapon}${k < old ? ` (vous pouvez en réarmer ${k})` : ''}.`, cost: fmtCost(rearmCost(s, Math.max(1, k))), eff: '', can: k > 0, why: whyNot(s, rearmCost(s, 1)) });
+      }
       out.push({ id: 'attaquer', icon: '⚔️', name: `Attaquer ${ERAS[s.era].enemy}`, desc: `Force ennemie ≈ ${e}. Butin et nouveaux habitants si victoire.`, cost: '—', eff: `${chance}% de chances`, can: s.army > 0, why: 'Il vous faut des soldats' });
       out.push({ id: 'fortifier', icon: '🧱', name: s.era < 2 ? 'Palissade en bois' : s.era < 4 ? 'Remparts de pierre' : 'Défenses en acier', desc: 'Protège contre les invasions.', cost: fmtCost(w.fort), eff: `+${w.fortN} 🛡️`, can: canPay(s, w.fort), why: whyNot(s, w.fort) });
       const peace = s.peaceUntil > s.day;
@@ -461,6 +510,12 @@
     return out;
   }
 
+  const num1 = (x) => String(Math.round(x * 10) / 10).replace('.', ',');
+  function armyText(s) {
+    const t = troopsOf(s);
+    if (!t.length) return 'aucun soldat';
+    return t.map((x) => `${x.n} ${UNITS[x.era].icon}`).join(' + ');
+  }
   // Bonus (vert) et malus (rouge) de chaque choix
   const ico = (r) => RES_ICONS[r] || '';
   const sgn = (v) => (v > 0 ? '+' : '−') + Math.abs(v);
@@ -483,7 +538,13 @@
     }
     if (cat === 'war') {
       const w = warCosts(s);
-      if (id === 'recruter') return { plus: [`+${w.recruitN} 🪖`], minus: costL(w.recruit) };
+      if (id === 'recruter') { const u = UNITS[s.era]; return { plus: [`+${w.recruitN} ${u.icon} ${u.name.toLowerCase()}`, `+${num1(w.recruitN * u.power)} ⚔️`], minus: costL(w.recruit).concat([`mangent ${Math.ceil(w.recruitN / 4)} 🍖/j`]) }; }
+      if (id === 'rearmer') {
+        const k = Math.max(1, rearmMax(s)), u = UNITS[s.era];
+        let left = k, g = 0;
+        for (const t of troopsOf(s).slice().sort((a, b) => a.era - b.era)) { if (t.era >= s.era) continue; const q = Math.min(left, t.n); g += q * (u.power - UNITS[t.era].power); left -= q; }
+        return { plus: [`${k} soldat${k > 1 ? 's' : ''} → ${u.icon} ${u.name.toLowerCase()}`, `+${num1(g)} ⚔️`], minus: costL(rearmCost(s, k)) };
+      }
       if (id === 'fortifier') return { plus: [`+${w.fortN} 🛡️`], minus: costL(w.fort) };
       if (id === 'paix') return { plus: ['🕊️ 12 jours sans invasion', '+3 😊'], minus: costL(w.peace) };
       if (id === 'attaquer') { const ch = Math.round(attackChance(s) * 100); return { plus: [`${ch}% : butin et nouveaux habitants`], minus: [`${100 - ch}% : −40% 🪖, −${1 + s.era} 👤`] }; }
@@ -494,8 +555,8 @@
   function warCosts(s) {
     const e = s.era;
     return {
-      recruit: e === 0 ? { food: 8 } : e === 1 ? { food: 5, gold: 14, wood: 5 } : { food: 5, gold: 8 + e * 6, iron: 2 + e * 2 },
-      recruitN: 3 + e * 2,
+      recruit: UNITS[e].cost,
+      recruitN: UNITS[e].n,
       fort: e < 2 ? { wood: 10 + e * 12 } : e < 4 ? { stone: 15 + e * 12 } : { stone: 40, iron: 20 + e * 8 },
       fortN: 4 + e * 3,
       peace: e === 0 ? { food: 10 } : { gold: 10 + e * 15 },
@@ -555,9 +616,24 @@
       if (id === 'recruter') {
         if (!canPay(s, w.recruit)) return { ok: false };
         pay(s, w.recruit);
-        s.army += w.recruitN;
-        log(s, `🪖 +${w.recruitN} soldats`);
-        return { ok: true, title: 'Recrutement', text: `${w.recruitN} nouveaux soldats rejoignent l'armée (${s.army} au total).`, icon: '🪖', good: true };
+        const u = UNITS[s.era];
+        addTroops(s, s.era, w.recruitN);
+        log(s, `${u.icon} +${w.recruitN} ${u.name.toLowerCase()}`);
+        return { ok: true, title: u.name, text: `${w.recruitN} ${u.name.toLowerCase()} armés de ${u.weapon} rejoignent l'armée (${s.army} soldats au total).`, icon: u.icon, good: true };
+      }
+      if (id === 'rearmer') {
+        const k = rearmMax(s);
+        if (k <= 0) return { ok: false };
+        pay(s, rearmCost(s, k));
+        let left = k;
+        for (const t of troopsOf(s).slice().sort((a, b) => a.era - b.era)) {
+          if (t.era >= s.era || left <= 0) continue;
+          const q = Math.min(left, t.n); t.n -= q; left -= q;
+        }
+        addTroops(s, s.era, k);
+        const u = UNITS[s.era];
+        log(s, `⚒️ ${k} soldats réarmés (${u.name.toLowerCase()})`);
+        return { ok: true, title: 'Réarmement', text: `${k} soldats reçoivent ${u.weapon} et deviennent des ${u.name.toLowerCase()}.`, icon: '⚒️', good: true };
       }
       if (id === 'fortifier') {
         if (!canPay(s, w.fort)) return { ok: false };
@@ -586,12 +662,12 @@
           const newcomers = 2 + e;
           s.pop += newcomers;
           s.happy = Math.min(100, s.happy + 4);
-          s.army = Math.max(0, s.army - Math.ceil(s.army * 0.1));
+          loseTroops(s, Math.ceil(s.army * 0.1));
           log(s, `⚔️ Victoire contre ${enemy}`);
           return { ok: true, title: 'Victoire !', text: `Vous l'emportez sur ${enemy}. Butin : ${fmtCost(loot)} et ${newcomers} habitants rejoignent votre pays.`, icon: '🏆', good: true };
         }
         const lostArmy = Math.ceil(s.army * 0.4);
-        s.army -= lostArmy;
+        loseTroops(s, lostArmy);
         const lostPop = Math.min(s.pop - 1, 1 + s.era);
         s.pop -= lostPop;
         s.happy = Math.max(0, s.happy - 8);
@@ -786,7 +862,7 @@
     const lostPop = Math.ceil(s.pop * 0.12);
     s.pop -= lostPop;
     for (const r of ['food', 'wood', 'stone', 'iron', 'coal', 'gold']) s.res[r] = Math.round(s.res[r] * 0.7);
-    s.army = Math.floor(s.army * 0.5);
+    loseTroops(s, Math.ceil(s.army * 0.5));
     s.happy = Math.max(0, s.happy - 10);
     log(s, `🔥 Invasion : pillage par ${enemy}`);
     return { title: 'Invasion !', text: `${cap1(enemy)} (force ${strength}) déborde votre défense (${p}). Pillage : ${lostPop} habitants perdus et 30% des réserves. Pensez à l'armée ou aux remparts !`, icon: '🔥', good: false };
@@ -802,6 +878,7 @@
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
     known, dilemmaView, choose, buildCost, canPay,
+    UNITS, troopsOf, armyPower, outdated, armyText,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
     prefOf, setPref, setQuota, applyQuotas, recommendQuotas,
   };

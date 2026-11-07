@@ -53,6 +53,9 @@
     lac: { x: 615, y: 845, label: 'B', title: 'Au bord du lac', sub: 'La pêche et un port : +3 🍖 et +2 💰 par jour' },
   };
 
+  // le camp de l'armée, à côté du village
+  const CAMP = { riviere: { x: 392, y: 650 }, lac: { x: 640, y: 770 } };
+
   /* ---------- génération des arbres & emplacements ---------- */
   const rnd = mulberry(20260);
   const trees = [];
@@ -80,6 +83,7 @@
         if (vnorm(px, py) > 0.86) continue;
         if (isWater(px, py, 16)) continue;
         if (Math.hypot(px - s.x, py - s.y) < 18) continue;   // place du drapeau
+        if (Math.hypot(px - CAMP[site].x, py - CAMP[site].y - 6) < 36) continue;   // camp de l'armée
         slots.push({ x: px, y: py, d: Math.hypot(px - s.x, (py - s.y) * 1.1) + r() * 26 });
       }
     }
@@ -555,7 +559,7 @@
     function clearTrees() {
       for (const t of trees) t.alive = true;
       if (!state || !state.site) return;
-      const pts = state.buildings.filter((b) => b.x != null).concat([SITES[state.site]]);
+      const pts = state.buildings.filter((b) => b.x != null).concat([SITES[state.site], CAMP[state.site]]);
       for (const t of trees) for (const p of pts) if (Math.hypot(t.x - p.x, t.y - p.y) < 26) { t.alive = false; break; }
     }
 
@@ -705,6 +709,63 @@
       }
     }
 
+    /* --- l'armée : une petite troupe en formation, équipée selon son époque --- */
+    const LOOK = [
+      { body: '#8b5a2b', head: '#c68a5a', gear: 'spear' },     // guerriers
+      { body: '#b23a2e', head: '#d9b44a', gear: 'shield' },    // légionnaires
+      { body: '#9aa3ad', head: '#6d757e', gear: 'sword' },     // chevaliers
+      { body: '#2f5fa8', head: '#1d2433', gear: 'musket' },    // mousquetaires
+      { body: '#6b7046', head: '#4d5233', gear: 'rifle' },     // fusiliers
+      { body: '#4f6b3a', head: '#2f4024', gear: 'rifle' },     // armée moderne
+    ];
+    function drawTroops(t) {
+      if (!state || !state.site || !state.army) return;
+      const c = CAMP[state.site];
+      const groups = (state.troops && state.troops.length) ? state.troops : [{ era: state.era, n: state.army }];
+      const total = groups.reduce((a, g) => a + g.n, 0);
+      const figs = Math.min(36, total);
+      // les meilleures unités devant
+      const list = [];
+      groups.slice().sort((a, b) => b.era - a.era).forEach((g) => { const k = Math.max(1, Math.round(g.n / total * figs)); for (let i = 0; i < k; i++) list.push(g.era); });
+      list.length = Math.min(list.length, figs);
+      const cols = 6;
+      // terrain d'entraînement
+      ctx.fillStyle = 'rgba(160,130,80,.35)';
+      ctx.beginPath(); ctx.ellipse(c.x, c.y + 8, 30, 16 + Math.ceil(list.length / cols) * 2, 0, 0, Math.PI * 2); ctx.fill();
+      // véhicules de l'armée moderne
+      const modern = groups.find((g) => g.era === 5);
+      if (modern) for (let i = 0; i < Math.min(3, Math.ceil(modern.n / 10)); i++) {
+        const vx = c.x - 26 + i * 18, vy = c.y - 12;
+        ctx.fillStyle = '#4f6b3a'; ctx.fillRect(vx - 6, vy - 3, 12, 6);
+        ctx.fillStyle = '#3d5530'; ctx.fillRect(vx - 3, vy - 6, 6, 3);
+        ctx.strokeStyle = '#3d5530'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(vx + 3, vy - 4.5); ctx.lineTo(vx + 9, vy - 5); ctx.stroke();
+      }
+      // canon pour les mousquetaires
+      if (groups.find((g) => g.era === 3)) {
+        const vx = c.x + 30, vy = c.y + 4;
+        ctx.fillStyle = '#5a3a22'; ctx.beginPath(); ctx.arc(vx, vy, 2.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2b2b2b'; ctx.save(); ctx.translate(vx, vy - 1); ctx.rotate(-0.3); ctx.fillRect(0, -1.2, 9, 2.4); ctx.restore();
+      }
+      list.forEach((era, i) => {
+        const L = LOOK[era];
+        const x = c.x - 20 + (i % cols) * 8 + (Math.floor(i / cols) % 2) * 4;
+        const y = c.y + Math.floor(i / cols) * 6;
+        const step = Math.sin(t * 0.006 + i) * 0.4;
+        ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(x + 1, y + 0.5, 2.2, 0.9, 0, 0, Math.PI * 2); ctx.fill();
+        if (era === 2 && i % 3 === 0) {          // un chevalier à cheval
+          ctx.fillStyle = '#7a5530'; ctx.fillRect(x - 3.5, y - 4, 7, 3); ctx.fillRect(x + 3, y - 6, 2, 3);
+        }
+        ctx.fillStyle = L.body; ctx.fillRect(x - 1.6, y - 5 + step, 3.2, 5);
+        ctx.fillStyle = L.head; ctx.beginPath(); ctx.arc(x, y - 6.2 + step, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#3b2a18'; ctx.lineWidth = 0.7; ctx.beginPath();
+        if (L.gear === 'spear') { ctx.moveTo(x + 2.2, y); ctx.lineTo(x + 2.2, y - 11); }
+        else if (L.gear === 'sword') { ctx.strokeStyle = '#d7dde3'; ctx.moveTo(x + 2, y - 3); ctx.lineTo(x + 3.5, y - 8); }
+        else { ctx.strokeStyle = '#2b2b2b'; ctx.moveTo(x + 1.5, y - 2); ctx.lineTo(x + 3, y - 10); }
+        ctx.stroke();
+        if (L.gear === 'shield') { ctx.fillStyle = '#d9b44a'; ctx.fillRect(x - 3.6, y - 5, 2, 4); }
+      });
+    }
+
     /* --- drapeau planté au point de fondation --- */
     function drawFlag(t) {
       if (!state || !state.site) return;
@@ -789,6 +850,7 @@
         else ARCH[Engine.B[it.b.id].arch](ctx, it.b.x, it.b.y, t, state);
       }
       for (const sm of smoke) ell(ctx, sm.x, sm.y, sm.r, sm.r, `rgba(90,90,95,${sm.a})`);
+      drawTroops(t);
       drawFlag(t);
       drawMarkers(t);
       // nuages qui passent

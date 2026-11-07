@@ -94,10 +94,18 @@
       <h4>À qui déclarer la guerre ?</h4>
       <p>Il y a un voisin par ère. Le choix <b>Attaquer</b> vise toujours le voisin de votre ère actuelle :</p>
       <table>${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} ${er.name}</td><td>${er.enemy}</td></tr>`).join('')}</table>
+      <h4>Les soldats de chaque époque</h4>
+      <p>L'armée est à part : les soldats ne sont pas des villageois et ne font pas d'autre tâche. Ils mangent 1 🍖 pour 4 soldats par jour. Chaque soldat <b>garde les armes de l'époque où il a été recruté</b>.</p>
+      <table><tr><th>Ère</th><th>Unité</th><th>Armes</th><th>Force</th><th>Recrutement</th></tr>
+      ${E.UNITS.map((u) => `<tr><td>${ERA_ICON[u.era]}</td><td>${u.icon} <b>${u.name}</b></td><td>${u.weapon}</td><td>${String(u.power).replace('.', ',')} ⚔️</td><td>+${u.n} pour ${fmtCost(u.cost)}</td></tr>`).join('')}
+      </table>
+      <p><b>⚒️ Réarmer</b> : quand vous changez d'ère, vos anciens soldats restent faibles. Le choix « Réarmer les anciens soldats » leur donne les armes de l'ère actuelle (environ 60 % du prix d'une recrue, sans nourriture). Dans les batailles perdues, ce sont les soldats les plus mal armés qui tombent en premier.</p>
+      <p>Sur la carte, l'armée s'entraîne à côté du village, avec l'équipement de son époque (lances, boucliers, chevaux, canons, fusils, blindés).</p>
       <h4>Votre puissance</h4>
-      <p><b>Puissance ⚔️ = soldats × (1 + 0,5 par ère) + défense 🛡️.</b> La défense vient des villageois <b>gardes</b>, des remparts, du château, de certaines lois et de la métallurgie. La force de l'ennemi augmente <b>chaque jour</b> et à chaque ère.</p>
+      <p><b>Puissance ⚔️ = force de chaque soldat (selon ses armes) + défense 🛡️.</b> La défense vient des villageois <b>gardes</b>, des remparts, du château, de certaines lois et de la métallurgie. La force de l'ennemi augmente <b>chaque jour</b> et à chaque ère.</p>
       <h4>Les choix de guerre</h4>
-      <ul><li><b>🪖 Recruter</b> : ajoute des soldats. Ça coûte de la nourriture, puis de l'or, puis du fer à partir du Moyen Âge.</li>
+      <ul><li><b>Recruter</b> : ajoute des soldats de l'époque actuelle (voir le tableau).</li>
+      <li><b>⚒️ Réarmer</b> : donne les armes de l'époque actuelle aux anciens soldats.</li>
       <li><b>🧱 Fortifier</b> : ajoute de la défense pour toujours (palissade en bois, puis remparts de pierre, puis défenses en acier).</li>
       <li><b>🕊️ Traité de paix</b> : aucune invasion pendant 12 jours, et +3 😊.</li>
       <li><b>⚔️ Attaquer</b> : affiche vos chances de gagner. Il faut au moins un soldat.</li></ul>
