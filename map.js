@@ -645,14 +645,23 @@
         people.push({ x: p.x, y: p.y, tx: p.x, ty: p.y, c: COLORS[Math.floor(Math.random() * COLORS.length)], wait: Math.random() * 3000, pick });
       }
       if (people.length > want) people.length = want;
-      const k = state.pop ? want / state.pop : 0;
-      const nWood = Math.round(Math.min(state.forest || 0, state.pop) * k);
-      const nStone = Math.round(Math.min(state.quarry || 0, Math.max(0, state.pop - (state.forest || 0))) * k);
+      // les chasseurs vont plus loin dans la forêt, les gardes tournent autour du village
+      const hunt = trees.filter((t) => t.alive && vnorm(t.x, t.y) > 0.7 && vnorm(t.x, t.y) < 0.98);
+      const huntPick = () => {
+        if (!hunt.length || Math.random() < 0.2) return pick();
+        const t = hunt[Math.floor(Math.random() * hunt.length)];
+        return { x: t.x + 6, y: t.y + 4 };
+      };
+      const guardPick = () => { const a = Math.random() * Math.PI * 2, r = 60 + Math.random() * 30; return { x: o.x + Math.cos(a) * r, y: o.y + Math.sin(a) * r * 0.8 }; };
+      const PICK = { wood: woodPick, stone: stonePick, iron: stonePick, coal: stonePick, hunt: huntPick, guard: guardPick };
+      const vs = state.villagers || [];
       people.forEach((p, i) => {
         const was = p.job;
-        p.job = i < nWood ? 'wood' : i < nWood + nStone ? 'stone' : '';
-        p.lumber = p.job !== '';
-        p.pick = p.job === 'wood' ? woodPick : p.job === 'stone' ? stonePick : pick;
+        const v = vs[Math.floor(i * vs.length / Math.max(1, people.length))];
+        p.job = v ? v.job : 'idle';
+        if (v && v.hue != null) p.c = `hsl(${v.hue},65%,58%)`;
+        p.lumber = !!PICK[p.job];
+        p.pick = PICK[p.job] || pick;
         if (p.job !== was) { const n = p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 400; }
       });
     }
@@ -676,10 +685,20 @@
       ctx.fillStyle = p.c;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x - 1.6, p.y - 5, 3.2, 5, 1.5) : ctx.rect(p.x - 1.6, p.y - 5, 3.2, 5); ctx.fill();
       ctx.beginPath(); ctx.arc(p.x, p.y - 6.2, 1.5, 0, Math.PI * 2); ctx.fill();
-      if (p.job === 'stone') {
+      if (p.job === 'hunt') {
+        ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(p.x + 2.2, p.y); ctx.lineTo(p.x + 2.2, p.y - 10); ctx.stroke();
+        ctx.fillStyle = '#9aa3ad'; ctx.beginPath(); ctx.moveTo(p.x + 1.4, p.y - 10); ctx.lineTo(p.x + 3, p.y - 10); ctx.lineTo(p.x + 2.2, p.y - 12); ctx.fill();
+      } else if (p.job === 'guard') {
+        ctx.fillStyle = '#8a8f96'; ctx.beginPath(); ctx.arc(p.x, p.y - 6.6, 1.7, Math.PI, 0); ctx.fill();
+        ctx.fillStyle = '#b5523b'; ctx.fillRect(p.x - 3.4, p.y - 4.6, 2, 3);
+      } else if (p.job === 'iron' || p.job === 'coal') {
+        ctx.fillStyle = p.job === 'coal' ? '#2b2b2b' : '#a0643a'; ctx.fillRect(p.x - 1.8, p.y - 10.2, 3.6, 2.6);
+        ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(p.x, p.y - 7.2, 0.7, 0, Math.PI * 2); ctx.fill();
+      } else if (p.job === 'stone') {
         ctx.fillStyle = '#9ea3a8'; ctx.fillRect(p.x - 1.8, p.y - 10.2, 3.6, 2.6);
         ctx.fillStyle = '#c3c7cb'; ctx.fillRect(p.x - 1.8, p.y - 10.2, 3.6, 1);
-      } else if (p.lumber) {
+      } else if (p.job === 'wood') {
         ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 0.8;
         ctx.beginPath(); ctx.moveTo(p.x + 1.2, p.y - 3); ctx.lineTo(p.x + 3.4, p.y - 7.4); ctx.stroke();
         ctx.fillStyle = '#9aa3ad'; ctx.fillRect(p.x + 2.6, p.y - 8.2, 2, 1.6);

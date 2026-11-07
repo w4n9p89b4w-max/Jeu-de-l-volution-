@@ -44,19 +44,34 @@
 
     parts.push(sec('res', '🪵 Les ressources', `
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
-      <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, chasse, champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
-      <tr><td>🪵</td><td>Bois</td><td>Les <b>habitants envoyés en forêt</b> (bouton 🌲 en bas) : 1,5 🪵 chacun par jour, +0,5 avec les <i>Outils en pierre</i>, +0,5 avec la <i>Métallurgie du fer</i>, +1 avec la <i>Machine à vapeur</i>. Puis la scierie et les usines.</td></tr>
-      <tr><td>🪨</td><td>Pierre</td><td>Les <b>habitants qui ramassent des pierres</b> (bouton 🌲🪨) : 0,75 🪨 chacun par jour, +0,25 avec les <i>Outils en pierre</i>, +0,25 avec la <i>Métallurgie du fer</i>, +0,5 avec la <i>Machine à vapeur</i>. Puis la carrière, les tailleurs de pierre et la gare.</td></tr>
-      <tr><td>🔩</td><td>Fer</td><td>À partir du <b>Moyen Âge</b> : mine de fer (après <i>Métallurgie du fer</i>), haut-fourneau, recyclage.</td></tr>
-      <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
-      <tr><td>💰</td><td>Or</td><td>1 pour 12 habitants restés au village (ni en forêt, ni aux pierres), marchés, banques, gares, lois.</td></tr>
-      <tr><td>💡</td><td>Savoir</td><td>Base 1/jour + 1 pour 20 habitants restés au village, feu, temples, bibliothèques, universités…</td></tr></table>
-      <h4>👷 Le travail des habitants</h4>
-      <p>Au début, pas de bâtiment pour le bois ni la pierre : touchez <b>🌲 🪨</b> en bas de l'écran (ou les pastilles 🪵 et 🪨) et choisissez combien d'habitants partent <b>couper du bois</b> et combien partent <b>ramasser des pierres</b> au pied de la montagne. Ce n'est pas le choix du jour : vous pouvez le changer à tout moment. Sur la carte, les bûcherons ont une hache sur l'épaule et les ramasseurs portent une pierre.</p>
-      <p><span class="g">Bonus</span> : du bois et de la pierre chaque jour. <span class="b">Malus</span> : les travailleurs ne rapportent plus d'or ni de savoir.</p>
+      <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, villageois à la <b>chasse</b> 🏹, camp de chasse, champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
+      <tr><td>🪵</td><td>Bois</td><td>Les villageois <b>bûcherons</b> 🌲, puis la scierie et les usines.</td></tr>
+      <tr><td>🪨</td><td>Pierre</td><td>Les villageois aux <b>pierres</b> 🪨, puis la carrière, les tailleurs de pierre et la gare.</td></tr>
+      <tr><td>🔩</td><td>Fer</td><td>À partir du <b>Moyen Âge</b> : villageois <b>mineurs de fer</b> ⛏️, mine de fer (après <i>Métallurgie du fer</i>), haut-fourneau, recyclage.</td></tr>
+      <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : villageois <b>mineurs de charbon</b> ⚫, mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
+      <tr><td>💰</td><td>Or</td><td>Villageois <b>marchands</b> 💰, 1 pour 12 villageois sans tâche, marchés, banques, gares, lois.</td></tr>
+      <tr><td>💡</td><td>Savoir</td><td>Base 1/jour, villageois <b>savants</b> 💡, 1 pour 20 villageois sans tâche, feu, temples, bibliothèques, universités…</td></tr></table>
       <h4>🪨 Ouvrir une carrière</h4>
       <p>Quand vous découvrez les <b>Outils en pierre</b>, le jeu vous propose d'ouvrir une carrière (A : l'ouvrir tout de suite pour du bois, B : plus tard). Elle produit +4 🪨/jour en plus des ramasseurs. Si vous dites « plus tard », elle reste disponible dans 🏠 Constructions.</p>
       <p>Carrières et mines s'installent au pied des montagnes.</p>`));
+
+    const J = E.JB;
+    parts.push(sec('villageois', '👷 Les villageois et leurs tâches', `
+      <p>Chaque habitant est une personne avec un <b>nom</b>, une <b>force</b> et une <b>faiblesse</b>. Touchez <b>👷 Villageois</b> en bas de l'écran (ou une pastille de ressource) pour voir tout le monde et donner une tâche à chacun. Ce n'est pas le choix du jour : vous pouvez changer quand vous voulez.</p>
+      <table><tr><th>Tâche</th><th>Rapporte (par villageois et par jour)</th><th>Disponible</th></tr>
+      ${E.JOBS.map((j) => `<tr><td>${j.icon} <b>${j.name}</b></td><td>${j.id === 'idle' ? '1 💰 pour 12 et 1 💡 pour 20 villageois sans tâche' : `${String(j.base).replace('.', ',')} ${j.res === 'def' ? '🛡️ (plus à chaque ère)' : I[j.res]}`}<br><small>${j.desc}</small></td><td>${j.lock || 'Dès le début'}</td></tr>`).join('')}
+      </table>
+      <p>Des découvertes augmentent ces rendements : le feu pour la chasse, les outils, la métallurgie et la vapeur pour le bois et la pierre, l'écriture, l'imprimerie et l'informatique pour les savants, la monnaie et la lettre de change pour les marchands…</p>
+      <h4>Forces et faiblesses</h4>
+      <p>Chaque villageois est <span class="g">doué pour une tâche (×1,6)</span> et <span class="b">mauvais dans une autre (×0,5)</span>. Dans la liste, chaque tâche affiche ce que la personne rapporterait : 💪 marque sa force, 🐌 sa faiblesse.</p>
+      <table><tr><th>Tâche</th><th>💪 Force</th><th>🐌 Faiblesse</th></tr>
+      ${Object.keys(E.STRONG).map((k) => `<tr><td>${J[k].icon} ${J[k].name}</td><td>${E.STRONG[k]}</td><td>${E.WEAK[k]}</td></tr>`).join('')}
+      </table>
+      <h4>Expérience</h4>
+      <p>Chaque jour passé à la même tâche ajoute +2 % de rendement dans cette tâche, jusqu'à +30 %. L'expérience est gardée si la personne change de tâche puis revient.</p>
+      <h4>Nouveaux villageois</h4>
+      <p>Quand la population grandit, les nouveaux venus se mettent d'eux-mêmes à la tâche où ils sont les meilleurs (si elle est disponible). Le bouton <b>✨ Répartir automatiquement</b> place tout le monde selon les besoins du pays et les forces de chacun. La pastille rouge sur 👷 indique les villageois sans tâche.</p>
+      <p>Les soldats 🪖 sont à part : ils ne comptent pas parmi les villageois.</p>`));
 
     parts.push(sec('peuple', '👤 Population et bonheur', `
       <ul><li><b>Croissance</b> : chaque nuit, la population grandit d'environ 7 % (au moins 1 habitant) s'il reste de la nourriture, s'il y a de la place 🏠 et si le bonheur est d'au moins 25 %.</li>
@@ -76,7 +91,7 @@
       <p>Il y a un voisin par ère. Le choix <b>Attaquer</b> vise toujours le voisin de votre ère actuelle :</p>
       <table>${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} ${er.name}</td><td>${er.enemy}</td></tr>`).join('')}</table>
       <h4>Votre puissance</h4>
-      <p><b>Puissance ⚔️ = soldats × (1 + 0,5 par ère) + défense 🛡️.</b> La défense vient des remparts, du château, de certaines lois et de la métallurgie. La force de l'ennemi augmente <b>chaque jour</b> et à chaque ère.</p>
+      <p><b>Puissance ⚔️ = soldats × (1 + 0,5 par ère) + défense 🛡️.</b> La défense vient des villageois <b>gardes</b>, des remparts, du château, de certaines lois et de la métallurgie. La force de l'ennemi augmente <b>chaque jour</b> et à chaque ère.</p>
       <h4>Les choix de guerre</h4>
       <ul><li><b>🪖 Recruter</b> : ajoute des soldats. Ça coûte de la nourriture, puis de l'or, puis du fer à partir du Moyen Âge.</li>
       <li><b>🧱 Fortifier</b> : ajoute de la défense pour toujours (palissade en bois, puis remparts de pierre, puis défenses en acier).</li>
@@ -113,7 +128,7 @@
       <li>📖 <b>Journal</b> : l'histoire de votre pays jour après jour (vous pouvez aussi toucher le nom du pays).</li>
       <li>⚙️ : recommencer une partie. La partie est sauvegardée automatiquement chaque nuit, dans ce navigateur.</li></ul>`));
 
-    const nav = [['but', 'But'], ['jour', 'Journée'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
+    const nav = [['but', 'But'], ['jour', 'Journée'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['villageois', 'Villageois'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
     return { nav, html: parts.join('') };
   }
 

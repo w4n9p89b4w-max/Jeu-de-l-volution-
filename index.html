@@ -40,7 +40,7 @@
       <button class="tile" data-cat="tech"><span class="tile-ico">💡</span><span>DÉCOUVERTES</span><i class="badge"></i></button>
     </div>
     <div class="dock-row">
-      <button class="small" id="bForest" aria-label="Travail des habitants">🌲 <span id="forestN">2</span> 🪨 <span id="quarryN">1</span></button>
+      <button class="small" id="bForest" aria-label="Les villageois">👷 Villageois<i class="badge" id="idleN"></i></button>
       <button class="small" id="bRest">😴 Repos</button>
       <button class="small" id="bLog" aria-label="Journal">📖</button>
       <button class="small" id="bHelp">📘 Règles</button>
@@ -98,6 +98,14 @@
 
   <div id="night"><span id="nightText"></span></div>
   <div id="toast"></div>
+
+  <!-- Les villageois et leurs tâches -->
+  <section id="people" hidden>
+    <div class="rules-head"><h2>👷 Les villageois</h2><button class="round" id="peopleClose" aria-label="Fermer">✕</button></div>
+    <div id="jobSummary"></div>
+    <div class="people-bar"><span id="peopleSub"></span><button class="small" id="bAuto">✨ Répartir automatiquement</button></div>
+    <div id="peopleList"></div>
+  </section>
 
   <!-- Annexe : règles du jeu -->
   <section id="rules" hidden>

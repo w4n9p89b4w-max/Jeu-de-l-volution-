@@ -77,29 +77,29 @@
 
   /* ---------- Découvertes (3 par ère : les 3 = ère suivante) ---------- */
   const DISCOVERIES = [
-    { id: 'feu', era: 0, name: 'Maîtrise du feu', icon: '🔥', cost: 5, eff: { happy: 5, food: 1 }, desc: 'Cuire, se chauffer, éloigner les bêtes.' },
-    { id: 'outils', era: 0, name: 'Outils en pierre', icon: '🪓', cost: 8, eff: { wood: 1, stone: 1 }, desc: 'Silex taillé. Débloque la Carrière.' },
-    { id: 'agriculture', era: 0, name: 'Agriculture', icon: '🌱', cost: 12, eff: { food: 3 }, desc: 'Planter des graines plutôt que les chercher.' },
+    { id: 'feu', era: 0, name: 'Maîtrise du feu', icon: '🔥', cost: 8, eff: { happy: 5, food: 1 }, desc: 'Cuire, se chauffer, éloigner les bêtes.' },
+    { id: 'outils', era: 0, name: 'Outils en pierre', icon: '🪓', cost: 13, eff: { wood: 1, stone: 1 }, desc: 'Silex taillé. Débloque la Carrière.' },
+    { id: 'agriculture', era: 0, name: 'Agriculture', icon: '🌱', cost: 19, eff: { food: 3 }, desc: 'Planter des graines plutôt que les chercher.' },
 
-    { id: 'ecriture', era: 1, name: 'Écriture', icon: '✍️', cost: 20, eff: { sci: 2 }, desc: 'Garder la mémoire des choses.' },
-    { id: 'roue', era: 1, name: 'La roue', icon: '☸️', cost: 25, eff: { wood: 2, stone: 2 }, desc: 'Transporter plus, plus loin.' },
-    { id: 'monnaie', era: 1, name: 'Monnaie', icon: '🪙', cost: 30, eff: { gold: 3 }, desc: 'Des pièces pour commercer.' },
+    { id: 'ecriture', era: 1, name: 'Écriture', icon: '✍️', cost: 32, eff: { sci: 2 }, desc: 'Garder la mémoire des choses.' },
+    { id: 'roue', era: 1, name: 'La roue', icon: '☸️', cost: 41, eff: { wood: 2, stone: 2 }, desc: 'Transporter plus, plus loin.' },
+    { id: 'monnaie', era: 1, name: 'Monnaie', icon: '🪙', cost: 48, eff: { gold: 3 }, desc: 'Des pièces pour commercer.' },
 
-    { id: 'metal', era: 2, name: 'Métallurgie du fer', icon: '⚒️', cost: 40, eff: { iron: 1, def: 10 }, desc: 'Fondre le minerai. Débloque la Mine de fer.' },
-    { id: 'assolement', era: 2, name: 'Assolement triennal', icon: '🌾', cost: 50, eff: { food: 8 }, desc: 'Faire tourner les cultures.' },
-    { id: 'boussole', era: 2, name: 'Boussole', icon: '🧭', cost: 55, eff: { gold: 5 }, desc: 'Naviguer et commercer au loin.' },
+    { id: 'metal', era: 2, name: 'Métallurgie du fer', icon: '⚒️', cost: 65, eff: { iron: 1, def: 10 }, desc: 'Fondre le minerai. Débloque la Mine de fer.' },
+    { id: 'assolement', era: 2, name: 'Assolement triennal', icon: '🌾', cost: 82, eff: { food: 8 }, desc: 'Faire tourner les cultures.' },
+    { id: 'boussole', era: 2, name: 'Boussole', icon: '🧭', cost: 89, eff: { gold: 5 }, desc: 'Naviguer et commercer au loin.' },
 
-    { id: 'imprimerie', era: 3, name: 'Imprimerie', icon: '📰', cost: 70, eff: { sci: 6 }, desc: 'Des livres pour tout le monde.' },
-    { id: 'astronomie', era: 3, name: 'Astronomie', icon: '🔭', cost: 85, eff: { sci: 4, happy: 3 }, desc: 'La Terre tourne autour du Soleil !' },
-    { id: 'change', era: 3, name: 'Lettre de change', icon: '📜', cost: 95, eff: { gold: 8 }, desc: 'L\'ancêtre du chèque.' },
+    { id: 'imprimerie', era: 3, name: 'Imprimerie', icon: '📰', cost: 113, eff: { sci: 6 }, desc: 'Des livres pour tout le monde.' },
+    { id: 'astronomie', era: 3, name: 'Astronomie', icon: '🔭', cost: 138, eff: { sci: 4, happy: 3 }, desc: 'La Terre tourne autour du Soleil !' },
+    { id: 'change', era: 3, name: 'Lettre de change', icon: '📜', cost: 154, eff: { gold: 8 }, desc: 'L\'ancêtre du chèque.' },
 
-    { id: 'vapeur', era: 4, name: 'Machine à vapeur', icon: '⚙️', cost: 120, eff: { coal: 6, iron: 6 }, desc: 'La force du charbon pompe l\'eau des mines.' },
-    { id: 'electricite', era: 4, name: 'Électricité', icon: '💡', cost: 140, eff: { gold: 10, happy: 5 }, desc: 'La lumière dans chaque maison.' },
-    { id: 'vaccins', era: 4, name: 'Vaccins', icon: '💉', cost: 160, eff: { happy: 8 }, desc: 'Fini les grandes épidémies.' },
+    { id: 'vapeur', era: 4, name: 'Machine à vapeur', icon: '⚙️', cost: 194, eff: { coal: 6, iron: 6 }, desc: 'La force du charbon pompe l\'eau des mines.' },
+    { id: 'electricite', era: 4, name: 'Électricité', icon: '💡', cost: 227, eff: { gold: 10, happy: 5 }, desc: 'La lumière dans chaque maison.' },
+    { id: 'vaccins', era: 4, name: 'Vaccins', icon: '💉', cost: 259, eff: { happy: 8 }, desc: 'Fini les grandes épidémies.' },
 
-    { id: 'informatique', era: 5, name: 'Informatique', icon: '💻', cost: 180, eff: { sci: 20 }, desc: 'Des machines qui calculent.' },
-    { id: 'internet', era: 5, name: 'Internet', icon: '🌐', cost: 210, eff: { gold: 20, happy: 5 }, desc: 'Le monde entier connecté.' },
-    { id: 'espace', era: 5, name: 'Conquête spatiale', icon: '🛰️', cost: 250, eff: {}, desc: 'Débloque la Base spatiale.' },
+    { id: 'informatique', era: 5, name: 'Informatique', icon: '💻', cost: 292, eff: { sci: 20 }, desc: 'Des machines qui calculent.' },
+    { id: 'internet', era: 5, name: 'Internet', icon: '🌐', cost: 341, eff: { gold: 20, happy: 5 }, desc: 'Le monde entier connecté.' },
+    { id: 'espace', era: 5, name: 'Conquête spatiale', icon: '🛰️', cost: 406, eff: {}, desc: 'Débloque la Base spatiale.' },
   ];
 
   /* ---------- Lois (adoptées une fois, effet permanent) ---------- */
@@ -136,7 +136,7 @@
   function newState(name, flag) {
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
-      day: 1, era: 0, pop: 5, forest: 2, quarry: 1, happy: 60, army: 0, fort: 0, peaceUntil: 0,
+      day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, fort: 0, peaceUntil: 0,
       res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 },
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
@@ -146,13 +146,14 @@
   // Mettre à jour une ancienne sauvegarde (version « matériaux »)
   function migrate(s) {
     if (!s) return s;
-    if (s.forest == null) {
-      // le camp de bûcherons n'existe plus : ses ouvriers partent en forêt
-      const camps = s.buildings.filter((b) => b.id === 'bucheron').length;
-      s.buildings = s.buildings.filter((b) => b.id !== 'bucheron');
-      s.forest = Math.min(s.pop, 2 + camps * 2);
+    s.buildings = s.buildings.filter((b) => b.id !== 'bucheron');   // le camp de bûcherons n'existe plus
+    if (!s.villagers) {
+      // ancienne sauvegarde : on crée les villageois et on les répartit
+      s.villagers = []; s.nextId = 1;
+      syncVillagers(s);
+      autoAssign(s);
     }
-    if (s.quarry == null) s.quarry = Math.min(Math.max(0, s.pop - s.forest), Math.max(1, Math.round(s.pop * 0.1)));
+    delete s.forest; delete s.quarry;
     if (s.v === 2) return s;
     const mat = s.res.mat || 0;
     s.res = { food: s.res.food || 0, wood: Math.round(mat * 0.6), stone: Math.round(mat * 0.4), iron: s.era >= 2 ? 10 : 0, coal: s.era >= 3 ? 10 : 0, gold: s.res.gold || 0, sci: s.res.sci || 0 };
@@ -177,7 +178,7 @@
 
   const count = (s, id) => s.buildings.filter((b) => b.id === id).length;
   const capacity = (s) => 5 + totals(s).cap;
-  const power = (s) => Math.round(s.army * (1 + s.era * 0.5) + totals(s).def);
+  const power = (s) => Math.round(s.army * (1 + s.era * 0.5) + totals(s).def + jobOutput(s).def);
   const enemyStrength = (s) => Math.round(4 + s.day * 0.6 * (1 + s.era * 0.6));
 
   // Les ressources visibles dans l'interface
@@ -203,25 +204,131 @@
     return Object.keys(cost).filter((r) => (s.res[r] || 0) < cost[r]).map((r) => RES_NAMES[r].toLowerCase());
   }
 
-  /* ---------- Les habitants en forêt ---------- */
-  // Chaque habitant envoyé en forêt rapporte du bois, mais ne rapporte
-  // plus d'or, de pierre ni de savoir.
-  function woodPerWorker(s) {
-    return 1.5 + (s.disc.includes('outils') ? 0.5 : 0) + (s.disc.includes('metal') ? 0.5 : 0) + (s.disc.includes('vapeur') ? 1 : 0);
+  /* ==========================================================================
+     LES VILLAGEOIS : chacun a un nom, une force, une faiblesse et une tâche
+     ========================================================================== */
+  const JOBS = [
+    { id: 'idle', name: 'Au village', icon: '🏡', res: null, desc: 'Sans tâche : rapporte un peu d\'or et de savoir.' },
+    { id: 'hunt', name: 'Chasse et cueillette', icon: '🏹', res: 'food', base: 2, desc: 'Gibier, baies et racines.' },
+    { id: 'wood', name: 'Bûcheron', icon: '🌲', res: 'wood', base: 1.5, desc: 'Couper du bois dans la forêt.' },
+    { id: 'stone', name: 'Pierres', icon: '🪨', res: 'stone', base: 0.75, desc: 'Ramasser et tailler la pierre au pied de la montagne.' },
+    { id: 'iron', name: 'Mineur de fer', icon: '⛏️', res: 'iron', base: 0.3, req: (s) => s.disc.includes('metal'), lock: 'Après la Métallurgie du fer', desc: 'Extraire le minerai de la montagne.' },
+    { id: 'coal', name: 'Mineur de charbon', icon: '⚫', res: 'coal', base: 0.3, req: (s) => s.era >= 3, lock: 'À partir de la Renaissance', desc: 'Descendre dans les galeries de charbon.' },
+    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.2, desc: 'Observer, réfléchir, inventer.' },
+    { id: 'trade', name: 'Marchand', icon: '💰', res: 'gold', base: 0.3, req: (s) => s.era >= 1, lock: 'À partir de l\'Antiquité', desc: 'Vendre et acheter avec les voisins.' },
+    { id: 'guard', name: 'Garde', icon: '🛡️', res: 'def', base: 1.5, desc: 'Surveiller la vallée (défense).' },
+  ];
+  const JB = byId(JOBS);
+  const WORK = JOBS.filter((j) => j.id !== 'idle').map((j) => j.id);
+  // Forces et faiblesses, selon la tâche
+  const STRONG = { hunt: 'Œil de lynx', wood: 'Bras solides', stone: 'Dos solide', iron: 'Endurance', coal: 'Pas peur du noir', sage: 'Esprit vif', trade: 'Beau parleur', guard: 'Courage' };
+  const WEAK = { hunt: 'Pas discret', wood: 'Mains fragiles', stone: 'Dos fragile', iron: 'Souffle court', coal: 'Peur du noir', sage: 'Tête en l\'air', trade: 'Timidité', guard: 'Peur des combats' };
+  const STRONG_X = 1.6, WEAK_X = 0.5, XP_MAX = 0.3, XP_DAY = 0.02;
+  const NAMES = ['Ako', 'Bria', 'Doran', 'Elka', 'Fenn', 'Gorm', 'Hala', 'Iko', 'Jora', 'Kali', 'Loa', 'Mako', 'Nura', 'Oki', 'Pia', 'Rok', 'Sila', 'Tao', 'Uma', 'Vik', 'Wenn', 'Yara', 'Zek', 'Arn', 'Bela', 'Cian', 'Dara', 'Eno', 'Fala', 'Gaïa', 'Hugo', 'Ilia', 'Jade', 'Kem', 'Lina', 'Milo', 'Nael', 'Opale', 'Paz', 'Quinn', 'Rena', 'Sacha', 'Timo', 'Ulla', 'Vala', 'Willa', 'Xan', 'Yanis', 'Zoé', 'Alix', 'Basile', 'Céleste', 'Dany', 'Eden', 'Flo', 'Gabin', 'Hélie', 'Isis', 'Jules', 'Kenzo', 'Léo', 'Maé', 'Nino', 'Olia', 'Pablo', 'Rosa', 'Sven', 'Tessa', 'Ugo', 'Vera', 'Wendy', 'Yuna', 'Zia', 'Anouk', 'Brune', 'Cyan', 'Dimi', 'Enzo', 'Fanny', 'Gwen', 'Hiro', 'Inès', 'Joss', 'Kaïs', 'Lou', 'Mila', 'Noa', 'Oscar', 'Pépin', 'Rémi', 'Suzon', 'Tilio', 'Vadim', 'Yaël'];
+
+  function makeVillager(s, rng) {
+    const used = new Set(s.villagers.map((v) => v.name));
+    let name = NAMES[Math.floor(rng() * NAMES.length)];
+    for (let i = 0; used.has(name) && i < 30; i++) name = NAMES[Math.floor(rng() * NAMES.length)];
+    if (used.has(name)) { let n = 2; while (used.has(`${name} ${toRoman(n)}`)) n++; name = `${name} ${toRoman(n)}`; }
+    const strong = WORK[Math.floor(rng() * WORK.length)];
+    let weak = strong;
+    while (weak === strong) weak = WORK[Math.floor(rng() * WORK.length)];
+    return { id: s.nextId++, name, strong, weak, job: 'idle', xp: {}, hue: Math.floor(rng() * 360) };
   }
-  // Ramasser des pierres au pied de la montagne : plus lent que le bois
-  function stonePerWorker(s) {
-    return 0.75 + (s.disc.includes('outils') ? 0.25 : 0) + (s.disc.includes('metal') ? 0.25 : 0) + (s.disc.includes('vapeur') ? 0.5 : 0);
+  function toRoman(n) { return ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][n] || String(n); }
+
+  const jobOpen = (s, j) => !JB[j].req || JB[j].req(s);
+  // Rendement de base d'une tâche (avant force/faiblesse et expérience)
+  function jobBase(s, j) {
+    const d = (x) => s.disc.includes(x);
+    const b = JB[j].base || 0;
+    if (j === 'hunt') return b + (d('feu') ? 0.5 : 0);
+    if (j === 'wood') return b + (d('outils') ? 0.5 : 0) + (d('metal') ? 0.5 : 0) + (d('vapeur') ? 1 : 0);
+    if (j === 'stone') return b + (d('outils') ? 0.25 : 0) + (d('metal') ? 0.25 : 0) + (d('vapeur') ? 0.5 : 0);
+    if (j === 'iron' || j === 'coal') return b + (d('vapeur') ? 0.6 : 0) + (d('electricite') ? 0.4 : 0);
+    if (j === 'sage') return b + (d('ecriture') ? 0.25 : 0) + (d('imprimerie') ? 0.5 : 0) + (d('informatique') ? 1 : 0);
+    if (j === 'trade') return b + (d('monnaie') ? 0.4 : 0) + (d('change') ? 0.6 : 0);
+    if (j === 'guard') return b * (1 + s.era * 0.5);
+    return b;
   }
-  const foresters = (s) => Math.max(0, Math.min(s.forest || 0, s.pop));
-  const quarriers = (s) => Math.max(0, Math.min(s.quarry || 0, s.pop - foresters(s)));
-  // job : 'forest' ou 'quarry'. Le total des ouvriers ne dépasse pas la population.
-  function setJob(s, job, n) {
-    const other = job === 'forest' ? (s.quarry || 0) : (s.forest || 0);
-    s[job] = Math.max(0, Math.min(s.pop - other, Math.round(n)));
-    return s[job];
+  const traitMult = (v, j) => (v.strong === j ? STRONG_X : v.weak === j ? WEAK_X : 1);
+  const xpBonus = (v, j) => Math.min(XP_MAX, ((v.xp && v.xp[j]) || 0) * XP_DAY);
+  // Ce qu'un villageois rapporterait par jour dans une tâche (sans le bonheur)
+  function yieldOf(s, v, j) {
+    if (j === 'idle' || !jobOpen(s, j)) return 0;
+    return jobBase(s, j) * traitMult(v, j) * (1 + xpBonus(v, j));
   }
-  const setForest = (s, n) => setJob(s, 'forest', n);
+  // Total produit par les villageois, par ressource
+  function jobOutput(s) {
+    const out = { food: 0, wood: 0, stone: 0, iron: 0, coal: 0, sci: 0, gold: 0, def: 0, idle: 0, count: {} };
+    for (const j of JOBS) out.count[j.id] = 0;
+    for (const v of s.villagers || []) {
+      const j = jobOpen(s, v.job) ? v.job : 'idle';
+      out.count[j]++;
+      if (j === 'idle') out.idle++;
+      else out[JB[j].res] += yieldOf(s, v, j);
+    }
+    return out;
+  }
+
+  // Garder autant de villageois que d'habitants
+  function syncVillagers(s, rng) {
+    rng = rng || Math.random;
+    if (!s.villagers) s.villagers = [];
+    if (!s.nextId) s.nextId = 1;
+    const born = [];
+    while (s.villagers.length < s.pop) {
+      const v = makeVillager(s, rng);
+      // un nouveau venu se met à ce qu'il fait le mieux, si c'est possible
+      v.job = jobOpen(s, v.strong) ? v.strong : 'idle';
+      s.villagers.push(v); born.push(v);
+    }
+    while (s.villagers.length > s.pop) s.villagers.splice(Math.floor(rng() * s.villagers.length), 1);
+    for (const v of s.villagers) if (!jobOpen(s, v.job)) v.job = 'idle';
+    return born;
+  }
+  function assign(s, id, job) {
+    const v = s.villagers.find((x) => x.id === id);
+    if (!v || !JB[job] || !jobOpen(s, job)) return false;
+    v.job = job;
+    return true;
+  }
+
+  // Répartition automatique : selon les besoins, puis chacun là où il est le meilleur
+  function autoAssign(s) {
+    syncVillagers(s);
+    const n = s.villagers.length;
+    for (const v of s.villagers) v.job = 'idle';
+    const t = totals(s);
+    const mult = 0.75 + s.happy / 200;
+    const lake = s.site === 'lac', river = s.site === 'riviere';
+    const foodFixed = (3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult;
+    const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed;
+    const want = {};
+    want.hunt = Math.max(0, Math.ceil(foodNeed / (jobBase(s, 'hunt') * mult)));
+    const share = s.era < 2
+      ? { wood: 0.35, stone: 0.25, sage: 0.15, trade: 0.1, guard: 0.05 }
+      : s.era < 4
+        ? { wood: 0.2, stone: 0.2, iron: 0.15, coal: 0.1, sage: 0.15, trade: 0.1, guard: 0.05 }
+        : { wood: 0.12, stone: 0.18, iron: 0.2, coal: 0.12, sage: 0.18, trade: 0.12, guard: 0.05 };
+    if (power(s) < enemyStrength(s) * 0.7) share.guard = (share.guard || 0) + 0.08;
+    const rest = Math.max(0, n - want.hunt);
+    let open = Object.keys(share).filter((j) => jobOpen(s, j));
+    const tot = open.reduce((a, j) => a + share[j], 0) || 1;
+    for (const j of open) want[j] = Math.floor(rest * share[j] / tot);
+    let left = n - Object.values(want).reduce((a, b) => a + b, 0);
+    for (let i = 0; left > 0 && open.length; i++, left--) want[open[i % open.length]]++;
+    // les meilleurs d'abord
+    const pairs = [];
+    for (const v of s.villagers) for (const j in want) if (want[j] > 0) pairs.push({ v, j, y: traitMult(v, j) * (1 + xpBonus(v, j)) });
+    pairs.sort((a, b) => b.y - a.y);
+    const done = new Set();
+    for (const p of pairs) {
+      if (done.has(p.v.id) || want[p.j] <= 0) continue;
+      p.v.job = p.j; want[p.j]--; done.add(p.v.id);
+    }
+  }
 
   /* ---------- Prévisions de la journée ---------- */
   function forecast(s) {
@@ -229,20 +336,19 @@
     const mult = 0.75 + s.happy / 200;
     const lake = s.site === 'lac', river = s.site === 'riviere';
     const prod = (base, v) => Math.round((base + v) * (base + v > 0 ? mult : 1));
-    const foodProd = Math.round((3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
+    const foodProd = Math.round((3 + t.food + jobOutput(s).food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
     const foodCons = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4);
-    const fo = foresters(s), qw = quarriers(s), free = s.pop - fo - qw;
+    const jo = jobOutput(s), free = jo.idle;
     const f = {
       food: foodProd - foodCons, foodProd, foodCons,
-      wood: prod(fo * woodPerWorker(s), t.wood),
-      stone: prod(qw * stonePerWorker(s), t.stone),
-      iron: prod(0, t.iron),
-      coal: prod(0, t.coal),
-      gold: prod(Math.floor(free / 12) + (lake ? 2 : 0), t.gold),
-      sci: prod(1 + Math.floor(free / 20), t.sci),
+      wood: prod(jo.wood, t.wood),
+      stone: prod(jo.stone, t.stone),
+      iron: prod(jo.iron, t.iron),
+      coal: prod(jo.coal, t.coal),
+      gold: prod(Math.floor(free / 12) + jo.gold + (lake ? 2 : 0), t.gold),
+      sci: prod(1 + Math.floor(free / 20) + jo.sci, t.sci),
     };
-    f.forest = fo; f.perWorker = woodPerWorker(s);
-    f.quarry = qw; f.stonePer = stonePerWorker(s); f.free = free;
+    f.jobs = jo; f.free = free; f.mult = mult;
     f.cap = 5 + t.cap;
     let target = 50 + t.happy;
     if (s.pop >= f.cap) target -= 5;
@@ -646,8 +752,20 @@
   const api = {
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
-    known, dilemmaView, choose, setForest, setJob, woodPerWorker, stonePerWorker, buildCost, canPay,
+    known, dilemmaView, choose, buildCost, canPay,
+    JOBS, JB, STRONG, WEAK, STRONG_X, WEAK_X, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
   };
+  // Après chaque action, les villageois suivent la population
+  api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };
+  api.choose = (s, ...rest) => { const r = choose(s, ...rest); syncVillagers(s); return r; };
+  api.endDay = (s, rng) => {
+    syncVillagers(s, rng);
+    for (const v of s.villagers) if (v.job !== 'idle') { v.xp[v.job] = Math.min(XP_MAX / XP_DAY, (v.xp[v.job] || 0) + 1); }
+    const rep = endDay(s, rng);
+    rep.born = syncVillagers(s, rng).map((v) => ({ name: v.name, job: v.job }));
+    return rep;
+  };
+  api.newState = (...a) => { const st = newState(...a); syncVillagers(st); autoAssign(st); return st; };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

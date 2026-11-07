@@ -151,10 +151,8 @@
     if (state.pop > lastPop) { hp.classList.remove('bump'); void hp.offsetWidth; hp.classList.add('bump'); }
     lastPop = state.pop;
     $('hName').textContent = state.name;
-    if (state.forest > state.pop) state.forest = state.pop;
-    if (state.forest + state.quarry > state.pop) state.quarry = Math.max(0, state.pop - state.forest);
-    $('forestN').textContent = state.forest;
-    $('quarryN').textContent = state.quarry;
+    const idle = (state.villagers || []).filter((v) => v.job === 'idle').length;
+    $('idleN').textContent = idle || '';
     const era = E.ERAS[state.era];
     $('hEra').textContent = `${era.name} · ${era.year}`;
     const d = (v) => v > 0 ? `<i class="up">+${v}</i>` : v < 0 ? `<i class="down">${v}</i>` : '';
@@ -257,7 +255,8 @@
     const d = rep.delta;
     const pd = rep.popDelta;
     const part = (v, i) => `${v >= 0 ? '+' : ''}${v}${i}`;
-    toast(`Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
+    const born = (rep.born || []).map((b) => `${b.name} ${E.JB[b.job].icon}`);
+    toast(`${born.length ? `Bienvenue à ${born.slice(0, 3).join(', ')}${born.length > 3 ? ` et ${born.length - 3} autres` : ''} !<br>` : ''}Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
     save();
     for (const ev of rep.events) {
       await wait(350);
@@ -333,39 +332,68 @@
     });
   }
 
-  /* ---------- Le travail des habitants : forêt et pierres ---------- */
-  function openForest() {
+  /* ---------- Les villageois : qui fait quoi ---------- */
+  const RES_OF = (j) => (j.res === 'def' ? '🛡️' : E.RES_ICONS[j.res]);
+  const num = (x) => (Math.round(x * 10) / 10).toString().replace('.', ',');
+  let jobFilter = 'all';
+  function openForest(filter) {
     if (!state || busy) return;
-    const hasQuarry = state.buildings.some((b) => b.id === 'carriere');
-    modal({
-      icon: '👷', title: 'Le travail des habitants',
-      html: `<p>Qui part travailler hors du village ? Ce n'est pas le choix du jour : changez-le quand vous voulez.</p>
-        <div class="job"><span class="jl">🌲 Couper du bois</span>
-          <div class="stepper"><button class="round" id="fMinus" aria-label="Moins de bûcherons">−</button><b id="fVal"></b><button class="round" id="fPlus" aria-label="Plus de bûcherons">+</button></div>
-          <span class="jg" id="fGain"></span></div>
-        <div class="job"><span class="jl">🪨 ${hasQuarry ? 'Travailler à la carrière' : 'Ramasser des pierres'}</span>
-          <div class="stepper"><button class="round" id="qMinus" aria-label="Moins de ramasseurs">−</button><b id="qVal"></b><button class="round" id="qPlus" aria-label="Plus de ramasseurs">+</button></div>
-          <span class="jg" id="qGain"></span></div>
-        <p id="fInfo" class="finfo"></p>`,
-      buttons: [{ label: 'C\'est parti !', value: true, primary: true }],
-    }).then(() => { save(); map.syncPeople(); });
-    const refresh = () => {
-      const f = E.forecast(state);
-      $('fVal').textContent = state.forest;
-      $('qVal').textContent = state.quarry;
-      $('fGain').innerHTML = `<span class="g">+${f.wood} 🪵/jour</span> <small>(${String(f.perWorker).replace('.', ',')} par bûcheron)</small>`;
-      $('qGain').innerHTML = `<span class="g">+${f.stone} 🪨/jour</span> <small>(${String(f.stonePer).replace('.', ',')} par ramasseur${hasQuarry ? ' + la carrière' : ''})</small>`;
-      $('fInfo').innerHTML = `<span class="b">Les travailleurs ne rapportent ni 💰 ni 💡.</span><br>
-        Restent au village : <b>${f.free} 👤</b> → ${f.gold} 💰 · ${f.sci} 💡 par jour`;
-      updateHUD();
-      map.syncPeople();
-    };
-    $('fMinus').onclick = () => { E.setJob(state, 'forest', state.forest - 1); refresh(); };
-    $('fPlus').onclick = () => { E.setJob(state, 'forest', state.forest + 1); refresh(); };
-    $('qMinus').onclick = () => { E.setJob(state, 'quarry', state.quarry - 1); refresh(); };
-    $('qPlus').onclick = () => { E.setJob(state, 'quarry', state.quarry + 1); refresh(); };
-    refresh();
+    if (typeof filter === 'string') jobFilter = filter;
+    $('people').hidden = false;
+    renderPeople();
   }
+  function closePeople() { $('people').hidden = true; save(); map.syncPeople(); updateHUD(); }
+  function renderJobSummary() {
+    const f = E.forecast(state), jo = f.jobs;
+    $('jobSummary').innerHTML = E.JOBS.map((j) => {
+      const open = E.jobOpen(state, j.id);
+      const n = jo.count[j.id] || 0;
+      const out = j.id === 'idle' ? `${f.free ? `+${Math.floor(f.free / 12)} 💰 +${Math.floor(f.free / 20)} 💡` : '—'}`
+        : j.res === 'def' ? `+${Math.round(jo.def)} 🛡️` : `+${num(jo[j.res] * f.mult)} ${RES_OF(j)}/j`;
+      return `<button class="jtile${open ? '' : ' locked'}${jobFilter === j.id ? ' on' : ''}" data-job="${j.id}" title="${j.desc}">
+        <span class="ji">${j.icon}</span><span class="jn">${j.name}</span>
+        <b>${open ? n : '🔒'}</b><span class="jo">${open ? out : j.lock}</span></button>`;
+    }).join('');
+    $('jobSummary').querySelectorAll('.jtile').forEach((t) => (t.onclick = () => {
+      jobFilter = jobFilter === t.dataset.job ? 'all' : t.dataset.job;
+      renderPeople();
+    }));
+  }
+  function villagerRow(v) {
+    const opts = E.JOBS.filter((j) => E.jobOpen(state, j.id)).map((j) => {
+      const y = E.yieldOf(state, v, j.id);
+      const tag = v.strong === j.id ? ' 💪' : v.weak === j.id ? ' 🐌' : '';
+      const txt = j.id === 'idle' ? `${j.icon} ${j.name}` : `${j.icon} ${j.name} : +${num(y)} ${RES_OF(j)}${tag}`;
+      return `<option value="${j.id}"${v.job === j.id ? ' selected' : ''}>${txt}</option>`;
+    }).join('');
+    const J = E.JB;
+    const xp = v.job !== 'idle' ? Math.round(E.xpBonus(v, v.job) * 100) : 0;
+    return `<div class="vrow" data-id="${v.id}">
+      <span class="av" style="--h:${v.hue}">${escapeHtml(v.name[0])}<i>${J[v.job].icon}</i></span>
+      <div class="vinfo">
+        <div class="vname"><b>${escapeHtml(v.name)}</b>${xp ? `<small>expérience +${xp}%</small>` : ''}</div>
+        <div class="vt"><span class="st">💪 ${E.STRONG[v.strong]} : ${J[v.strong].icon} ×1,6</span><span class="wk">🐌 ${E.WEAK[v.weak]} : ${J[v.weak].icon} ×0,5</span></div>
+        <select aria-label="Tâche de ${escapeHtml(v.name)}">${opts}</select>
+      </div></div>`;
+  }
+  function renderPeople() {
+    renderJobSummary();
+    const list = state.villagers.filter((v) => jobFilter === 'all' || v.job === jobFilter);
+    const label = jobFilter === 'all' ? `Tous les villageois (${state.villagers.length})` : `${E.JB[jobFilter].icon} ${E.JB[jobFilter].name} (${list.length})`;
+    $('peopleSub').innerHTML = `${label}${jobFilter !== 'all' ? ' · <button class="link" id="pAll">voir tout</button>' : ''}`;
+    if ($('pAll')) $('pAll').onclick = () => { jobFilter = 'all'; renderPeople(); };
+    $('peopleList').innerHTML = list.map(villagerRow).join('') || '<p class="empty">Personne ici pour l\'instant. Touchez une tâche en haut pour voir qui la fait.</p>';
+    $('peopleList').querySelectorAll('.vrow select').forEach((sel) => (sel.onchange = () => {
+      const id = +sel.closest('.vrow').dataset.id;
+      E.assign(state, id, sel.value);
+      const v = state.villagers.find((x) => x.id === id);
+      sel.closest('.vrow').outerHTML = villagerRow(v);
+      renderPeople();
+      updateHUD();
+    }));
+  }
+  $('peopleClose').onclick = closePeople;
+  $('bAuto').onclick = () => { E.autoAssign(state); renderPeople(); updateHUD(); toast('Chacun a été placé selon les besoins et ses forces'); };
 
   // Après les Outils en pierre : proposer d'ouvrir une carrière
   async function proposeQuarry() {
@@ -390,7 +418,7 @@
     }
   }
   $('bForest').onclick = openForest;
-  $('res').addEventListener('click', (e) => { if (e.target.closest('[title="Bois"], [title="Pierre"]')) openForest(); });
+  $('res').addEventListener('click', (e) => { if (e.target.closest('.chip')) openForest(); });
 
   $('bRest').onclick = () => choisir('rest');
   $('bLog').onclick = () => {
@@ -491,7 +519,7 @@
       save();
       caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('BESOIN DE <em>BOIS</em> ET DE <em>PIERRE</em> ?<small>Touchez 🌲🪨 pour envoyer des habitants travailler</small>', 3200);
+      if (!busy) caption('QUI FAIT <em>QUOI</em> ?<small>Touchez 👷 pour donner une tâche à chaque villageois</small>', 3200);
     };
   });
 
