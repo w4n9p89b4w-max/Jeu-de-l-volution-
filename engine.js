@@ -228,7 +228,29 @@
   const atPeace = (s) => s.day >= (s.warUntil || 0);
   const huntPerSoldier = (s) => 1 + (s.disc.includes('feu') ? 0.25 : 0);
   const soldierHunt = (s) => (atPeace(s) ? s.army * huntPerSoldier(s) : 0);
-  const enemyStrength = (s) => Math.round(4 + s.day * 0.6 * (1 + s.era * 0.6));
+  /* ---------- L'ennemi de l'ère ----------
+     À chaque ère, un ennemi envoie une armée tous les RAID_EVERY jours.
+     La seule façon d'arrêter ces attaques : aller le vaincre (sa vie à 0).
+     Il ne revient pas : le suivant n'apparaît qu'à l'ère suivante. */
+  const RIVAL_BASE = [8, 22, 45, 75, 115, 160];
+  const RIVAL_GROWTH = 0.02;          // +2 % de force par jour
+  const RAID_EVERY = 7, FIRST_RAID = 10;
+  function rival(s) {
+    if (!s.rival || s.rival.era !== s.era) {
+      s.rival = { era: s.era, born: s.day, hp: 100, dead: false, nextRaid: s.era === 0 ? Math.max(s.day + FIRST_RAID, 11) : s.day + 5 };
+    }
+    return s.rival;
+  }
+  const rivalForce = (s) => { const R = rival(s); return Math.round(RIVAL_BASE[R.era] * (1 + RIVAL_GROWTH * Math.max(0, s.day - R.born))); };
+  const enemyStrength = (s) => (rival(s).dead ? 0 : rivalForce(s));
+  // Prévision d'une attaque : dégâts infligés (en % de vie) et soldats perdus
+  function battlePreview(s) {
+    // en attaque, ce sont surtout les soldats qui comptent (remparts et gardes restent au pays)
+    const P = Math.round(armyPower(s) + (power(s) - armyPower(s)) * 0.25), F = Math.max(1, rivalForce(s)), r = P / F;
+    const dmg = Math.round(Math.max(8, Math.min(100, 55 * r)));
+    const loss = Math.max(0.05, Math.min(0.6, 0.3 / Math.max(0.1, r)));
+    return { P, F, dmg, lossN: Math.ceil(s.army * loss), loss, hits: Math.ceil(rival(s).hp / dmg) };
+  }
 
   // Les ressources visibles dans l'interface
   function known(s) {
@@ -265,7 +287,7 @@
     { id: 'coal', name: 'Mineur de charbon', icon: '⚫', res: 'coal', base: 0.3, req: (s) => s.era >= 3, lock: 'À partir de la Renaissance', desc: 'Descendre dans les galeries de charbon.' },
     { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.2, desc: 'Observer, réfléchir, inventer.' },
     { id: 'trade', name: 'Marchand', icon: '💰', res: 'gold', base: 0.3, req: (s) => s.era >= 1, lock: 'À partir de l\'Antiquité', desc: 'Vendre et acheter avec les voisins.' },
-    { id: 'guard', name: 'Garde', icon: '🛡️', res: 'def', base: 1.5, desc: 'Surveiller la vallée (défense).' },
+    { id: 'guard', name: 'Garde', icon: '🛡️', res: 'def', base: 1, desc: 'Surveiller la vallée (défense).' },
   ];
   const JB = byId(JOBS);
   const WORK = JOBS.filter((j) => j.id !== 'idle').map((j) => j.id);
@@ -298,7 +320,7 @@
     if (j === 'iron' || j === 'coal') return b + (d('vapeur') ? 0.6 : 0) + (d('electricite') ? 0.4 : 0);
     if (j === 'sage') return b + (d('ecriture') ? 0.25 : 0) + (d('imprimerie') ? 0.5 : 0) + (d('informatique') ? 1 : 0);
     if (j === 'trade') return b + (d('monnaie') ? 0.4 : 0) + (d('change') ? 0.6 : 0);
-    if (j === 'guard') return b * (1 + s.era * 0.5);
+    if (j === 'guard') return b * (1 + s.era * 0.3);
     return b;
   }
   const traitMult = (v, j) => (v.strong === j ? STRONG_X : v.weak === j ? WEAK_X : 1);
@@ -387,7 +409,7 @@
       : s.era < 4
         ? { wood: 0.2, stone: 0.2, iron: 0.15, coal: 0.1, sage: 0.15, trade: 0.1, guard: 0.05 }
         : { wood: 0.12, stone: 0.18, iron: 0.2, coal: 0.12, sage: 0.18, trade: 0.12, guard: 0.05 };
-    if (power(s) < enemyStrength(s) * 0.7) share.guard = (share.guard || 0) + 0.08;
+    if (!rival(s).dead && power(s) < rivalForce(s) * 0.7) share.guard = (share.guard || 0) + 0.08;
     const rest = Math.max(0, n - want.hunt);
     const open = Object.keys(share).filter((j) => jobOpen(s, j));
     const tot = open.reduce((a, j) => a + share[j], 0) || 1;
@@ -498,8 +520,7 @@
       }
     } else if (cat === 'war') {
       const w = warCosts(s);
-      const p = power(s), e = enemyStrength(s);
-      const chance = Math.round(100 * attackChance(s));
+      const R = rival(s);
       const u = UNITS[s.era];
       out.push({ id: 'recruter', icon: u.icon, name: u.verb, desc: `Armés de ${u.weapon}. Chacun vaut ${String(u.power).replace('.', ',')} ⚔️. Votre armée : ${armyText(s)}.`, cost: fmtCost(w.recruit), eff: `+${w.recruitN}`, can: canPay(s, w.recruit), why: whyNot(s, w.recruit) });
       const old = outdated(s);
@@ -507,10 +528,13 @@
         const k = rearmMax(s);
         out.push({ id: 'rearmer', icon: '⚒️', name: `Réarmer les anciens soldats`, desc: `${old} soldat${old > 1 ? 's ont' : ' a'} des armes d'une ancienne époque. Ils reçoivent ${u.weapon}${k < old ? ` (vous pouvez en réarmer ${k})` : ''}.`, cost: fmtCost(rearmCost(s, Math.max(1, k))), eff: '', can: k > 0, why: whyNot(s, rearmCost(s, 1)) });
       }
-      out.push({ id: 'attaquer', icon: '⚔️', name: `Attaquer ${ERAS[s.era].enemy}`, desc: `Force ennemie ≈ ${e}. Butin et nouveaux habitants si victoire.`, cost: '—', eff: `${chance}% de chances`, can: s.army > 0, why: 'Il vous faut des soldats' });
-      out.push({ id: 'fortifier', icon: '🧱', name: s.era < 2 ? 'Palissade en bois' : s.era < 4 ? 'Remparts de pierre' : 'Défenses en acier', desc: 'Protège contre les invasions.', cost: fmtCost(w.fort), eff: `+${w.fortN} 🛡️`, can: canPay(s, w.fort), why: whyNot(s, w.fort) });
+      if (!R.dead) {
+        const bp = battlePreview(s);
+        out.push({ id: 'attaquer', icon: '⚔️', name: `Attaquer ${ERAS[s.era].enemy}`, desc: `Sa force : ${bp.F} ⚔️ · sa vie : ${R.hp} %. Puissance de votre armée en attaque : ${bp.P} ⚔️. Le vaincre arrête ses attaques jusqu'à la fin de l'ère.`, cost: '—', eff: '', can: s.army > 0, why: 'Il vous faut des soldats' });
+      }
+      out.push({ id: 'fortifier', icon: '🧱', name: s.era < 2 ? 'Palissade en bois' : s.era < 4 ? 'Remparts de pierre' : 'Défenses en acier', desc: 'Protège contre les attaques ennemies.', cost: fmtCost(w.fort), eff: `+${w.fortN} 🛡️`, can: canPay(s, w.fort), why: whyNot(s, w.fort) });
       const peace = s.peaceUntil > s.day;
-      out.push({ id: 'paix', icon: '🕊️', name: 'Traité de paix', desc: peace ? `En paix jusqu'au jour ${s.peaceUntil}.` : 'Aucune invasion pendant 12 jours.', cost: fmtCost(w.peace), eff: '+3 😊', can: !peace && canPay(s, w.peace), why: peace ? 'Déjà en paix' : whyNot(s, w.peace) });
+      if (!R.dead) out.push({ id: 'paix', icon: '🕊️', name: 'Trêve', desc: peace ? `Trêve jusqu'au jour ${s.peaceUntil}.` : `Repousse la prochaine attaque de 12 jours. Elle ne met pas fin à la guerre : seule une victoire le peut.`, cost: fmtCost(w.peace), eff: '+3 😊', can: !peace && canPay(s, w.peace), why: peace ? 'Déjà en paix' : whyNot(s, w.peace) });
     }
     for (const o of out) Object.assign(o, bonusMalus(s, cat, o.id));
     return out;
@@ -552,8 +576,12 @@
         return { plus: [`${k} soldat${k > 1 ? 's' : ''} → ${u.icon} ${u.name.toLowerCase()}`, `+${num1(g)} ⚔️`], minus: costL(rearmCost(s, k)) };
       }
       if (id === 'fortifier') return { plus: [`+${w.fortN} 🛡️`], minus: costL(w.fort) };
-      if (id === 'paix') return { plus: ['🕊️ 12 jours sans invasion', '+3 😊'], minus: costL(w.peace) };
-      if (id === 'attaquer') { const ch = Math.round(attackChance(s) * 100); return { plus: [`${ch}% : butin et nouveaux habitants`], minus: [`${100 - ch}% : −40% 🪖, −${1 + s.era} 👤`, `${WAR_DAYS} jours de guerre : les soldats ne chassent plus`] }; }
+      if (id === 'paix') return { plus: ['🕊️ 12 jours sans attaque', '+3 😊'], minus: costL(w.peace) };
+      if (id === 'attaquer') {
+        const bp = battlePreview(s);
+        return { plus: [bp.dmg >= rival(s).hp ? `💀 le vaincre (−${bp.dmg} % de vie)` : `−${bp.dmg} % de vie à l'ennemi`, bp.hits > 1 ? `il faudra ~${bp.hits} attaques` : 'butin et habitants'],
+          minus: [`≈ −${bp.lossN} 🪖 soldats`, `${WAR_DAYS} jours de guerre : les soldats ne chassent plus`] };
+      }
     }
     return { plus: [], minus: [] };
   }
@@ -568,10 +596,7 @@
       peace: e === 0 ? { food: 10 } : { gold: 10 + e * 15 },
     };
   }
-  function attackChance(s) {
-    const p = power(s), e = enemyStrength(s);
-    return Math.max(0.05, Math.min(0.95, p / (p + e * 0.9)));
-  }
+
 
   /* ---------- Appliquer le choix du jour ---------- */
   // Renvoie { ok, title, text, icon, good, built?, newEra? }
@@ -649,38 +674,42 @@
         return { ok: true, title: 'Fortifications', text: `La défense du pays augmente de ${w.fortN}.`, icon: '🧱', good: true };
       }
       if (id === 'paix') {
-        if (s.peaceUntil > s.day || !canPay(s, w.peace)) return { ok: false };
+        if (rival(s).dead || s.peaceUntil > s.day || !canPay(s, w.peace)) return { ok: false };
         pay(s, w.peace);
         s.peaceUntil = s.day + 12;
         s.warUntil = 0;
+        rival(s).nextRaid = Math.max(rival(s).nextRaid, s.peaceUntil);
         s.happy = Math.min(100, s.happy + 3);
-        log(s, `🕊️ Traité de paix jusqu'au jour ${s.peaceUntil}`);
-        return { ok: true, title: 'Traité de paix', text: `Aucune invasion jusqu'au jour ${s.peaceUntil}.`, icon: '🕊️', good: true };
+        log(s, `🕊️ Trêve jusqu'au jour ${s.peaceUntil}`);
+        return { ok: true, title: 'Trêve', text: `${cap1(ERAS[s.era].enemy)} n'attaquera pas avant le jour ${rival(s).nextRaid}.`, icon: '🕊️', good: true };
       }
       if (id === 'attaquer') {
-        if (s.army <= 0) return { ok: false };
+        const R = rival(s);
+        if (s.army <= 0 || R.dead) return { ok: false };
         s.stats.battles++;
         s.warUntil = s.day + WAR_DAYS;
         const enemy = ERAS[s.era].enemy;
-        if (rng() < attackChance(s)) {
+        const bp = battlePreview(s);
+        const dmg = Math.max(1, Math.round(bp.dmg * (0.8 + rng() * 0.4)));
+        const lost = Math.min(s.army, Math.ceil(s.army * bp.loss * (0.8 + rng() * 0.4)));
+        loseTroops(s, lost);
+        R.hp = Math.max(0, R.hp - dmg);
+        if (R.hp <= 0) {
+          R.dead = true;
           s.stats.victories++;
           const e = s.era;
-          const loot = { food: 10 + e * 15, wood: 10 + e * 10, stone: 5 + e * 10, iron: e >= 2 ? e * 8 : 0, gold: e * 20 };
+          const loot = { food: 20 + e * 25, wood: 20 + e * 15, stone: 15 + e * 15, iron: e >= 2 ? e * 15 : 0, gold: 10 + e * 30 };
           gain(s, loot);
-          const newcomers = 2 + e;
+          const newcomers = 3 + e * 2;
           s.pop += newcomers;
-          s.happy = Math.min(100, s.happy + 4);
-          loseTroops(s, Math.ceil(s.army * 0.1));
-          log(s, `⚔️ Victoire contre ${enemy}`);
-          return { ok: true, title: 'Victoire !', text: `Vous l'emportez sur ${enemy}. Butin : ${fmtCost(loot)} et ${newcomers} habitants rejoignent votre pays.`, icon: '🏆', good: true };
+          s.happy = Math.min(100, s.happy + 10);
+          s.peaceUntil = 0;
+          log(s, `🏆 ${cap1(enemy)} est vaincu`);
+          return { ok: true, title: 'Victoire totale !', text: `${cap1(enemy)} est vaincu et n'attaquera plus jusqu'à la fin de l'ère (un nouvel ennemi viendra à l'ère suivante). Butin : ${fmtCost(loot)}. ${newcomers} habitants rejoignent votre pays. Vous avez perdu ${lost} soldats.`, icon: '🏆', good: true };
         }
-        const lostArmy = Math.ceil(s.army * 0.4);
-        loseTroops(s, lostArmy);
-        const lostPop = Math.min(s.pop - 1, 1 + s.era);
-        s.pop -= lostPop;
-        s.happy = Math.max(0, s.happy - 8);
-        log(s, `⚔️ Défaite contre ${enemy}`);
-        return { ok: true, title: 'Défaite…', text: `${cap1(enemy)} vous repousse. Vous perdez ${lostArmy} soldats et ${lostPop} habitants.`, icon: '💀', good: false };
+        s.happy = Math.max(0, s.happy - 2);
+        log(s, `⚔️ Bataille contre ${enemy} (−${dmg} % de vie)`);
+        return { ok: true, title: 'Bataille', text: `Vos soldats frappent ${enemy} : −${dmg} % de vie (il lui reste ${R.hp} %). Vous perdez ${lost} soldats. Il faut l'achever pour arrêter ses attaques.`, icon: '⚔️', good: dmg >= 30 };
       }
     }
     if (cat === 'rest') {
@@ -764,10 +793,10 @@
         { label: 'Augmenter les salaires', hint: (s) => `-${20 + s.era * 10} 💰, +8 😊`, run: (s) => { s.res.gold -= 20 + s.era * 10; s.happy = Math.min(100, s.happy + 8); return ['Les ouvriers reprennent le travail en chantant.', true]; } },
         { label: 'Refuser', hint: () => '-10 😊, -20% 🔩', run: (s) => { s.happy = Math.max(0, s.happy - 10); s.res.iron = Math.round(s.res.iron * 0.8); return ['La grève dure des semaines.', false]; } },
       ] },
-    { id: 'alliance', w: 2, ok: (s) => s.day > 8, icon: '🤝', title: 'Une proposition d\'alliance',
+    { id: 'alliance', w: 2, ok: (s) => s.day > 8 && !rival(s).dead, icon: '🤝', title: 'Une proposition d\'alliance',
       text: (s) => `${cap1(ERAS[s.era].enemy)} propose une alliance… contre un tribut.`,
       choices: [
-        { label: 'Payer le tribut', hint: (s) => `-${8 + s.era * 12} 💰/🍖, paix 10 jours`, run: (s) => { const n = 8 + s.era * 12; if (s.era === 0) s.res.food -= n; else s.res.gold -= n; s.peaceUntil = Math.max(s.peaceUntil, s.day + 10); return ['Les voisins vous laisseront tranquilles pendant 10 jours.', true]; } },
+        { label: 'Payer le tribut', hint: (s) => `-${8 + s.era * 12} 💰/🍖, paix 10 jours`, run: (s) => { const n = 8 + s.era * 12; if (s.era === 0) s.res.food -= n; else s.res.gold -= n; s.peaceUntil = Math.max(s.peaceUntil, s.day + 10); rival(s).nextRaid = Math.max(rival(s).nextRaid, s.peaceUntil); return ['Les voisins vous laisseront tranquilles pendant 10 jours.', true]; } },
         { label: 'Refuser fièrement', hint: () => '+3 😊, risque de guerre', run: (s) => { s.happy = Math.min(100, s.happy + 3); s.peaceUntil = 0; return ['Le peuple apprécie votre courage… les voisins beaucoup moins.', true]; } },
       ] },
   ];
@@ -824,9 +853,11 @@
 
     // Événements
     if (s.pop > 0) {
-      const invasionChance = s.day > 10 && s.day >= s.peaceUntil ? 0.07 + s.era * 0.01 : 0;
-      if (rng() < invasionChance) {
+      const R = rival(s);
+      if (!R.dead && s.day >= R.nextRaid && s.day < s.peaceUntil) R.nextRaid = s.peaceUntil;
+      if (!R.dead && s.day >= R.nextRaid) {
         report.events.push(invasion(s, rng));
+        R.nextRaid = s.day + RAID_EVERY;
       } else if (s.happy < 30 && rng() < 0.5) {
         const g = Math.ceil(s.res.gold * 0.3), m = Math.ceil(s.res.wood * 0.2);
         s.res.gold -= g; s.res.wood -= m;
@@ -858,23 +889,29 @@
 
   function invasion(s, rng) {
     const enemy = ERAS[s.era].enemy;
-    const strength = Math.round(enemyStrength(s) * (0.6 + rng() * 0.6));
+    const strength = Math.round(rivalForce(s) * (0.5 + rng() * 0.4));
     const p = power(s);
     s.stats.battles++;
     s.warUntil = s.day + WAR_DAYS;
     if (p >= strength) {
       s.stats.victories++;
       s.happy = Math.min(100, s.happy + 5);
-      log(s, `🛡️ Invasion repoussée (${enemy})`);
-      return { title: 'Invasion repoussée !', text: `${cap1(enemy)} attaque avec une force de ${strength}, mais votre défense (${p}) tient bon.`, icon: '🛡️', good: true };
+      const R = rival(s);
+      R.hp = Math.max(5, R.hp - 10);
+      log(s, `🛡️ Attaque repoussée (${enemy})`);
+      return { title: 'Attaque repoussée !', text: `${cap1(enemy)} envoie une armée de force ${strength}, mais votre défense (${p}) tient bon. Son armée détruite l'affaiblit (−10 % de vie, il lui reste ${R.hp} %). Prochaine attaque dans ${RAID_EVERY} jours, sauf si vous allez le vaincre.`, icon: '🛡️', good: true };
     }
-    const lostPop = Math.ceil(s.pop * 0.12);
+    const lostPop = Math.ceil(s.pop * 0.15);
     s.pop -= lostPop;
-    for (const r of ['food', 'wood', 'stone', 'iron', 'coal', 'gold']) s.res[r] = Math.round(s.res[r] * 0.7);
+    for (const r of ['food', 'wood', 'stone', 'iron', 'coal', 'gold']) s.res[r] = Math.round(s.res[r] * 0.6);
     loseTroops(s, Math.ceil(s.army * 0.5));
-    s.happy = Math.max(0, s.happy - 10);
-    log(s, `🔥 Invasion : pillage par ${enemy}`);
-    return { title: 'Invasion !', text: `${cap1(enemy)} (force ${strength}) déborde votre défense (${p}). Pillage : ${lostPop} habitants perdus et 30% des réserves. Pensez à l'armée ou aux remparts !`, icon: '🔥', good: false };
+    s.happy = Math.max(0, s.happy - 15);
+    // l'ennemi incendie un bâtiment
+    const burnable = s.buildings.map((b, k) => k).filter((k) => !B[s.buildings[k].id].unique);
+    let burnt = '';
+    if (burnable.length) { const k = burnable[Math.floor(rng() * burnable.length)]; burnt = B[s.buildings[k].id].name; s.buildings.splice(k, 1); }
+    log(s, `🔥 Pillage par ${enemy}`);
+    return { title: 'Attaque ennemie !', text: `${cap1(enemy)} envoie une armée de force ${strength} qui déborde votre défense (${p}). Pillage : ${lostPop} habitants perdus, 40 % des réserves et la moitié de l'armée${burnt ? `, et votre ${burnt.toLowerCase()} est incendié(e)` : ''}. Il reviendra dans ${RAID_EVERY} jours : renforcez-vous et allez le vaincre !`, icon: '🔥', good: false };
   }
 
   const cap1 = (t) => t[0].toUpperCase() + t.slice(1);
@@ -886,6 +923,7 @@
   const api = {
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
+    rival, rivalForce, battlePreview, RAID_EVERY,
     known, dilemmaView, choose, buildCost, canPay,
     UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,

@@ -361,3 +361,15 @@ em { font-style: normal; color: var(--yellow); }
 .clock.stopped #clockTxt { color: var(--muted); }
 .dock-title small { display: block; font-size: 12px; text-align: center; -webkit-text-stroke: 0; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 #dock.done .tiles { opacity: .45; }
+
+/* ---------- L'ennemi ---------- */
+.enemy { display: flex; align-items: center; gap: 6px; width: 100%; max-width: 380px; margin-top: 2px; background: rgba(40, 20, 20, .86); color: #fff; border-radius: 10px; padding: 4px 9px; font-size: 11.5px; font-weight: 900; box-shadow: 0 2px 0 rgba(0,0,0,.2); }
+.enemy .en { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.enemy .hp { flex: 1; min-width: 40px; height: 7px; background: rgba(255,255,255,.2); border-radius: 4px; overflow: hidden; }
+.enemy .hp span { display: block; height: 100%; background: linear-gradient(90deg, #ff6b5e, #d6453d); }
+.enemy .hpt { font-variant-numeric: tabular-nums; }
+.enemy .ef.bad { color: #ffb4ad; }
+.enemy .ew { white-space: nowrap; color: #ffd98a; }
+.enemy.soon { animation: pulse 1s infinite; }
+@keyframes pulse { 50% { background: rgba(160, 30, 30, .92); } }
+.enemy.dead { justify-content: center; background: rgba(30, 100, 60, .85); }

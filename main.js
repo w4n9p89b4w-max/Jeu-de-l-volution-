@@ -161,8 +161,8 @@
       `<span class="chip${r === 'food' && f.food < 0 ? ' warn' : ''}" title="${E.RES_NAMES[r]}">${E.RES_ICONS[r]} ${fmt(state.res[r])} ${d(f[r])}</span>`).concat([
       `<span class="chip${state.happy < 30 ? ' warn' : ''}" title="Bonheur">${state.happy >= 70 ? '😄' : state.happy >= 40 ? '🙂' : state.happy >= 25 ? '😐' : '😠'} ${state.happy}%</span>`,
       `<span class="chip${state.pop >= f.cap ? ' warn' : ''}" title="Logements">🏠 ${fmt(state.pop)}/${fmt(f.cap)}</span>`,
-      `<span class="chip${E.atPeace(state) ? '' : ' warn'}" title="${E.atPeace(state) ? 'En paix : les soldats chassent' : 'En guerre : les soldats restent au camp'}">⚔️ ${E.power(state)}${peace}${E.atPeace(state) ? '' : ` 🔥 guerre ${state.warUntil - state.day} j`}</span>`,
-    ]).join('');
+      `<span class="chip${E.atPeace(state) ? '' : ' warn'}" title="${E.atPeace(state) ? 'En paix : les soldats chassent' : 'En guerre : les soldats restent au camp'}">⚔️ ${E.power(state)}${E.atPeace(state) ? '' : ` 🔥 ${state.warUntil - state.day} j`}</span>`,
+    ]).join('') + enemyChip();
     // pastilles : nombre de choix possibles
     document.querySelectorAll('.tile').forEach((t) => {
       const n = E.options(state, t.dataset.cat).filter((o) => o.can).length;
@@ -170,11 +170,24 @@
     });
   }
 
+  // L'ennemi de l'ère : sa vie, sa force et sa prochaine attaque
+  function enemyChip() {
+    const R = E.rival(state), en = E.ERAS[state.era].enemy, name = en[0].toUpperCase() + en.slice(1);
+    if (R.dead) return `<button class="enemy dead" id="enemyChip">🏆 ${name} est vaincu</button>`;
+    const days = Math.max(0, R.nextRaid - state.day);
+    const when = state.peaceUntil > state.day ? `🕊️ trêve ${state.peaceUntil - state.day} j` : days === 0 ? '⚠️ attaque cette nuit !' : `attaque dans ${days} j`;
+    const danger = E.power(state) < E.rivalForce(state) * 0.9;
+    return `<button class="enemy${days <= 1 && !(state.peaceUntil > state.day) ? ' soon' : ''}" id="enemyChip" title="Touchez pour ouvrir les choix de guerre">
+      <span class="en">🏴 ${name}</span><span class="hp"><span style="width:${R.hp}%"></span></span><span class="hpt">${R.hp} %</span>
+      <span class="ef${danger ? ' bad' : ''}">⚔️ ${E.rivalForce(state)}</span><span class="ew">${when}</span></button>`;
+  }
+  $('res').addEventListener('click', (e) => { if (e.target.closest('#enemyChip')) { e.stopPropagation(); openSheet('war'); } }, true);
+
   /* ---------- Feuille de choix ---------- */
   const CAT = {
     build: { title: '🏠 Constructions', sub: 'Que construit-on aujourd\'hui ?' },
     law: { title: '📜 Lois', sub: 'Une loi adoptée s\'applique pour toujours.' },
-    war: { title: '⚔️ Guerres', sub: 'Défendre la vallée… ou attaquer les voisins.' },
+    war: { title: '⚔️ Guerres', sub: 'L\'ennemi attaque régulièrement : seule une victoire l\'arrête.' },
     tech: { title: '💡 Découvertes', sub: '' },
   };
   function openSheet(cat) {
@@ -504,7 +517,7 @@
     }
   }
   $('bForest').onclick = openForest;
-  $('res').addEventListener('click', (e) => { if (e.target.closest('.chip')) openForest(); });
+  $('res').addEventListener('click', (e) => { if (e.target.closest('.chip') && !e.target.closest('#enemyChip')) openForest(); });
 
   $('bRest').onclick = () => choisir('rest');
   $('bLog').onclick = () => {

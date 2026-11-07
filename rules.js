@@ -91,32 +91,33 @@
       </table>`));
 
     parts.push(sec('guerre', '⚔️ La guerre', `
-      <h4>À qui déclarer la guerre ?</h4>
-      <p>Il y a un voisin par ère. Le choix <b>Attaquer</b> vise toujours le voisin de votre ère actuelle :</p>
+      <h4>Un ennemi par ère</h4>
+      <p>À chaque ère, un ennemi menace la vallée. Son nom, sa <b>vie ❤️</b>, sa <b>force ⚔️</b> et le nombre de jours avant sa prochaine attaque sont affichés en haut de l'écran (touchez la pastille pour ouvrir les choix de guerre).</p>
       <table>${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} ${er.name}</td><td>${er.enemy}</td></tr>`).join('')}</table>
+      <h4>Ses attaques</h4>
+      <ul><li>Il envoie une armée <b>tous les ${E.RAID_EVERY} jours</b> (la première au jour 11 en Préhistoire, puis 5 jours après chaque changement d'ère).</li>
+      <li>Sa force augmente de 2 % chaque jour. L'armée qu'il envoie vaut entre 50 % et 90 % de sa force.</li>
+      <li>Si votre puissance (soldats + défense) est au moins égale : <b>attaque repoussée</b>, +5 😊, et l'ennemi perd 10 % de vie.</li>
+      <li>Sinon, <b>pillage</b> : 15 % des habitants, 40 % de toutes les réserves, la moitié de l'armée, −15 😊, et <b>un bâtiment incendié</b>.</li>
+      <li>Une <b>🕊️ trêve</b> (choix du jour) ou une alliance (dilemme) repousse la prochaine attaque, mais ne met pas fin à la guerre.</li></ul>
+      <h4>La seule façon d'y mettre fin : le vaincre</h4>
+      <ol><li>Recrutez des soldats (choix du jour), réarmez-les, et choisissez <b>⚔️ Attaquer</b>.</li>
+      <li>Chaque attaque lui enlève de la vie selon la <b>puissance de votre armée</b> comparée à sa force : à force égale, environ 55 % ; avec deux fois plus de puissance, il est vaincu d'un coup. Avant d'attaquer, le choix affiche les dégâts prévus et le nombre d'attaques nécessaires.</li>
+      <li>Chaque attaque coûte des soldats (moins si vous êtes bien plus fort que lui), les plus mal armés en premier.</li>
+      <li>Quand sa vie tombe à 0 : <b>🏆 victoire totale</b>. Gros butin, nouveaux habitants, +10 😊, et <b>plus aucune attaque jusqu'à la fin de l'ère</b>. Un nouvel ennemi apparaît à l'ère suivante.</li></ol>
+      <p>Après une défaite partielle, vous pouvez réattaquer dès le lendemain tant qu'il vous reste des soldats. Mais attention : sa force augmente chaque jour, et sa vie ne remonte pas.</p>
+      <h4>Votre puissance</h4>
+      <p><b>Pour vous défendre</b> : force de vos soldats + défense 🛡️ (gardes, remparts, château, lois, métallurgie). <b>Pour attaquer</b>, ce sont surtout les soldats qui comptent : la défense ne compte qu'au quart, car les remparts et les gardes restent au pays.</p>
+      <h4>Temps de guerre</h4>
+      <p>Après chaque bataille (attaque ou défense), le pays est <b>en guerre 5 jours</b> (🔥 en haut de l'écran) : les soldats ne chassent plus.</p>
       <h4>Les soldats de chaque époque</h4>
-      <p>L'armée est à part : les soldats ne sont pas des villageois. Ils mangent 1 🍖 pour 4 soldats par jour. <b>En temps de paix, ils chassent</b> : chaque soldat rapporte 1 🍖 par jour (1,25 avec la maîtrise du feu). <b>En temps de guerre</b> (pendant 5 jours après une attaque ou une invasion, signalé par 🔥 en haut de l'écran), ils restent au camp et ne chassent plus. Un traité de paix arrête la guerre tout de suite. Chaque soldat <b>garde les armes de l'époque où il a été recruté</b>.</p>
+      <p>L'armée est à part : les soldats ne sont pas des villageois. Ils mangent 1 🍖 pour 4 soldats par jour. <b>En temps de paix, ils chassent</b> : chaque soldat rapporte 1 🍖 par jour (1,25 avec la maîtrise du feu). <b>En temps de guerre</b> (pendant 5 jours après une attaque ou une invasion, signalé par 🔥 en haut de l'écran), ils restent au camp et ne chassent plus. Une trêve arrête aussi ce temps de guerre. Chaque soldat <b>garde les armes de l'époque où il a été recruté</b>.</p>
       <table><tr><th>Ère</th><th>Unité</th><th>Armes</th><th>Force</th><th>Recrutement</th></tr>
       ${E.UNITS.map((u) => `<tr><td>${ERA_ICON[u.era]}</td><td>${u.icon} <b>${u.name}</b></td><td>${u.weapon}</td><td>${String(u.power).replace('.', ',')} ⚔️</td><td>+${u.n} pour ${fmtCost(u.cost)}</td></tr>`).join('')}
       </table>
       <p><b>⚒️ Réarmer</b> : quand vous changez d'ère, vos anciens soldats restent faibles. Le choix « Réarmer les anciens soldats » leur donne les armes de l'ère actuelle (environ 60 % du prix d'une recrue, sans nourriture). Dans les batailles perdues, ce sont les soldats les plus mal armés qui tombent en premier.</p>
       <p>Sur la carte, l'armée s'entraîne à côté du village, avec l'équipement de son époque (lances, boucliers, chevaux, canons, fusils, blindés).</p>
-      <h4>Votre puissance</h4>
-      <p><b>Puissance ⚔️ = force de chaque soldat (selon ses armes) + défense 🛡️.</b> La défense vient des villageois <b>gardes</b>, des remparts, du château, de certaines lois et de la métallurgie. La force de l'ennemi augmente <b>chaque jour</b> et à chaque ère.</p>
-      <h4>Les choix de guerre</h4>
-      <ul><li><b>Recruter</b> : ajoute des soldats de l'époque actuelle (voir le tableau).</li>
-      <li><b>⚒️ Réarmer</b> : donne les armes de l'époque actuelle aux anciens soldats.</li>
-      <li><b>🧱 Fortifier</b> : ajoute de la défense pour toujours (palissade en bois, puis remparts de pierre, puis défenses en acier).</li>
-      <li><b>🕊️ Traité de paix</b> : aucune invasion pendant 12 jours, et +3 😊.</li>
-      <li><b>⚔️ Attaquer</b> : affiche vos chances de gagner. Il faut au moins un soldat.</li></ul>
-      <h4>Victoire ou défaite</h4>
-      <table><tr><th>Si vous gagnez 🏆</th><th>Si vous perdez 💀</th></tr>
-      <tr><td>Butin en 🍖 🪵 🪨, plus 💰 et 🔩 dans les ères avancées. <b>2 + ère</b> habitants rejoignent votre pays. +4 😊. Vous perdez 10 % de vos soldats.</td>
-      <td>Vous perdez <b>40 % des soldats</b>, <b>1 + ère</b> habitants et 8 😊.</td></tr></table>
-      <h4>Peut-on retenter après une défaite ?</h4>
-      <p><b>Oui.</b> Une défaite ne termine pas la partie. Vous pouvez réattaquer dès le lendemain (un choix par jour), tant qu'il vous reste des soldats. Comme l'ennemi devient plus fort chaque jour, recrutez ou fortifiez d'abord, et visez au moins 60-70 % de chances.</p>
-      <h4>Les invasions</h4>
-      <p>À partir du jour 11, chaque nuit, il y a environ <b>7 % de risque</b> (+1 % par ère) qu'un voisin vous attaque, sauf pendant une paix. Si votre puissance est au moins égale à la sienne, l'invasion est repoussée (+5 😊). Sinon, c'est le pillage : 12 % des habitants, 30 % des réserves et la moitié de l'armée sont perdus.</p>`));
+    `));
 
     parts.push(sec('events', '🎲 Événements et dilemmes', `
       <p>Certaines nuits, il se passe quelque chose : récolte abondante, nomades, comète, trésor, filon de fer, tempête, loups, crue, épidémie (impossible après les <i>Vaccins</i>), incendie, coup de grisou…</p>

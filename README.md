@@ -15,7 +15,8 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
    - 📜 **Lois** : partage du gibier, impôt, suffrage universel, transition écologique…
    - ⚔️ **Guerres** : recruter, attaquer les voisins, fortifier, signer la paix.
    - 💡 **Découvertes** : les 3 découvertes d'une ère font passer à la suivante.
-4. La nuit tombe, la production tombe, la population grandit… et des événements surviennent (récoltes, épidémies, invasions, manifs !).
+4. La nuit tombe, la production tombe, la population grandit… et des événements surviennent (récoltes, épidémies, manifs !).
+5. **La guerre** : à chaque ère, un ennemi envoie une armée tous les 7 jours (pillages, bâtiments incendiés). La seule façon d’y mettre fin : recruter une armée et aller le vaincre (sa vie tombe à chaque attaque). Vaincu, il ne revient plus ; un nouvel ennemi arrive à l’ère suivante. Les soldats ont les armes de leur époque et chassent en temps de paix.
 5. Parfois, un **dilemme** vous oblige à choisir entre **A** et **B** : accueillir des réfugiés ou fermer la frontière, couper la forêt ou la protéger, ouvrir une mine de charbon sous les champs…
 
 **Les ressources** : 🍖 nourriture, 🪵 bois, 🪨 pierre, 🔩 fer (dès le Moyen Âge), ⚫ charbon (dès la Renaissance), 💰 or et 💡 savoir.
