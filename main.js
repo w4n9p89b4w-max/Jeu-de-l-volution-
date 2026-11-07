@@ -159,56 +159,55 @@
       `<span class="chip${state.pop >= f.cap ? ' warn' : ''}" title="Logements">🏠 ${fmt(state.pop)}/${fmt(f.cap)}</span>`,
       `<span class="chip" title="Puissance militaire">⚔️ ${E.power(state)}${peace}</span>`,
     ]).join('');
-    // pastilles : nombre de choix possibles
-    document.querySelectorAll('.tile').forEach((t) => {
-      const n = E.options(state, t.dataset.cat).filter((o) => o.can).length;
-      t.querySelector('.badge').textContent = t.dataset.cat === 'war' ? '' : n ? n : '';
-    });
+    const g = E.nextGoal(state);
+    $('hGoal').innerHTML = g ? `🎯 ${g.icon} ${g.text} · ${g.need}` : '';
+    $('hGoal').hidden = !g;
+    renderCards();
   }
 
-  /* ---------- Feuille de choix ---------- */
-  const CAT = {
-    build: { title: '🏠 Constructions', sub: 'Que construit-on aujourd\'hui ?' },
-    law: { title: '📜 Lois', sub: 'Une loi adoptée s\'applique pour toujours.' },
-    war: { title: '⚔️ Guerres', sub: 'Défendre la vallée… ou attaquer les voisins.' },
-    tech: { title: '💡 Découvertes', sub: '' },
-  };
-  function openSheet(cat) {
-    if (busy || !state) return;
-    const c = CAT[cat];
-    $('sheetTitle').textContent = c.title;
-    let sub = c.sub;
-    if (cat === 'tech') {
-      const left = E.DISCOVERIES.filter((d) => d.era === state.era && !state.disc.includes(d.id)).length;
-      sub = state.era < E.ERAS.length - 1
-        ? `Encore ${left} découverte${left > 1 ? 's' : ''} pour entrer dans : ${E.ERAS[state.era + 1].name}`
-        : 'Dernière ère : visez les étoiles !';
-    }
-    $('sheetSub').textContent = sub;
-    const list = $('sheetList'); list.innerHTML = '';
-    const opts = E.options(state, cat);
-    if (!opts.length) list.innerHTML = '<div class="empty">Rien de nouveau pour l\'instant…<br>Faites des découvertes pour changer d\'ère !</div>';
-    for (const o of opts) {
+  /* ---------- Les 4 cartes du jour ---------- */
+  let selected = -1;
+  const TAGCLASS = { build: 't-build', law: 't-law', tech: 't-tech', war: 't-war', trade: 't-trade' };
+  function renderCards() {
+    const hand = E.ensureHand(state);
+    const box = $('cards'); box.innerHTML = '';
+    hand.forEach((c, i) => {
+      const ok = E.playable(state, c);
       const bt = document.createElement('button');
-      bt.className = 'opt' + (o.can ? '' : ' off');
-      const isNew = o.era != null && o.era === state.era && state.era > 0 && cat !== 'tech';
-      bt.innerHTML = `<span class="oi">${o.icon}</span><span><b>${o.name}${isNew ? '<span class="new">NOUVEAU</span>' : ''}</b><p>${o.desc}</p><span class="eff">${o.eff}</span></span><span class="cost">${o.cost}${o.can ? '' : `<span class="why">${o.why}</span>`}</span>`;
-      bt.onclick = () => { if (o.can) { closeSheet(); choisir(cat, o.id); } };
-      list.appendChild(bt);
-    }
-    $('sheet').classList.add('open');
-    $('toast').classList.remove('show');
+      bt.className = `pcard ${TAGCLASS[c.kind] || ''}${ok ? '' : ' off'}${i === selected ? ' sel' : ''}`;
+      bt.innerHTML = `<span class="pl">${'ABCD'[i]}</span><span class="ptag">${c.tag}</span>
+        <span class="phead"><span class="pi">${c.icon}</span><b>${c.title}</b></span>
+        <span class="plus">${c.plus.join(' ') || '—'}</span>
+        <span class="minus">${c.minus.join(' ') || 'Aucun malus'}</span>${ok ? '' : '<span class="why">Pas assez de ressources</span>'}`;
+      bt.title = c.desc;
+      bt.onclick = () => pickCard(i);
+      box.appendChild(bt);
+    });
+    const c = hand[selected];
+    $('confirm').hidden = !c;
+    if (c) $('confirm').innerHTML = `Choisir ${'ABCD'[selected]} · ${c.icon} ${c.title}<small>${c.desc}</small>`;
   }
-  function closeSheet() { $('sheet').classList.remove('open'); }
-  $('sheetClose').onclick = closeSheet;
-  document.querySelectorAll('.tile').forEach((t) => (t.onclick = () => openSheet(t.dataset.cat)));
-  $('map').addEventListener('pointerdown', closeSheet);
+  function pickCard(i) {
+    if (busy) return;
+    const c = state.hand[i];
+    if (!E.playable(state, c)) { toast('Pas assez de ressources pour cette carte'); return; }
+    selected = selected === i ? -1 : i;
+    renderCards();
+  }
+  $('confirm').onclick = () => { if (selected >= 0) choisir(selected); };
 
   /* ---------- Le choix du jour ---------- */
-  async function choisir(cat, id) {
+  async function choisir(i) {
     if (busy) return;
-    const r = E.act(state, cat, id);
+    let r;
+    if (i === 'rest') { r = E.act(state, 'rest'); state.hand = null; }
+    else {
+      const c = state.hand[i];
+      r = E.play(state, i);
+      if (r.ok && c.kind === 'war' && c.id === 'attaquer') r.battle = true;
+    }
     if (!r.ok) return;
+    selected = -1;
     busy = true;
     $('dock').classList.add('busy');
     if (r.built) {
@@ -225,7 +224,7 @@
       busy = false; $('dock').classList.remove('busy');
       return;
     }
-    if (cat === 'war' && id === 'attaquer') {
+    if (r.battle) {
       await wait(500);
       await modal({ icon: r.icon, title: r.title, text: r.text, good: r.good });
     } else {
@@ -273,7 +272,7 @@
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
     else if (state.day === 2) caption('CHAQUE JOUR<br><em>VOUS CHOISISSEZ</em>', 2200);
-    else if (state.day === 4) caption('FAITES DES <em>DÉCOUVERTES</em><small>pour changer d\'ère</small>', 2400);
+    else if (state.day === 4) caption('ACCUMULEZ DU <em>SAVOIR</em> 💡<small>pour faire des découvertes et changer d\'ère</small>', 2400);
   }
 
   async function dilemma(dv) {
@@ -344,7 +343,7 @@
     return modal({
       icon: '❔', title: 'Comment jouer',
       html: `<div class="help">
-        <p><b>Chaque jour, vous choisissez</b> une seule action : construire, adopter une loi, faire la guerre ou une découverte. Puis la nuit tombe et le jour suivant commence.</p><p>🅰️🅱️ Parfois, un événement vous oblige à <b>choisir entre A et B</b>.</p><p>🪵 Bois, 🪨 pierre, 🔩 fer (Moyen Âge) et ⚫ charbon (Renaissance) servent à construire. Carrières et mines s'installent au pied des montagnes.</p>
+        <p><b>Chaque jour, vous choisissez une carte</b> parmi 4 (A, B, C, D). Chaque carte a un <b style="color:#2e9d57">bonus</b> et un <b style="color:#d6453d">malus</b> : construire coûte des ressources, une loi a ses avantages et ses inconvénients, une carte ressources en donne une et en prend une autre… Puis la nuit tombe et de nouvelles cartes arrivent.</p><p>😴 Aucune carte ne vous plaît ? Le <b>Repos</b> passe la journée (+4 😊).</p><p>🎯 En haut, l'objectif indique la prochaine découverte : quand vous avez assez de 💡, elle apparaît dans vos cartes. 3 découvertes = ère suivante.</p><p>🪵 Bois, 🪨 pierre, 🔩 fer (Moyen Âge) et ⚫ charbon (Renaissance) servent à construire. Carrières et mines s'installent au pied des montagnes.</p>
         <p>🍖 Nourrissez la population, 🏠 logez-la et 😊 gardez-la heureuse pour qu'elle grandisse. Un peuple malheureux manifeste !</p>
         <p>💡 Le savoir permet les <b>découvertes</b>. Faites les 3 découvertes d'une ère pour passer à la suivante : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.</p>
         <p>⚔️ Les voisins attaquent parfois : gardez une armée ou des remparts.</p>
@@ -420,7 +419,7 @@
       save();
       caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('PREMIÈRE IDÉE :<br>DU <em>BOIS</em> ET DU <em>GIBIER</em> 🪓🏹', 2600);
+      if (!busy) caption('CHOISISSEZ UNE <em>CARTE</em><small>chaque carte a un bonus et un malus</small>', 2600);
     };
   });
 

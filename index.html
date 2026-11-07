@@ -22,6 +22,7 @@
     </div>
     <button class="country" id="hCountry"><canvas id="hFlag" width="60" height="40"></canvas><span id="hName">PAYS SANS NOM</span></button>
     <div class="era" id="hEra">Préhistoire</div>
+    <div class="goal" id="hGoal" hidden></div>
     <div id="res"></div>
   </header>
 
@@ -33,12 +34,8 @@
   <!-- Le choix du jour -->
   <footer id="dock" class="hidden">
     <div class="dock-title">CHAQUE JOUR <em>VOUS CHOISISSEZ</em></div>
-    <div class="tiles">
-      <button class="tile" data-cat="build"><span class="tile-ico">🏠</span><span>CONSTRUCTIONS</span><i class="badge"></i></button>
-      <button class="tile" data-cat="law"><span class="tile-ico">📜</span><span>LOIS</span><i class="badge"></i></button>
-      <button class="tile" data-cat="war"><span class="tile-ico">⚔️</span><span>GUERRES</span><i class="badge"></i></button>
-      <button class="tile" data-cat="tech"><span class="tile-ico">💡</span><span>DÉCOUVERTES</span><i class="badge"></i></button>
-    </div>
+    <button id="confirm" class="btn primary confirm" hidden></button>
+    <div id="cards"></div>
     <div class="dock-row">
       <button class="small" id="bRest">😴 Repos</button>
       <button class="small" id="bLog">📖 Journal</button>
@@ -46,13 +43,6 @@
       <button class="small" id="bMenu">⚙️</button>
     </div>
   </footer>
-
-  <!-- Liste des choix d'une catégorie -->
-  <div id="sheet" class="sheet">
-    <div class="sheet-head"><h2 id="sheetTitle"></h2><button class="round" id="sheetClose">✕</button></div>
-    <p id="sheetSub"></p>
-    <div id="sheetList"></div>
-  </div>
 
   <!-- Écran titre -->
   <section id="title" class="screen">

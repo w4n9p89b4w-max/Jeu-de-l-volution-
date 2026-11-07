@@ -10,11 +10,13 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
 2. **Premier choix : où fonde-t-on le pays ?**
    - **A — au bord de la rivière** : de l'eau et des terres fertiles (+25 % de nourriture).
    - **B — au bord du lac** : la pêche et un port (+3 🍖 et +2 💰 par jour).
-3. **Chaque jour, vous choisissez** une seule action :
-   - 🏠 **Constructions** : huttes, champs, temples, châteaux, usines, gratte-ciel…
-   - 📜 **Lois** : partage du gibier, impôt, suffrage universel, transition écologique…
-   - ⚔️ **Guerres** : recruter, attaquer les voisins, fortifier, signer la paix.
-   - 💡 **Découvertes** : les 3 découvertes d'une ère font passer à la suivante.
+3. **Chaque jour, vous choisissez une carte** parmi 4 (A, B, C, D). Chaque carte a un **bonus** (en vert) et un **malus** (en rouge) :
+   - 🏠 **Construction** : coûte des ressources, rapporte chaque jour (huttes, champs, mines, usines, gratte-ciel…).
+   - 📜 **Loi** : un avantage permanent, souvent avec un inconvénient.
+   - 💡 **Découverte** : coûte du savoir ; les 3 découvertes d'une ère font passer à la suivante.
+   - ⚔️ **Guerre** : recruter, fortifier, signer la paix, attaquer les voisins.
+   - 🔁 **Ressources** : on en gagne une, on en perd une autre (couper la forêt, vendre du bois, grande fête…).
+   Aucune carte ne plaît ? Le **Repos** passe la journée.
 4. La nuit tombe, la production tombe, la population grandit… et des événements surviennent (récoltes, épidémies, invasions, manifs !).
 5. Parfois, un **dilemme** vous oblige à choisir entre **A** et **B** : accueillir des réfugiés ou fermer la frontière, couper la forêt ou la protéger, ouvrir une mine de charbon sous les champs…
 
