@@ -222,6 +222,12 @@
     return k;
   }
   const power = (s) => Math.round(armyPower(s) + totals(s).def + jobOutput(s).def);
+  // En temps de paix, les soldats partent chasser. Après une bataille ou une
+  // invasion, le pays est « en guerre » pendant 5 jours : ils restent au camp.
+  const WAR_DAYS = 5;
+  const atPeace = (s) => s.day >= (s.warUntil || 0);
+  const huntPerSoldier = (s) => 1 + (s.disc.includes('feu') ? 0.25 : 0);
+  const soldierHunt = (s) => (atPeace(s) ? s.army * huntPerSoldier(s) : 0);
   const enemyStrength = (s) => Math.round(4 + s.day * 0.6 * (1 + s.era * 0.6));
 
   // Les ressources visibles dans l'interface
@@ -372,7 +378,7 @@
     const mult = 0.75 + s.happy / 200;
     const lake = s.site === 'lac', river = s.site === 'riviere';
     const foodFixed = (3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult;
-    const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed;
+    const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed - soldierHunt(s) * mult;
     const want = {};
     for (const j of WORK) want[j] = 0;
     want.hunt = Math.min(n, Math.max(0, Math.ceil(foodNeed / (jobBase(s, 'hunt') * mult))));
@@ -428,7 +434,7 @@
     const mult = 0.75 + s.happy / 200;
     const lake = s.site === 'lac', river = s.site === 'riviere';
     const prod = (base, v) => Math.round((base + v) * (base + v > 0 ? mult : 1));
-    const foodProd = Math.round((3 + t.food + jobOutput(s).food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
+    const foodProd = Math.round((3 + t.food + jobOutput(s).food + soldierHunt(s) + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
     const foodCons = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4);
     const jo = jobOutput(s), free = jo.idle;
     const f = {
@@ -440,7 +446,7 @@
       gold: prod(Math.floor(free / 12) + jo.gold + (lake ? 2 : 0), t.gold),
       sci: prod(1 + Math.floor(free / 20) + jo.sci, t.sci),
     };
-    f.jobs = jo; f.free = free; f.mult = mult;
+    f.jobs = jo; f.free = free; f.mult = mult; f.soldierFood = soldierHunt(s) * mult * (river ? 1.25 : 1); f.peace = atPeace(s);
     f.cap = 5 + t.cap;
     let target = 50 + t.happy;
     if (s.pop >= f.cap) target -= 5;
@@ -538,7 +544,7 @@
     }
     if (cat === 'war') {
       const w = warCosts(s);
-      if (id === 'recruter') { const u = UNITS[s.era]; return { plus: [`+${w.recruitN} ${u.icon} ${u.name.toLowerCase()}`, `+${num1(w.recruitN * u.power)} ⚔️`], minus: costL(w.recruit).concat([`mangent ${Math.ceil(w.recruitN / 4)} 🍖/j`]) }; }
+      if (id === 'recruter') { const u = UNITS[s.era]; return { plus: [`+${w.recruitN} ${u.icon} ${u.name.toLowerCase()}`, `+${num1(w.recruitN * u.power)} ⚔️`, `en paix : chassent +${num1(w.recruitN * huntPerSoldier(s))} 🍖/j`], minus: costL(w.recruit).concat([`mangent ${Math.ceil(w.recruitN / 4)} 🍖/j`]) }; }
       if (id === 'rearmer') {
         const k = Math.max(1, rearmMax(s)), u = UNITS[s.era];
         let left = k, g = 0;
@@ -547,7 +553,7 @@
       }
       if (id === 'fortifier') return { plus: [`+${w.fortN} 🛡️`], minus: costL(w.fort) };
       if (id === 'paix') return { plus: ['🕊️ 12 jours sans invasion', '+3 😊'], minus: costL(w.peace) };
-      if (id === 'attaquer') { const ch = Math.round(attackChance(s) * 100); return { plus: [`${ch}% : butin et nouveaux habitants`], minus: [`${100 - ch}% : −40% 🪖, −${1 + s.era} 👤`] }; }
+      if (id === 'attaquer') { const ch = Math.round(attackChance(s) * 100); return { plus: [`${ch}% : butin et nouveaux habitants`], minus: [`${100 - ch}% : −40% 🪖, −${1 + s.era} 👤`, `${WAR_DAYS} jours de guerre : les soldats ne chassent plus`] }; }
     }
     return { plus: [], minus: [] };
   }
@@ -646,6 +652,7 @@
         if (s.peaceUntil > s.day || !canPay(s, w.peace)) return { ok: false };
         pay(s, w.peace);
         s.peaceUntil = s.day + 12;
+        s.warUntil = 0;
         s.happy = Math.min(100, s.happy + 3);
         log(s, `🕊️ Traité de paix jusqu'au jour ${s.peaceUntil}`);
         return { ok: true, title: 'Traité de paix', text: `Aucune invasion jusqu'au jour ${s.peaceUntil}.`, icon: '🕊️', good: true };
@@ -653,6 +660,7 @@
       if (id === 'attaquer') {
         if (s.army <= 0) return { ok: false };
         s.stats.battles++;
+        s.warUntil = s.day + WAR_DAYS;
         const enemy = ERAS[s.era].enemy;
         if (rng() < attackChance(s)) {
           s.stats.victories++;
@@ -853,6 +861,7 @@
     const strength = Math.round(enemyStrength(s) * (0.6 + rng() * 0.6));
     const p = power(s);
     s.stats.battles++;
+    s.warUntil = s.day + WAR_DAYS;
     if (p >= strength) {
       s.stats.victories++;
       s.happy = Math.min(100, s.happy + 5);
@@ -878,7 +887,7 @@
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
     known, dilemmaView, choose, buildCost, canPay,
-    UNITS, troopsOf, armyPower, outdated, armyText,
+    UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
     prefOf, setPref, setQuota, applyQuotas, recommendQuotas,
   };

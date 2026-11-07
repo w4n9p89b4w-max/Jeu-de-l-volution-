@@ -161,7 +161,7 @@
       `<span class="chip${r === 'food' && f.food < 0 ? ' warn' : ''}" title="${E.RES_NAMES[r]}">${E.RES_ICONS[r]} ${fmt(state.res[r])} ${d(f[r])}</span>`).concat([
       `<span class="chip${state.happy < 30 ? ' warn' : ''}" title="Bonheur">${state.happy >= 70 ? '😄' : state.happy >= 40 ? '🙂' : state.happy >= 25 ? '😐' : '😠'} ${state.happy}%</span>`,
       `<span class="chip${state.pop >= f.cap ? ' warn' : ''}" title="Logements">🏠 ${fmt(state.pop)}/${fmt(f.cap)}</span>`,
-      `<span class="chip" title="Puissance militaire">⚔️ ${E.power(state)}${peace}</span>`,
+      `<span class="chip${E.atPeace(state) ? '' : ' warn'}" title="${E.atPeace(state) ? 'En paix : les soldats chassent' : 'En guerre : les soldats restent au camp'}">⚔️ ${E.power(state)}${peace}${E.atPeace(state) ? '' : ` 🔥 guerre ${state.warUntil - state.day} j`}</span>`,
     ]).join('');
     // pastilles : nombre de choix possibles
     document.querySelectorAll('.tile').forEach((t) => {
@@ -413,9 +413,10 @@
       }
       const have = jo.count[id] || 0, want = q[id] || 0;
       const out = j.res === 'def' ? `+${Math.round(jo.def)} 🛡️` : `+${num(jo[j.res] * f.mult)} ${RES_OF(j)}/jour`;
-      return `<div class="jrow${have ? ' busy' : ''}">
+      const extra = id === 'hunt' && state.army ? `<br>${f.peace ? `+ ${state.army} soldats en paix : +${num(f.soldierFood)} 🍖/jour` : `les ${state.army} soldats sont en guerre et ne chassent pas`}` : '';
+      return `<div class="jrow${have || extra ? ' busy' : ''}">
         <span class="ti">${j.icon}</span>
-        <div class="tname"><b>${j.name}</b><small>${have ? out : 'Personne'}${have < want ? ` <span class="warn">· personne de libre</span>` : ''}</small></div>
+        <div class="tname"><b>${j.name}</b><small>${have ? out : 'Personne'}${have < want ? ` <span class="warn">· personne de libre</span>` : ''}${extra}</small></div>
         <div class="tstep"><button class="qb" data-job="${id}" data-d="-1" aria-label="Retirer un villageois de ${j.name}"${want ? '' : ' disabled'}>−</button><b>${have}</b><button class="qb" data-job="${id}" data-d="1" aria-label="Ajouter un villageois à ${j.name}"${idle || have < want ? '' : ' disabled'}>+</button></div>
       </div>`;
     }).join('');

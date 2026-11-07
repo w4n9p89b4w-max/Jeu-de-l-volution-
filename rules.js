@@ -95,7 +95,7 @@
       <p>Il y a un voisin par ère. Le choix <b>Attaquer</b> vise toujours le voisin de votre ère actuelle :</p>
       <table>${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} ${er.name}</td><td>${er.enemy}</td></tr>`).join('')}</table>
       <h4>Les soldats de chaque époque</h4>
-      <p>L'armée est à part : les soldats ne sont pas des villageois et ne font pas d'autre tâche. Ils mangent 1 🍖 pour 4 soldats par jour. Chaque soldat <b>garde les armes de l'époque où il a été recruté</b>.</p>
+      <p>L'armée est à part : les soldats ne sont pas des villageois. Ils mangent 1 🍖 pour 4 soldats par jour. <b>En temps de paix, ils chassent</b> : chaque soldat rapporte 1 🍖 par jour (1,25 avec la maîtrise du feu). <b>En temps de guerre</b> (pendant 5 jours après une attaque ou une invasion, signalé par 🔥 en haut de l'écran), ils restent au camp et ne chassent plus. Un traité de paix arrête la guerre tout de suite. Chaque soldat <b>garde les armes de l'époque où il a été recruté</b>.</p>
       <table><tr><th>Ère</th><th>Unité</th><th>Armes</th><th>Force</th><th>Recrutement</th></tr>
       ${E.UNITS.map((u) => `<tr><td>${ERA_ICON[u.era]}</td><td>${u.icon} <b>${u.name}</b></td><td>${u.weapon}</td><td>${String(u.power).replace('.', ',')} ⚔️</td><td>+${u.n} pour ${fmtCost(u.cost)}</td></tr>`).join('')}
       </table>

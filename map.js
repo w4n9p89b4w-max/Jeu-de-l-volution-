@@ -621,6 +621,7 @@
     }
     function syncPeople() {
       if (!state || !state.site) { people = []; return; }
+      people = people.filter((p) => !p.soldier);
       const want = Math.min(state.pop, 140);
       const homes = state.buildings.filter((b) => b.x != null);
       const pick = () => { const h = homes.length ? homes[Math.floor(Math.random() * homes.length)] : SITES[state.site]; return { x: h.x + (Math.random() - 0.5) * 50, y: h.y + 8 + (Math.random() - 0.5) * 40 }; };
@@ -668,6 +669,17 @@
         p.pick = PICK[p.job] || pick;
         if (p.job !== was) { const n = p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 400; }
       });
+      // en temps de paix, une partie de l'armée part chasser
+      if (state.army && state.day >= (state.warUntil || 0)) {
+        const c = CAMP[state.site];
+        const best = (state.troops && state.troops.length) ? state.troops[state.troops.length - 1].era : state.era;
+        const n = Math.min(18, Math.ceil(state.army * 0.6));
+        for (let i = 0; i < n; i++) {
+          const q = { x: c.x + (Math.random() - 0.5) * 30, y: c.y + Math.random() * 12, c: LOOK[best].body, soldier: true, job: 'hunt', lumber: true, pick: huntPick, wait: Math.random() * 1500 };
+          q.tx = q.x; q.ty = q.y;
+          people.push(q);
+        }
+      }
     }
     function updatePeople(dt) {
       for (const p of people) {
@@ -723,7 +735,9 @@
       const c = CAMP[state.site];
       const groups = (state.troops && state.troops.length) ? state.troops : [{ era: state.era, n: state.army }];
       const total = groups.reduce((a, g) => a + g.n, 0);
-      const figs = Math.min(36, total);
+      const peace = state.day >= (state.warUntil || 0);
+      const figs = Math.min(36, peace ? Math.max(0, total - Math.min(18, Math.ceil(total * 0.6))) : total);
+      if (!figs) return;
       // les meilleures unités devant
       const list = [];
       groups.slice().sort((a, b) => b.era - a.era).forEach((g) => { const k = Math.max(1, Math.round(g.n / total * figs)); for (let i = 0; i < k; i++) list.push(g.era); });
