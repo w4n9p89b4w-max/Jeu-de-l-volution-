@@ -15,7 +15,7 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 em { font-style: normal; color: var(--yellow); }
 .hidden { display: none !important; }
 
-#app { position: fixed; inset: 0; max-width: 560px; margin: 0 auto; overflow: hidden; background: #e8ecef; }
+#app { position: fixed; inset: 0; max-width: 560px; margin: 0 auto; overflow: hidden; overflow: clip; background: #e8ecef; }
 #map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
 
 /* ---------- Texte « vidéo » ---------- */
@@ -72,8 +72,8 @@ em { font-style: normal; color: var(--yellow); }
 .tile-ico { font-size: 24px; line-height: 1; }
 .badge { position: absolute; top: -6px; right: -4px; min-width: 19px; height: 19px; border-radius: 10px; background: var(--bad); color: #fff; font-style: normal; font-size: 11px; font-weight: 900; display: grid; place-items: center; padding: 0 5px; box-shadow: 0 2px 0 rgba(0,0,0,.2); }
 .badge:empty { display: none; }
-.dock-row { display: flex; gap: 6px; }
-.small { background: rgba(255, 255, 255, .92); border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 900; box-shadow: 0 2px 0 rgba(0, 0, 0, .15); }
+.dock-row { display: flex; gap: 5px; flex-wrap: nowrap; }
+.small { white-space: nowrap; background: rgba(255, 255, 255, .92); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 900; box-shadow: 0 2px 0 rgba(0, 0, 0, .15); }
 #dock.busy .tiles, #dock.busy .dock-row { opacity: .5; pointer-events: none; }
 
 /* ---------- Feuille de choix ---------- */
@@ -196,3 +196,11 @@ em { font-style: normal; color: var(--yellow); }
 .finfo { font-size: 13px; }
 .finfo .g { color: #1f7a42; font-weight: 900; }
 .finfo .b { color: #b5332b; font-weight: 800; }
+
+.job { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #f4f0e6; border-radius: 12px; padding: 8px; margin: 8px 0; }
+.job .jl { font-weight: 900; font-size: 14px; }
+.job .stepper { margin: 2px 0; }
+.job .stepper b { min-width: 50px; }
+.job .jg { font-size: 12.5px; }
+.job .g { color: #1f7a42; font-weight: 900; }
+.job small { color: var(--muted); font-weight: 700; }

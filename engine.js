@@ -33,7 +33,7 @@
     // Préhistoire
     { id: 'hutte', era: 0, name: 'Hutte', icon: '🛖', arch: 'hut', cost: { wood: 6 }, eff: { cap: 6 }, desc: 'Un abri de branches et de peaux.' },
     { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 5 }, eff: { food: 4 }, desc: 'Les chasseurs ramènent du gibier.' },
-    { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Tailler la pierre au pied de la montagne.' },
+    { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Une vraie carrière : bien plus efficace que ramasser des cailloux.' },
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
     // Antiquité
@@ -136,7 +136,7 @@
   function newState(name, flag) {
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
-      day: 1, era: 0, pop: 5, forest: 2, happy: 60, army: 0, fort: 0, peaceUntil: 0,
+      day: 1, era: 0, pop: 5, forest: 2, quarry: 1, happy: 60, army: 0, fort: 0, peaceUntil: 0,
       res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 },
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
@@ -152,6 +152,7 @@
       s.buildings = s.buildings.filter((b) => b.id !== 'bucheron');
       s.forest = Math.min(s.pop, 2 + camps * 2);
     }
+    if (s.quarry == null) s.quarry = Math.min(Math.max(0, s.pop - s.forest), Math.max(1, Math.round(s.pop * 0.1)));
     if (s.v === 2) return s;
     const mat = s.res.mat || 0;
     s.res = { food: s.res.food || 0, wood: Math.round(mat * 0.6), stone: Math.round(mat * 0.4), iron: s.era >= 2 ? 10 : 0, coal: s.era >= 3 ? 10 : 0, gold: s.res.gold || 0, sci: s.res.sci || 0 };
@@ -208,11 +209,19 @@
   function woodPerWorker(s) {
     return 1.5 + (s.disc.includes('outils') ? 0.5 : 0) + (s.disc.includes('metal') ? 0.5 : 0) + (s.disc.includes('vapeur') ? 1 : 0);
   }
-  const foresters = (s) => Math.max(0, Math.min(s.forest || 0, s.pop));
-  function setForest(s, n) {
-    s.forest = Math.max(0, Math.min(s.pop, Math.round(n)));
-    return s.forest;
+  // Ramasser des pierres au pied de la montagne : plus lent que le bois
+  function stonePerWorker(s) {
+    return 0.75 + (s.disc.includes('outils') ? 0.25 : 0) + (s.disc.includes('metal') ? 0.25 : 0) + (s.disc.includes('vapeur') ? 0.5 : 0);
   }
+  const foresters = (s) => Math.max(0, Math.min(s.forest || 0, s.pop));
+  const quarriers = (s) => Math.max(0, Math.min(s.quarry || 0, s.pop - foresters(s)));
+  // job : 'forest' ou 'quarry'. Le total des ouvriers ne dépasse pas la population.
+  function setJob(s, job, n) {
+    const other = job === 'forest' ? (s.quarry || 0) : (s.forest || 0);
+    s[job] = Math.max(0, Math.min(s.pop - other, Math.round(n)));
+    return s[job];
+  }
+  const setForest = (s, n) => setJob(s, 'forest', n);
 
   /* ---------- Prévisions de la journée ---------- */
   function forecast(s) {
@@ -222,17 +231,18 @@
     const prod = (base, v) => Math.round((base + v) * (base + v > 0 ? mult : 1));
     const foodProd = Math.round((3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
     const foodCons = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4);
-    const fo = foresters(s), free = s.pop - fo;
+    const fo = foresters(s), qw = quarriers(s), free = s.pop - fo - qw;
     const f = {
       food: foodProd - foodCons, foodProd, foodCons,
       wood: prod(fo * woodPerWorker(s), t.wood),
-      stone: prod(Math.floor(free / 15), t.stone),
+      stone: prod(qw * stonePerWorker(s), t.stone),
       iron: prod(0, t.iron),
       coal: prod(0, t.coal),
       gold: prod(Math.floor(free / 12) + (lake ? 2 : 0), t.gold),
       sci: prod(1 + Math.floor(free / 20), t.sci),
     };
     f.forest = fo; f.perWorker = woodPerWorker(s);
+    f.quarry = qw; f.stonePer = stonePerWorker(s); f.free = free;
     f.cap = 5 + t.cap;
     let target = 50 + t.happy;
     if (s.pop >= f.cap) target -= 5;
@@ -376,6 +386,7 @@
       s.disc.push(id);
       log(s, `${d.icon} Découverte : ${d.name}`);
       const r = { ok: true, title: 'Découverte !', text: `${d.name} — ${d.desc}`, icon: d.icon, good: true };
+      if (id === 'outils' && !count(s, 'carriere')) r.proposeQuarry = true;
       const eraDone = DISCOVERIES.filter((x) => x.era === s.era).every((x) => s.disc.includes(x.id));
       if (eraDone && s.era < ERAS.length - 1) {
         s.era++;
@@ -635,7 +646,7 @@
   const api = {
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
-    known, dilemmaView, choose, setForest, woodPerWorker,
+    known, dilemmaView, choose, setForest, setJob, woodPerWorker, stonePerWorker, buildCost, canPay,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Engine = api;

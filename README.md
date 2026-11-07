@@ -19,7 +19,7 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
 5. Parfois, un **dilemme** vous oblige à choisir entre **A** et **B** : accueillir des réfugiés ou fermer la frontière, couper la forêt ou la protéger, ouvrir une mine de charbon sous les champs…
 
 **Les ressources** : 🍖 nourriture, 🪵 bois, 🪨 pierre, 🔩 fer (dès le Moyen Âge), ⚫ charbon (dès la Renaissance), 💰 or et 💡 savoir.
-Le bois vient des **habitants envoyés en forêt** (bouton 🌲, à régler à tout moment) : ils rapportent du bois mais plus d'or, de pierre ni de savoir.
+Le bois et la pierre viennent des **habitants envoyés au travail** (bouton 🌲🪨, à régler à tout moment) : bûcherons en forêt et ramasseurs de pierres au pied de la montagne. Ils ne rapportent plus d'or ni de savoir. Après les *Outils en pierre*, le jeu propose d'ouvrir une **carrière**.
 Carrières et mines s'installent au pied des montagnes ; hauts-fourneaux et usines consomment du charbon.
 
 **Les 6 ères** : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.

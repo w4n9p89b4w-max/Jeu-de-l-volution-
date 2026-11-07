@@ -626,18 +626,34 @@
         const t = spots[Math.floor(Math.random() * spots.length)];
         return { x: t.x + (Math.random() - 0.5) * 8, y: t.y + 4 };
       };
+      const o = SITES[state.site];
+      const rocks = [];
+      for (let a = 0; a < Math.PI * 2; a += 0.05) {
+        const x = VX + Math.cos(a) * VRX * 0.97, y = VY + Math.sin(a) * VRY * 0.97;
+        if (!isWater(x, y, 20) && y > 150) rocks.push({ x, y, d: Math.hypot(x - o.x, y - o.y) });
+      }
+      rocks.sort((a, b) => a.d - b.d);
+      const near = rocks.slice(0, 8);
+      const stonePick = () => {
+        if (!near.length || Math.random() < 0.3) return pick();
+        const r = near[Math.floor(Math.random() * near.length)];
+        return { x: r.x + (Math.random() - 0.5) * 14, y: r.y + (Math.random() - 0.5) * 8 };
+      };
       while (people.length < want) {
         const p = pick();
         if (isWater(p.x, p.y, 2)) continue;
         people.push({ x: p.x, y: p.y, tx: p.x, ty: p.y, c: COLORS[Math.floor(Math.random() * COLORS.length)], wait: Math.random() * 3000, pick });
       }
       if (people.length > want) people.length = want;
-      const nWood = state.pop ? Math.round(Math.min(state.forest || 0, state.pop) * want / state.pop) : 0;
+      const k = state.pop ? want / state.pop : 0;
+      const nWood = Math.round(Math.min(state.forest || 0, state.pop) * k);
+      const nStone = Math.round(Math.min(state.quarry || 0, Math.max(0, state.pop - (state.forest || 0))) * k);
       people.forEach((p, i) => {
-        const wasLumber = p.lumber;
-        p.lumber = i < nWood;
-        p.pick = p.lumber ? woodPick : pick;
-        if (p.lumber !== wasLumber) { const n = p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 400; }
+        const was = p.job;
+        p.job = i < nWood ? 'wood' : i < nWood + nStone ? 'stone' : '';
+        p.lumber = p.job !== '';
+        p.pick = p.job === 'wood' ? woodPick : p.job === 'stone' ? stonePick : pick;
+        if (p.job !== was) { const n = p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 400; }
       });
     }
     function updatePeople(dt) {
@@ -660,7 +676,10 @@
       ctx.fillStyle = p.c;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x - 1.6, p.y - 5, 3.2, 5, 1.5) : ctx.rect(p.x - 1.6, p.y - 5, 3.2, 5); ctx.fill();
       ctx.beginPath(); ctx.arc(p.x, p.y - 6.2, 1.5, 0, Math.PI * 2); ctx.fill();
-      if (p.lumber) {
+      if (p.job === 'stone') {
+        ctx.fillStyle = '#9ea3a8'; ctx.fillRect(p.x - 1.8, p.y - 10.2, 3.6, 2.6);
+        ctx.fillStyle = '#c3c7cb'; ctx.fillRect(p.x - 1.8, p.y - 10.2, 3.6, 1);
+      } else if (p.lumber) {
         ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 0.8;
         ctx.beginPath(); ctx.moveTo(p.x + 1.2, p.y - 3); ctx.lineTo(p.x + 3.4, p.y - 7.4); ctx.stroke();
         ctx.fillStyle = '#9aa3ad'; ctx.fillRect(p.x + 2.6, p.y - 8.2, 2, 1.6);

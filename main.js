@@ -8,6 +8,8 @@
   const SAVE_KEY = 'evolution-pays-v1';
 
   const map = ValleyMap.create($('map'));
+  // l'écran du jeu ne doit jamais défiler (sinon tout se décale)
+  $('app').addEventListener('scroll', () => { $('app').scrollTop = 0; $('app').scrollLeft = 0; });
   let state = null;
   let busy = false;
 
@@ -150,7 +152,9 @@
     lastPop = state.pop;
     $('hName').textContent = state.name;
     if (state.forest > state.pop) state.forest = state.pop;
+    if (state.forest + state.quarry > state.pop) state.quarry = Math.max(0, state.pop - state.forest);
     $('forestN').textContent = state.forest;
+    $('quarryN').textContent = state.quarry;
     const era = E.ERAS[state.era];
     $('hEra').textContent = `${era.name} · ${era.year}`;
     const d = (v) => v > 0 ? `<i class="up">+${v}</i>` : v < 0 ? `<i class="down">${v}</i>` : '';
@@ -234,6 +238,7 @@
     } else {
       await wait(1100);
     }
+    if (r.proposeQuarry) await proposeQuarry();
     if (r.newEra != null) await newEra(r.newEra);
     await endOfDay();
     busy = false; $('dock').classList.remove('busy');
@@ -328,36 +333,64 @@
     });
   }
 
-  /* ---------- Les habitants en forêt ---------- */
+  /* ---------- Le travail des habitants : forêt et pierres ---------- */
   function openForest() {
     if (!state || busy) return;
+    const hasQuarry = state.buildings.some((b) => b.id === 'carriere');
     modal({
-      icon: '🌲', title: 'Envoyer en forêt',
-      html: `<p>Combien d'habitants partent couper du bois ?</p>
-        <div class="stepper"><button class="round" id="fMinus" aria-label="Moins">−</button><b id="fVal"></b><button class="round" id="fPlus" aria-label="Plus">+</button></div>
-        <input type="range" id="fRange" min="0" step="1">
+      icon: '👷', title: 'Le travail des habitants',
+      html: `<p>Qui part travailler hors du village ? Ce n'est pas le choix du jour : changez-le quand vous voulez.</p>
+        <div class="job"><span class="jl">🌲 Couper du bois</span>
+          <div class="stepper"><button class="round" id="fMinus" aria-label="Moins de bûcherons">−</button><b id="fVal"></b><button class="round" id="fPlus" aria-label="Plus de bûcherons">+</button></div>
+          <span class="jg" id="fGain"></span></div>
+        <div class="job"><span class="jl">🪨 ${hasQuarry ? 'Travailler à la carrière' : 'Ramasser des pierres'}</span>
+          <div class="stepper"><button class="round" id="qMinus" aria-label="Moins de ramasseurs">−</button><b id="qVal"></b><button class="round" id="qPlus" aria-label="Plus de ramasseurs">+</button></div>
+          <span class="jg" id="qGain"></span></div>
         <p id="fInfo" class="finfo"></p>`,
       buttons: [{ label: 'C\'est parti !', value: true, primary: true }],
     }).then(() => { save(); map.syncPeople(); });
-    const range = $('fRange');
     const refresh = () => {
       const f = E.forecast(state);
-      range.max = state.pop; range.value = state.forest;
-      $('fVal').textContent = `${state.forest} / ${state.pop} 👤`;
-      $('fInfo').innerHTML = `<span class="g">+${f.wood} 🪵/jour</span> (${String(f.perWorker).replace('.', ',')} 🪵 par bûcheron)<br>
-        <span class="b">Les bûcherons ne rapportent ni 💰, ni 🪨, ni 💡.</span><br>
-        Reste au village : ${state.pop - state.forest} 👤 → ${f.gold} 💰 · ${f.stone} 🪨 · ${f.sci} 💡 par jour`;
-      $('forestN').textContent = state.forest;
+      $('fVal').textContent = state.forest;
+      $('qVal').textContent = state.quarry;
+      $('fGain').innerHTML = `<span class="g">+${f.wood} 🪵/jour</span> <small>(${String(f.perWorker).replace('.', ',')} par bûcheron)</small>`;
+      $('qGain').innerHTML = `<span class="g">+${f.stone} 🪨/jour</span> <small>(${String(f.stonePer).replace('.', ',')} par ramasseur${hasQuarry ? ' + la carrière' : ''})</small>`;
+      $('fInfo').innerHTML = `<span class="b">Les travailleurs ne rapportent ni 💰 ni 💡.</span><br>
+        Restent au village : <b>${f.free} 👤</b> → ${f.gold} 💰 · ${f.sci} 💡 par jour`;
       updateHUD();
       map.syncPeople();
     };
-    $('fMinus').onclick = () => { E.setForest(state, state.forest - 1); refresh(); };
-    $('fPlus').onclick = () => { E.setForest(state, state.forest + 1); refresh(); };
-    range.oninput = () => { E.setForest(state, +range.value); refresh(); };
+    $('fMinus').onclick = () => { E.setJob(state, 'forest', state.forest - 1); refresh(); };
+    $('fPlus').onclick = () => { E.setJob(state, 'forest', state.forest + 1); refresh(); };
+    $('qMinus').onclick = () => { E.setJob(state, 'quarry', state.quarry - 1); refresh(); };
+    $('qPlus').onclick = () => { E.setJob(state, 'quarry', state.quarry + 1); refresh(); };
     refresh();
   }
+
+  // Après les Outils en pierre : proposer d'ouvrir une carrière
+  async function proposeQuarry() {
+    const b = E.B.carriere;
+    const cost = E.buildCost(state, b);
+    const ok = E.canPay(state, cost);
+    const v = await modal({
+      icon: '🪨', title: 'Ouvrir une carrière ?',
+      html: `<p>Avec les outils en pierre, vos ramasseurs ont repéré un bon filon au pied de la montagne. Une vraie carrière produirait bien plus que les cailloux ramassés à la main.</p>
+        <p class="finfo"><span class="g">+4 🪨/jour</span> pour toujours<br><span class="b">−${cost.wood} 🪵</span></p>`,
+      buttons: [
+        { label: ok ? 'A · Ouvrir la carrière' : 'A · Pas assez de bois…', hint: ok ? `−${cost.wood} 🪵, +4 🪨/jour` : 'Elle reste disponible dans Constructions', value: ok ? 'open' : 'later', primary: true, cls: 'choice-a' },
+        { label: 'B · Plus tard', hint: 'Elle reste disponible dans Constructions', value: 'later', cls: 'choice-b' },
+      ],
+    });
+    if (v !== 'open') return;
+    const r = E.act(state, 'build', 'carriere');
+    if (r.ok) {
+      map.place(r.built); map.syncPeople(); updateHUD(); save();
+      caption('🪨 CARRIÈRE <em>OUVERTE</em> !', 1800);
+      await wait(1200);
+    }
+  }
   $('bForest').onclick = openForest;
-  $('res').addEventListener('click', (e) => { if (e.target.closest('[title="Bois"]')) openForest(); });
+  $('res').addEventListener('click', (e) => { if (e.target.closest('[title="Bois"], [title="Pierre"]')) openForest(); });
 
   $('bRest').onclick = () => choisir('rest');
   $('bLog').onclick = () => {
@@ -458,7 +491,7 @@
       save();
       caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('BESOIN DE <em>BOIS</em> ?<small>Touchez 🌲 pour envoyer des habitants en forêt</small>', 3000);
+      if (!busy) caption('BESOIN DE <em>BOIS</em> ET DE <em>PIERRE</em> ?<small>Touchez 🌲🪨 pour envoyer des habitants travailler</small>', 3200);
     };
   });
 

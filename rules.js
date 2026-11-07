@@ -46,14 +46,16 @@
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
       <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, chasse, champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
       <tr><td>🪵</td><td>Bois</td><td>Les <b>habitants envoyés en forêt</b> (bouton 🌲 en bas) : 1,5 🪵 chacun par jour, +0,5 avec les <i>Outils en pierre</i>, +0,5 avec la <i>Métallurgie du fer</i>, +1 avec la <i>Machine à vapeur</i>. Puis la scierie et les usines.</td></tr>
-      <tr><td>🪨</td><td>Pierre</td><td>1 pour 15 habitants restés au village, carrière (après <i>Outils en pierre</i>), tailleurs de pierre, gare.</td></tr>
+      <tr><td>🪨</td><td>Pierre</td><td>Les <b>habitants qui ramassent des pierres</b> (bouton 🌲🪨) : 0,75 🪨 chacun par jour, +0,25 avec les <i>Outils en pierre</i>, +0,25 avec la <i>Métallurgie du fer</i>, +0,5 avec la <i>Machine à vapeur</i>. Puis la carrière, les tailleurs de pierre et la gare.</td></tr>
       <tr><td>🔩</td><td>Fer</td><td>À partir du <b>Moyen Âge</b> : mine de fer (après <i>Métallurgie du fer</i>), haut-fourneau, recyclage.</td></tr>
       <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
-      <tr><td>💰</td><td>Or</td><td>1 pour 12 habitants restés au village, marchés, banques, gares, lois.</td></tr>
+      <tr><td>💰</td><td>Or</td><td>1 pour 12 habitants restés au village (ni en forêt, ni aux pierres), marchés, banques, gares, lois.</td></tr>
       <tr><td>💡</td><td>Savoir</td><td>Base 1/jour + 1 pour 20 habitants restés au village, feu, temples, bibliothèques, universités…</td></tr></table>
-      <h4>🌲 Envoyer des habitants en forêt</h4>
-      <p>Il n'y a pas de camp de bûcherons : touchez <b>🌲</b> en bas de l'écran (ou la pastille 🪵) et choisissez combien d'habitants partent couper du bois. Ce n'est pas le choix du jour : vous pouvez le changer à tout moment. Sur la carte, on les voit partir vers la forêt, la hache sur l'épaule.</p>
-      <p><span class="g">Bonus</span> : du bois chaque jour. <span class="b">Malus</span> : les bûcherons ne rapportent plus d'or, de pierre ni de savoir.</p>
+      <h4>👷 Le travail des habitants</h4>
+      <p>Au début, pas de bâtiment pour le bois ni la pierre : touchez <b>🌲 🪨</b> en bas de l'écran (ou les pastilles 🪵 et 🪨) et choisissez combien d'habitants partent <b>couper du bois</b> et combien partent <b>ramasser des pierres</b> au pied de la montagne. Ce n'est pas le choix du jour : vous pouvez le changer à tout moment. Sur la carte, les bûcherons ont une hache sur l'épaule et les ramasseurs portent une pierre.</p>
+      <p><span class="g">Bonus</span> : du bois et de la pierre chaque jour. <span class="b">Malus</span> : les travailleurs ne rapportent plus d'or ni de savoir.</p>
+      <h4>🪨 Ouvrir une carrière</h4>
+      <p>Quand vous découvrez les <b>Outils en pierre</b>, le jeu vous propose d'ouvrir une carrière (A : l'ouvrir tout de suite pour du bois, B : plus tard). Elle produit +4 🪨/jour en plus des ramasseurs. Si vous dites « plus tard », elle reste disponible dans 🏠 Constructions.</p>
       <p>Carrières et mines s'installent au pied des montagnes.</p>`));
 
     parts.push(sec('peuple', '👤 Population et bonheur', `
