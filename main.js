@@ -141,6 +141,7 @@
 
   /* ---------- HUD ---------- */
   const fmt = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : String(n);
+  const short = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',') + 'k' : String(n));
   let lastPop = 0;
   function updateHUD() {
     if (!state) return;
@@ -155,14 +156,14 @@
     $('idleN').textContent = idle || '';
     const era = E.ERAS[state.era];
     $('hEra').textContent = `${era.name} · ${era.year}`;
-    const d = (v) => v > 0 ? `<i class="up">+${v}</i>` : v < 0 ? `<i class="down">${v}</i>` : '';
-    const peace = state.peaceUntil > state.day ? ' 🕊️' : '';
+    // une seule ligne : l'icône et la quantité ; le détail s'ouvre en touchant la ligne
+    const mood = state.happy >= 70 ? '😄' : state.happy >= 40 ? '🙂' : state.happy >= 25 ? '😐' : '😠';
     $('res').innerHTML = E.known(state).map((r) =>
-      `<span class="chip${r === 'food' && f.food < 0 ? ' warn' : ''}" title="${E.RES_NAMES[r]}">${E.RES_ICONS[r]} ${fmt(state.res[r])} ${d(f[r])}</span>`).concat([
-      `<span class="chip${state.happy < 30 ? ' warn' : ''}" title="Bonheur">${state.happy >= 70 ? '😄' : state.happy >= 40 ? '🙂' : state.happy >= 25 ? '😐' : '😠'} ${state.happy}%</span>`,
-      `<span class="chip${state.pop >= f.cap ? ' warn' : ''}" title="Logements">🏠 ${fmt(state.pop)}/${fmt(f.cap)}</span>`,
-      `<span class="chip${E.atPeace(state) ? '' : ' warn'}" title="${E.atPeace(state) ? 'En paix : les soldats chassent' : 'En guerre : les soldats restent au camp'}">⚔️ ${E.power(state)}${E.atPeace(state) ? '' : ` 🔥 ${state.warUntil - state.day} j`}</span>`,
-    ]).join('') + enemyChip();
+      `<span class="rc${r === 'food' && f.food < 0 ? ' warn' : ''}">${E.RES_ICONS[r]}<b>${short(state.res[r])}</b></span>`).concat([
+      `<span class="rc${state.happy < 30 ? ' warn' : ''}">${mood}<b>${state.happy}%</b></span>`,
+      `<span class="rc${state.pop >= f.cap ? ' warn' : ''}">🏠<b>${fmt(state.pop)}/${fmt(f.cap)}</b></span>`,
+    ]).join('');
+    $('enemyBox').innerHTML = enemyChip();
     // pastilles : nombre de choix possibles
     document.querySelectorAll('.tile').forEach((t) => {
       const n = E.options(state, t.dataset.cat).filter((o) => o.can).length;
@@ -170,18 +171,40 @@
     });
   }
 
-  // L'ennemi de l'ère : sa vie, sa force et sa prochaine attaque
+  // L'ennemi de l'ère : petite pastille, qui grandit quand une attaque approche
   function enemyChip() {
     const R = E.rival(state), en = E.ERAS[state.era].enemy, name = en[0].toUpperCase() + en.slice(1);
-    if (R.dead) return `<button class="enemy dead" id="enemyChip">🏆 ${name} est vaincu</button>`;
+    if (R.dead) return `<button class="enemy small-e dead" id="enemyChip">🏆 ${name} vaincu</button>`;
+    const truce = state.peaceUntil > state.day;
     const days = Math.max(0, R.nextRaid - state.day);
-    const when = state.peaceUntil > state.day ? `🕊️ trêve ${state.peaceUntil - state.day} j` : days === 0 ? '⚠️ attaque cette nuit !' : `attaque dans ${days} j`;
+    const when = truce ? `🕊️ trêve ${state.peaceUntil - state.day} j` : days === 0 ? '⚠️ attaque cette nuit !' : `attaque dans ${days} j`;
+    const near = !truce && days <= 2;
+    const fire = E.atPeace(state) ? '' : ` · 🔥 guerre ${state.warUntil - state.day} j`;
+    if (!near) return `<button class="enemy small-e" id="enemyChip" title="Touchez pour ouvrir les choix de guerre">🏴 ${name} · ❤️ ${R.hp} % · ${when}${fire}</button>`;
     const danger = E.power(state) < E.rivalForce(state) * 0.9;
-    return `<button class="enemy${days <= 1 && !(state.peaceUntil > state.day) ? ' soon' : ''}" id="enemyChip" title="Touchez pour ouvrir les choix de guerre">
-      <span class="en">🏴 ${name}</span><span class="hp"><span style="width:${R.hp}%"></span></span><span class="hpt">${R.hp} %</span>
-      <span class="ef${danger ? ' bad' : ''}">⚔️ ${E.rivalForce(state)}</span><span class="ew">${when}</span></button>`;
+    return `<button class="enemy${days <= 1 ? ' soon' : ''}" id="enemyChip" title="Touchez pour ouvrir les choix de guerre">
+      <span class="en">🏴 ${name}</span><span class="hp"><span style="width:${R.hp}%"></span></span>
+      <span class="ef${danger ? ' bad' : ''}">⚔️ ${E.rivalForce(state)} contre ${E.power(state)}</span><span class="ew">${when}</span></button>`;
   }
-  $('res').addEventListener('click', (e) => { if (e.target.closest('#enemyChip')) { e.stopPropagation(); openSheet('war'); } }, true);
+  $('enemyBox').addEventListener('click', (e) => { if (e.target.closest('#enemyChip')) openSheet('war'); });
+
+  // Détail des ressources (touche la ligne des ressources)
+  function showResources() {
+    if (!state) return;
+    const f = E.forecast(state);
+    const sg = (v) => (v > 0 ? `<span class="g">+${v}</span>` : v < 0 ? `<span class="b">${v}</span>` : '0');
+    const rows = E.known(state).map((r) => `<tr><td>${E.RES_ICONS[r]} ${E.RES_NAMES[r]}</td><td><b>${fmt(state.res[r])}</b></td><td>${sg(f[r])} /jour</td></tr>`).join('');
+    modal({
+      icon: '📊', title: 'Vos ressources',
+      html: `<table class="vcard">${rows}
+        <tr><td>😊 Bonheur</td><td><b>${state.happy} %</b></td><td>${state.happy < 30 ? '<span class="b">manifs possibles</span>' : ''}</td></tr>
+        <tr><td>🏠 Logements</td><td><b>${state.pop}/${f.cap}</b></td><td>${state.pop >= f.cap ? '<span class="b">plein</span>' : ''}</td></tr>
+        <tr><td>⚔️ Puissance</td><td><b>${E.power(state)}</b></td><td>${E.atPeace(state) ? 'en paix' : `<span class="b">🔥 en guerre ${state.warUntil - state.day} j</span>`}</td></tr></table>
+        <p class="finfo">La nourriture : ${f.foodProd} produite, ${f.foodCons} mangée par jour.</p>`,
+      buttons: [{ label: '👷 Voir les villageois', value: 'people', primary: true }, { label: 'Fermer', value: false }],
+    }).then((v) => { if (v === 'people') openForest(); });
+  }
+  $('res').addEventListener('click', showResources);
 
   /* ---------- Feuille de choix ---------- */
   const CAT = {
@@ -279,9 +302,8 @@
     $('clockTxt').textContent = paused ? 'En pause' : `${secondsLeft()} s`;
     $('clock').classList.toggle('stopped', stopped);
     $('dock').classList.toggle('done', !!state.chosen);
-    $('dockTitle').innerHTML = state.chosen
-      ? `CHOIX DU JOUR <em>FAIT ✔</em> <small>prochain jour dans ${secondsLeft()} s</small>`
-      : 'CHAQUE JOUR <em>VOUS CHOISISSEZ</em>';
+    $('dockTitle').hidden = !state.chosen;
+    if (state.chosen) $('dockTitle').innerHTML = `✔ Choix du jour fait · prochain jour dans ${secondsLeft()} s`;
   }
   setInterval(() => {
     const now = performance.now(), dt = Math.min(500, now - lastTick);
@@ -336,7 +358,7 @@
     if (f.food < 0) caption('ATTENTION : <em>FAMINE</em> EN VUE !<small>Construisez de quoi manger</small>', 2600);
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
-    else if (state.day === 2) caption('UN JOUR DURE <em>40 SECONDES</em><small>Un seul choix par jour · ⏸️ pause et ×2 / ×4 en haut</small>', 3000);
+    else if (state.day === 2) caption('UN JOUR DURE <em>40 SECONDES</em><small>Un seul choix par jour · ⏸️ et ×2 / ×4 en haut à gauche</small>', 3000);
     else if (state.day === 4) caption('FAITES DES <em>DÉCOUVERTES</em><small>pour changer d\'ère</small>', 2400);
   }
 
@@ -517,18 +539,22 @@
     }
   }
   $('bForest').onclick = openForest;
-  $('res').addEventListener('click', (e) => { if (e.target.closest('.chip') && !e.target.closest('#enemyChip')) openForest(); });
 
   $('bRest').onclick = () => choisir('rest');
-  $('bLog').onclick = () => {
+  function showLog() {
     if (!state) return;
     const rows = state.log.map((l) => `<div><span>J${l.day}</span>${l.text}</div>`).join('') || '<div>Rien encore…</div>';
     modal({ icon: '📖', title: `Journal de ${state.name}`, html: `<div class="log">${rows}</div>`, buttons: [{ label: 'Fermer', value: true }] });
-  };
-  $('bHelp').onclick = () => showHelp();
-  $('hCountry').onclick = $('bLog').onclick;
+  }
+  $('hCountry').onclick = showLog;
   $('bMenu').onclick = async () => {
-    const v = await modal({ icon: '⚙️', title: 'Menu', text: 'La partie est sauvegardée automatiquement à la fin de chaque jour.', buttons: [{ label: 'Reprendre', value: 'back', primary: true }, { label: 'Nouvelle partie', value: 'new' }] });
+    const v = await modal({ icon: '☰', title: 'Menu', text: 'La partie est sauvegardée automatiquement chaque nuit.', buttons: [
+      { label: '📘 Règles du jeu', value: 'rules', primary: true },
+      { label: '📖 Journal du pays', value: 'log' },
+      { label: 'Reprendre', value: 'back' },
+      { label: 'Nouvelle partie', value: 'new' }] });
+    if (v === 'rules') showHelp();
+    if (v === 'log') showLog();
     if (v === 'new') {
       const ok = await modal({ icon: '⚠️', title: 'Tout recommencer ?', text: `${state.name} sera effacé pour toujours.`, buttons: [{ label: 'Oui, recommencer', value: true, primary: true }, { label: 'Annuler', value: false }] });
       if (ok) { wipe(); location.reload(); }

@@ -57,7 +57,7 @@
 
     const J = E.JB;
     parts.push(sec('villageois', '👷 Les villageois et leurs tâches', `
-      <p>Chaque habitant est une personne avec un <b>nom</b>, une <b>force</b> et une <b>faiblesse</b>. Touchez <b>👷 Villageois</b> en bas de l'écran (ou une pastille de ressource). Ce n'est pas le choix du jour : vous pouvez tout changer quand vous voulez.</p>
+      <p>Chaque habitant est une personne avec un <b>nom</b>, une <b>force</b> et une <b>faiblesse</b>. Touchez <b>👷 Villageois</b> en bas de l'écran. Ce n'est pas le choix du jour : vous pouvez tout changer quand vous voulez.</p>
       <h4>Onglet « 📋 Tâches »</h4>
       <p>La liste de toutes les tâches. Sur chaque ligne, <b>+</b> envoie un villageois de plus et <b>−</b> en retire un, selon vos besoins. La ligne montre combien de villageois y travaillent et ce qu'ils rapportent par jour. En haut, <b>« Au village, sans tâche »</b> compte ceux qui sont libres. Le jeu choisit lui-même <b>qui</b> part : d'abord ceux qui <b>préfèrent</b> la tâche, puis <b>les plus forts</b>. <b>✨ Répartir comme le conseille le jeu</b> répartit tout le monde selon les besoins du pays.</p>
       <h4>Onglet « ⭐ Préférences »</h4>
@@ -138,8 +138,8 @@
 
     parts.push(sec('controles', '👆 Commandes', `
       <ul><li>Glissez sur la carte pour vous déplacer. Pincez, ou utilisez la molette, pour zoomer. 🎯 recentre la vue.</li>
-      <li>📖 <b>Journal</b> : l'histoire de votre pays jour après jour (vous pouvez aussi toucher le nom du pays).</li>
-      <li>⚙️ : recommencer une partie. La partie est sauvegardée automatiquement chaque nuit, dans ce navigateur.</li></ul>`));
+      <li><b>En haut</b> : le jour et le temps qui reste (⏸️ pause, ×1 / ×2 / ×4), votre pays et son ère (touchez-le pour le 📖 journal), la population. Dessous, vos ressources : touchez la ligne pour voir ce que vous gagnez ou perdez chaque jour. Puis l'ennemi de l'ère, qui grandit quand une attaque approche.</li>
+      <li><b>☰ Menu</b> : les règles, le journal, ou une nouvelle partie. La partie est sauvegardée automatiquement chaque nuit, dans ce navigateur.</li></ul>`));
 
     const nav = [['but', 'But'], ['jour', 'Journée'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['villageois', 'Villageois'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
     return { nav, html: parts.join('') };

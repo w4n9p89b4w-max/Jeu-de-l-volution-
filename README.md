@@ -44,5 +44,5 @@ python3 -m http.server 8000
 - `engine.js` — règles, données (ères, constructions, lois, découvertes, événements) et simulation, sans DOM.
 - `map.js` — rendu de la vallée sur canvas (montagnes, rivière, lac, arbres, bâtiments, habitants).
 - `main.js` — interface : écrans de départ, HUD, choix du jour, modales, sauvegarde.
-- `rules.js` — l'annexe « Règles du jeu » (bouton 📘), générée à partir des données du jeu.
+- `rules.js` — l'annexe « Règles du jeu » (☰ Menu → Règles), générée à partir des données du jeu.
 - `style.css`, `index.html`.

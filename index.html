@@ -16,14 +16,14 @@
 
   <!-- HUD : jour, population, nom du pays -->
   <header id="hud" class="hidden">
-    <div class="hud-row">
-      <div class="pill day"><small>JOUR</small><b id="hDay">1</b><span class="daybar"><span id="dayBar"></span></span></div>
-      <div class="pill pop"><span class="ico">👤</span><div><small>POPULATION</small><b id="hPop">0</b></div></div>
+    <div class="topbar">
+      <div class="tb-day"><small>JOUR</small><b id="hDay">1</b><span class="daybar"><span id="dayBar"></span></span></div>
+      <div class="clock" id="clock"><button id="bPause" aria-label="Pause">⏸️</button><span id="clockTxt">40 s</span><button id="bSpeed" aria-label="Vitesse">×1</button></div>
+      <button class="tb-country" id="hCountry" aria-label="Journal du pays"><canvas id="hFlag" width="60" height="40"></canvas><span class="tb-txt"><b id="hName">PAYS</b><small id="hEra">Préhistoire</small></span></button>
+      <div class="tb-pop" title="Population">👤 <b id="hPop">0</b></div>
     </div>
-    <div class="clock" id="clock"><button id="bPause" aria-label="Pause">⏸️</button><span id="clockTxt">40 s</span><button id="bSpeed" aria-label="Vitesse">×1</button></div>
-    <button class="country" id="hCountry"><canvas id="hFlag" width="60" height="40"></canvas><span id="hName">PAYS SANS NOM</span></button>
-    <div class="era" id="hEra">Préhistoire</div>
-    <div id="res"></div>
+    <button id="res" aria-label="Détail des ressources"></button>
+    <div id="enemyBox"></div>
   </header>
 
   <button id="recenter" class="round hidden" title="Recentrer">🎯</button>
@@ -43,9 +43,7 @@
     <div class="dock-row">
       <button class="small" id="bForest" aria-label="Les villageois">👷 Villageois<i class="badge" id="idleN"></i></button>
       <button class="small" id="bRest">😴 Repos</button>
-      <button class="small" id="bLog" aria-label="Journal">📖</button>
-      <button class="small" id="bHelp">📘 Règles</button>
-      <button class="small" id="bMenu">⚙️</button>
+      <button class="small" id="bMenu">☰ Menu</button>
     </div>
   </footer>
 
