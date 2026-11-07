@@ -56,6 +56,10 @@
       <li><b>Après ${E.HUNT_APPATS} journées de chasse</b> (une journée par chasseur et par jour), le jeu propose de <b>poser des appâts et des pièges</b> en forêt (A : les poser, B : plus tard). Les chasseurs rapportent alors <b>50 % de plus</b>.</li>
       <li><b>Une fois les appâts posés, après ${E.HUNT_CAMP} journées de chasse</b>, le jeu propose de <b>construire un camp de chasse</b> : +4 🍖 par jour. Vous pouvez ensuite en construire d'autres.</li></ol>
       <p>Si vous répondez « plus tard », la construction reste disponible dans 🏠 Constructions. Ces propositions ne comptent pas comme le choix du jour.</p>
+      <h4>🌾 La nourriture, après la chasse</h4>
+      <p>Avec la découverte de l'<b>Agriculture</b>, un nouveau métier apparaît : <b>🌾 Agriculteur</b> (2,5 🍖 par jour, plus avec l'assolement, la vapeur et l'électricité). À force de cultiver, le jeu propose : champ de blé → charrue (+50 %) → moulin → irrigation (+50 %) → grande ferme → ferme mécanisée → ferme verticale.</p>
+      <h4>🏠 Les maisons</h4>
+      <p>À force de construire, on apprend : 3 huttes débloquent la maison en pierre, 3 maisons en pierre les colombages, 3 colombages l'hôtel particulier, 2 hôtels l'immeuble, 2 immeubles le gratte-ciel. Si vous changez d'ère sans les avoir construits, le type de maison de l'ère précédente se débloque quand même.</p>
       <h4>📈 Tout progresse par la pratique</h4>
       <p>Comme pour la chasse, chaque travail s'améliore à force d'être pratiqué. Quand une étape est atteinte, le jeu la <b>propose</b> la nuit (A : l'adopter tout de suite, B : plus tard). Ces propositions ne comptent pas comme le choix du jour.</p>
       <table><tr><th>Amélioration</th><th>Quand</th><th>Effet</th><th>Prix</th></tr>

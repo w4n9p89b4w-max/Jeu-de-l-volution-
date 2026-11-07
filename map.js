@@ -682,7 +682,14 @@
         return { x: t.x + 6, y: t.y + 4 };
       };
       const guardPick = () => { const a = Math.random() * Math.PI * 2, r = 60 + Math.random() * 30; return { x: o.x + Math.cos(a) * r, y: o.y + Math.sin(a) * r * 0.8 }; };
-      const PICK = { wood: woodPick, stone: stonePick, iron: stonePick, coal: stonePick, hunt: huntPick, guard: guardPick };
+      // les agriculteurs travaillent dans les champs et les fermes
+      const fields = state.buildings.filter((b) => b.x != null && ['field', 'mill', 'barn', 'tractor', 'greentower'].includes(Engine.B[b.id].arch));
+      const farmPick = () => {
+        if (!fields.length || Math.random() < 0.2) return pick();
+        const f = fields[Math.floor(Math.random() * fields.length)];
+        return { x: f.x + (Math.random() - 0.5) * 30, y: f.y + (Math.random() - 0.5) * 18 };
+      };
+      const PICK = { wood: woodPick, stone: stonePick, iron: stonePick, coal: stonePick, hunt: huntPick, guard: guardPick, farm: farmPick };
       const vs = state.villagers || [];
       people.forEach((p, i) => {
         const was = p.job;
@@ -725,7 +732,10 @@
       ctx.fillStyle = p.c;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x - 1.6, p.y - 5, 3.2, 5, 1.5) : ctx.rect(p.x - 1.6, p.y - 5, 3.2, 5); ctx.fill();
       ctx.beginPath(); ctx.arc(p.x, p.y - 6.2, 1.5, 0, Math.PI * 2); ctx.fill();
-      if (p.job === 'hunt') {
+      if (p.job === 'farm') {
+        ctx.fillStyle = '#e8c95a'; ctx.beginPath(); ctx.ellipse(p.x, p.y - 7.4, 2.6, 0.9, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(p.x + 2.2, p.y); ctx.lineTo(p.x + 2.2, p.y - 8); ctx.lineTo(p.x + 3.8, p.y - 8); ctx.stroke();
+      } else if (p.job === 'hunt') {
         ctx.strokeStyle = '#7a5530'; ctx.lineWidth = 0.7;
         ctx.beginPath(); ctx.moveTo(p.x + 2.2, p.y); ctx.lineTo(p.x + 2.2, p.y - 10); ctx.stroke();
         ctx.fillStyle = '#9aa3ad'; ctx.beginPath(); ctx.moveTo(p.x + 1.4, p.y - 10); ctx.lineTo(p.x + 3, p.y - 10); ctx.lineTo(p.x + 2.2, p.y - 12); ctx.fill();

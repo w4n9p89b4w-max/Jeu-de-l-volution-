@@ -425,7 +425,7 @@
   /* Deux onglets : « Combien par tâche » (quotas) et « Préférences » */
   let peopleTab = 'jobs';
   const PREF_TXT = ['Jamais', 'Basse', 'Normale', 'Haute'];
-  const SHORT = { hunt: 'Chasse', wood: 'Bois', stone: 'Pierre', iron: 'Fer', coal: 'Charbon', sage: 'Savoir', trade: 'Commerce', guard: 'Garde' };
+  const SHORT = { farm: 'Champs', hunt: 'Chasse', wood: 'Bois', stone: 'Pierre', iron: 'Fer', coal: 'Charbon', sage: 'Savoir', trade: 'Commerce', guard: 'Garde' };
   const RES_WORD = { food: 'nourriture', wood: 'bois', stone: 'pierre', iron: 'fer', coal: 'charbon', sci: 'savoir', gold: 'or', def: 'défense' };
 
   function renderPeople() {
@@ -539,6 +539,8 @@
         : 'Vos armes sont au point : il est temps de les fabriquer en série.';
       return { icon: b.icon, title: `Nouvelle arme : ${b.name} ?`, done: `${b.icon} ${b.name.toUpperCase()} <em>!</em>`, a: step === 'c' ? `Construire : ${b.name}` : `Adopter : ${b.name}`, text: `${intro} ${b.desc}`, plus };
     }
+    if (b.eff && b.eff.cap) return { icon: b.icon, title: `Construire : ${b.name} ?`, done: `${b.icon} ${b.name.toUpperCase()} <em>!</em>`, a: `Construire : ${b.name}`, text: `À force de bâtir, vos villageois ont appris une nouvelle façon de construire des maisons. ${b.desc}`, plus };
+    if (b.eff && b.eff.food) return { icon: b.icon, title: `${b.name} ?`, done: `${b.icon} ${b.name.toUpperCase()} <em>!</em>`, a: `Construire : ${b.name}`, text: `Vos agriculteurs connaissent bien la terre maintenant : ils proposent d'aller plus loin. ${b.desc}`, plus };
     if (id === 'scierie') return { icon: b.icon, title: 'Construire une scierie ?', done: '🪚 SCIERIE <em>CONSTRUITE</em> !', a: 'Construire la scierie', text: 'Les bûcherons n\'arrivent plus à suivre : une scierie couperait le bois bien plus vite.', plus };
     return { icon: b.icon, title: `${b.name} ?`, done: `${b.icon} ${b.name.toUpperCase()} <em>!</em>`, a: `Adopter : ${b.name}`, text: `À force de pratiquer, vos villageois ont trouvé une meilleure façon de travailler. ${b.desc}`, plus };
   }

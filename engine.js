@@ -38,15 +38,15 @@
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
     // Antiquité
-    { id: 'champ', era: 1, name: 'Champ de blé', icon: '🌾', arch: 'field', cost: { wood: 8 }, eff: { food: 8 }, desc: 'Les premières récoltes.' },
-    { id: 'maison', era: 1, name: 'Maison en pierre', icon: '🏠', arch: 'house', cost: { wood: 5, stone: 12 }, eff: { cap: 14 }, desc: 'Solide et durable.' },
+    { id: 'champ', era: 1, name: 'Champ de blé', icon: '🌾', arch: 'field', unlock: 'champ', cost: { wood: 8 }, eff: { food: 8 }, desc: 'Les premières récoltes.' },
+    { id: 'maison', era: 1, name: 'Maison en pierre', icon: '🏠', arch: 'house', unlock: 'maison', cost: { wood: 5, stone: 12 }, eff: { cap: 14 }, desc: 'Solide et durable.' },
     { id: 'marche', era: 1, name: 'Marché', icon: '🏺', arch: 'market', cost: { wood: 10, stone: 5 }, eff: { gold: 4 }, desc: 'On y échange poteries et épices.' },
     { id: 'temple', era: 1, name: 'Temple', icon: '🏛️', arch: 'temple', cost: { stone: 25, gold: 10 }, eff: { happy: 8, sci: 2 }, desc: 'Colonnes de marbre et offrandes.' },
     { id: 'biblio', era: 1, name: 'Bibliothèque', icon: '📜', arch: 'library', cost: { wood: 10, stone: 12, gold: 15 }, eff: { sci: 4 }, desc: 'Des rouleaux de papyrus par milliers.' },
     // Moyen Âge
     { id: 'minefer', era: 2, name: 'Mine de fer', icon: '⛏️', arch: 'mine', cost: { wood: 20, stone: 15 }, eff: { iron: 4 }, req: 'metal', desc: 'Creuser la montagne pour trouver du minerai.' },
-    { id: 'moulin', era: 2, name: 'Moulin', icon: '🌬️', arch: 'mill', cost: { wood: 20, stone: 8, gold: 10 }, eff: { food: 14 }, desc: 'Le vent moud le grain.' },
-    { id: 'colombage', era: 2, name: 'Maison à colombages', icon: '🏘️', arch: 'timber', cost: { wood: 25, stone: 8, gold: 10 }, eff: { cap: 22 }, desc: 'Des maisons serrées le long des ruelles.' },
+    { id: 'moulin', era: 2, name: 'Moulin', icon: '🌬️', arch: 'mill', unlock: 'moulin', cost: { wood: 20, stone: 8, gold: 10 }, eff: { food: 14 }, desc: 'Le vent moud le grain.' },
+    { id: 'colombage', era: 2, name: 'Maison à colombages', icon: '🏘️', arch: 'timber', unlock: 'colombage', cost: { wood: 25, stone: 8, gold: 10 }, eff: { cap: 22 }, desc: 'Des maisons serrées le long des ruelles.' },
     { id: 'scierie', era: 2, name: 'Scierie', icon: '🪚', arch: 'sawmill', unlock: 'scierie', cost: { wood: 15, stone: 10, iron: 5 }, eff: { wood: 10 }, desc: 'Des lames de fer pour couper plus vite.' },
     { id: 'monastere', era: 2, name: 'Monastère', icon: '📖', arch: 'monastery', cost: { stone: 40, gold: 20 }, eff: { sci: 7 }, desc: 'Les moines recopient les savoirs anciens.' },
     { id: 'chateau', era: 2, name: 'Château fort', icon: '🏰', arch: 'castle', cost: { stone: 60, iron: 10, gold: 30 }, eff: { def: 20, happy: 3 }, desc: 'Remparts, tours et pont-levis.' },
@@ -54,22 +54,22 @@
     // Renaissance
     { id: 'minecharbon', era: 3, name: 'Mine de charbon', icon: '⚫', arch: 'coalmine', cost: { wood: 30, stone: 20, iron: 10 }, eff: { coal: 5 }, desc: 'Le « charbon de terre » brûle mieux que le bois.' },
     { id: 'tailleurs', era: 3, name: 'Atelier de tailleurs de pierre', icon: '🧱', arch: 'stoneyard', cost: { wood: 20, iron: 10 }, eff: { stone: 14 }, desc: 'Des blocs taillés au millimètre.' },
-    { id: 'ferme', era: 3, name: 'Grande ferme', icon: '🐄', arch: 'barn', cost: { wood: 30, iron: 5, gold: 20 }, eff: { food: 22 }, desc: 'Élevage et cultures variées.' },
-    { id: 'hotel', era: 3, name: 'Hôtel particulier', icon: '🏡', arch: 'mansion', cost: { wood: 10, stone: 45, gold: 30 }, eff: { cap: 35 }, desc: 'De belles demeures en pierre de taille.' },
+    { id: 'ferme', era: 3, name: 'Grande ferme', icon: '🐄', arch: 'barn', unlock: 'ferme', cost: { wood: 30, iron: 5, gold: 20 }, eff: { food: 22 }, desc: 'Élevage et cultures variées.' },
+    { id: 'hotel', era: 3, name: 'Hôtel particulier', icon: '🏡', arch: 'mansion', unlock: 'hotel', cost: { wood: 10, stone: 45, gold: 30 }, eff: { cap: 35 }, desc: 'De belles demeures en pierre de taille.' },
     { id: 'banque', era: 3, name: 'Banque', icon: '🏦', arch: 'bank', cost: { stone: 50, gold: 30 }, eff: { gold: 15 }, desc: 'Prêts, crédits et lettres de change.' },
     { id: 'universite', era: 3, name: 'Université', icon: '🎓', arch: 'university', cost: { wood: 20, stone: 50, gold: 50 }, eff: { sci: 12 }, desc: 'Savants et étudiants débattent.' },
     { id: 'theatre', era: 3, name: 'Théâtre', icon: '🎭', arch: 'theatre', cost: { wood: 30, stone: 30, gold: 40 }, eff: { happy: 12 }, desc: 'Comédies et tragédies.' },
     // Révolution industrielle
     { id: 'hautfourneau', era: 4, name: 'Haut-fourneau', icon: '🔥', arch: 'furnace', cost: { stone: 50, coal: 30 }, eff: { iron: 15, coal: -4, happy: -3 }, desc: 'Transforme le charbon en fer… à grand feu.' },
     { id: 'usine', era: 4, name: 'Usine', icon: '🏭', arch: 'factory', cost: { stone: 40, iron: 40, coal: 20 }, eff: { gold: 25, wood: 10, coal: -3, happy: -4 }, desc: 'Production de masse… et fumée noire.' },
-    { id: 'immeuble', era: 4, name: 'Immeuble ouvrier', icon: '🏢', arch: 'tenement', cost: { stone: 60, iron: 30, gold: 40 }, eff: { cap: 70 }, desc: 'Loger les ouvriers près des usines.' },
-    { id: 'meca', era: 4, name: 'Ferme mécanisée', icon: '🚜', arch: 'tractor', cost: { iron: 40, coal: 20, gold: 50 }, eff: { food: 40 }, desc: 'Les machines remplacent les bras.' },
+    { id: 'immeuble', era: 4, name: 'Immeuble ouvrier', icon: '🏢', arch: 'tenement', unlock: 'immeuble', cost: { stone: 60, iron: 30, gold: 40 }, eff: { cap: 70 }, desc: 'Loger les ouvriers près des usines.' },
+    { id: 'meca', era: 4, name: 'Ferme mécanisée', icon: '🚜', arch: 'tractor', unlock: 'meca', cost: { iron: 40, coal: 20, gold: 50 }, eff: { food: 40 }, desc: 'Les machines remplacent les bras.' },
     { id: 'gare', era: 4, name: 'Gare', icon: '🚂', arch: 'station', cost: { iron: 60, coal: 40, gold: 60 }, eff: { gold: 25, stone: 10 }, desc: 'Le chemin de fer relie le pays au monde.' },
     { id: 'ecole', era: 4, name: 'École publique', icon: '🏫', arch: 'school', cost: { wood: 20, stone: 50, gold: 60 }, eff: { sci: 20, happy: 4 }, desc: 'Apprendre à lire, écrire, compter.' },
     // Monde moderne
     { id: 'eolien', era: 5, name: 'Parc éolien', icon: '🌀', arch: 'wind', cost: { iron: 60, gold: 80 }, eff: { gold: 20, coal: 10, happy: 5 }, desc: 'Une énergie propre : plus besoin de brûler autant de charbon.' },
-    { id: 'gratteciel', era: 5, name: 'Gratte-ciel', icon: '🏙️', arch: 'tower', cost: { stone: 80, iron: 120, gold: 120 }, eff: { cap: 160 }, desc: 'La ville grandit vers le ciel.' },
-    { id: 'vertical', era: 5, name: 'Ferme verticale', icon: '🥬', arch: 'greentower', cost: { stone: 40, iron: 80, gold: 100 }, eff: { food: 80 }, desc: 'Des cultures sur 30 étages.' },
+    { id: 'gratteciel', era: 5, name: 'Gratte-ciel', icon: '🏙️', arch: 'tower', unlock: 'gratteciel', cost: { stone: 80, iron: 120, gold: 120 }, eff: { cap: 160 }, desc: 'La ville grandit vers le ciel.' },
+    { id: 'vertical', era: 5, name: 'Ferme verticale', icon: '🥬', arch: 'greentower', unlock: 'vertical', cost: { stone: 40, iron: 80, gold: 100 }, eff: { food: 80 }, desc: 'Des cultures sur 30 étages.' },
     { id: 'hopital', era: 5, name: 'Hôpital', icon: '🏥', arch: 'hospital', cost: { stone: 80, iron: 40, gold: 100 }, eff: { happy: 10, cap: 20 }, desc: 'Soigner tout le monde.' },
     { id: 'recyclage', era: 5, name: 'Centre de recyclage', icon: '♻️', arch: 'recycle', cost: { stone: 60, gold: 80 }, eff: { iron: 20, stone: 10, happy: 2 }, desc: 'Rien ne se perd : le vieux métal redevient neuf.' },
     { id: 'labo', era: 5, name: 'Centre de recherche', icon: '🔬', arch: 'lab', cost: { stone: 60, iron: 80, gold: 120 }, eff: { sci: 40 }, desc: 'Physique, biologie, intelligence artificielle…' },
@@ -78,6 +78,8 @@
     { id: 'leviers', era: 0, name: 'Leviers et cordes', icon: '🪢', upgrade: 'stone', cost: { wood: 10 }, eff: {}, unlock: 'leviers', unique: true, desc: 'Déplacer les gros blocs : les villageois aux pierres rapportent 50 % de plus.' },
     { id: 'conteurs', era: 0, name: 'Conteurs et peintures', icon: '🎨', upgrade: 'sage', cost: { wood: 5, stone: 5 }, eff: {}, unlock: 'conteurs', unique: true, desc: 'Transmettre le savoir : les savants rapportent 50 % de plus.' },
     { id: 'tours', era: 0, name: 'Tours de guet', icon: '🗼', upgrade: 'guard', cost: { wood: 15, stone: 10 }, eff: {}, unlock: 'tours', unique: true, desc: 'Voir arriver l\'ennemi de loin : les gardes défendent 50 % mieux.' },
+    { id: 'charrue', era: 1, name: 'Charrue', icon: '🐂', upgrade: 'farm', cost: { wood: 15, stone: 5 }, eff: {}, unlock: 'charrue', unique: true, desc: 'Un bœuf tire la charrue : les agriculteurs rapportent 50 % de plus.' },
+    { id: 'irrigation', era: 2, name: 'Irrigation', icon: '💧', upgrade: 'farm', cost: { wood: 25, stone: 25 }, eff: {}, unlock: 'irrigation', unique: true, desc: 'Des canaux depuis la rivière : les agriculteurs rapportent encore 50 % de plus.' },
     { id: 'balances', era: 1, name: 'Poids et balances', icon: '⚖️', upgrade: 'trade', cost: { stone: 10, gold: 10 }, eff: {}, unlock: 'balances', unique: true, desc: 'Des mesures justes : les marchands rapportent 50 % de plus.' },
     { id: 'etais', era: 2, name: 'Galeries étayées', icon: '🏗️', upgrade: 'iron', cost: { wood: 30 }, eff: {}, unlock: 'etais', unique: true, desc: 'Des poutres pour creuser plus loin : les mineurs de fer rapportent 50 % de plus.' },
     { id: 'lampes', era: 3, name: 'Lampes de mineur', icon: '🪔', upgrade: 'coal', cost: { iron: 15 }, eff: {}, unlock: 'lampes', unique: true, desc: 'Y voir clair sous terre : les mineurs de charbon rapportent 50 % de plus.' },
@@ -234,6 +236,20 @@
     { key: 'tours', b: 'tours', ok: (s) => work(s, 'guard') >= 10, hint: 'Après 10 journées de garde' },
     { key: 'balances', b: 'balances', ok: (s) => work(s, 'trade') >= 10, hint: 'Après 10 journées de marchand' },
     { key: 'etais', b: 'etais', ok: (s) => work(s, 'iron') >= 15, hint: 'Après 15 journées de mineur de fer' },
+    // agriculture : à force de cultiver
+    { key: 'champ', b: 'champ', ok: (s) => work(s, 'farm') >= 10 || s.era >= 2, hint: 'Après 10 journées d\'agriculteur' },
+    { key: 'charrue', b: 'charrue', ok: (s) => work(s, 'farm') >= 25, hint: 'Après 25 journées d\'agriculteur' },
+    { key: 'moulin', b: 'moulin', ok: (s) => (count(s, 'champ') >= 2 && work(s, 'farm') >= 60) || s.era >= 3, hint: 'Avec 2 champs, après 60 journées d\'agriculteur' },
+    { key: 'irrigation', b: 'irrigation', ok: (s) => count(s, 'charrue') && work(s, 'farm') >= 90, hint: 'Avec la charrue, après 90 journées d\'agriculteur' },
+    { key: 'ferme', b: 'ferme', ok: (s) => (count(s, 'moulin') && work(s, 'farm') >= 120) || s.era >= 4, hint: 'Avec un moulin, après 120 journées d\'agriculteur' },
+    { key: 'meca', b: 'meca', ok: (s) => (count(s, 'ferme') && work(s, 'farm') >= 200) || s.era >= 5, hint: 'Avec une grande ferme, après 200 journées d\'agriculteur' },
+    { key: 'vertical', b: 'vertical', ok: (s) => count(s, 'meca') && work(s, 'farm') >= 300, hint: 'Avec une ferme mécanisée, après 300 journées d\'agriculteur' },
+    // maisons : à force de construire
+    { key: 'maison', b: 'maison', ok: (s) => count(s, 'hutte') >= 3 || s.era >= 2, hint: 'Après avoir construit 3 huttes' },
+    { key: 'colombage', b: 'colombage', ok: (s) => count(s, 'maison') >= 3 || s.era >= 3, hint: 'Après avoir construit 3 maisons en pierre' },
+    { key: 'hotel', b: 'hotel', ok: (s) => count(s, 'colombage') >= 3 || s.era >= 4, hint: 'Après avoir construit 3 maisons à colombages' },
+    { key: 'immeuble', b: 'immeuble', ok: (s) => count(s, 'hotel') >= 2 || s.era >= 5, hint: 'Après avoir construit 2 hôtels particuliers' },
+    { key: 'gratteciel', b: 'gratteciel', ok: (s) => count(s, 'immeuble') >= 2, hint: 'Après avoir construit 2 immeubles' },
     { key: 'lampes', b: 'lampes', ok: (s) => work(s, 'coal') >= 15, hint: 'Après 15 journées de mineur de charbon' },
   ];
   for (let e = 0; e < 6; e++) {
@@ -247,7 +263,7 @@
   const UNLOCK_HINT = Object.fromEntries(STEPS.map((x) => [x.key, `Se débloque : ${x.hint.toLowerCase()}`]));
   const unlocked = (s, k) => (s.unlocks || []).includes(k);
   // l'étape précédente d'une chaîne (pour n'afficher que la prochaine étape verrouillée)
-  const PREV = { chasse: 'appats', scierie: 'haches' };
+  const PREV = { chasse: 'appats', scierie: 'haches', moulin: 'champ', ferme: 'moulin', meca: 'ferme', vertical: 'meca', maison: 'hutte', colombage: 'maison', hotel: 'colombage', immeuble: 'hotel', gratteciel: 'immeuble' };
   for (let e = 0; e < 6; e++) { const [a1, a2, a3] = WPN(e); PREV[a2] = a1; PREV[a3] = a2; }
   function checkUnlocks(s) {
     s.unlocks = s.unlocks || [];
@@ -261,7 +277,7 @@
     return news;
   }
   // niveaux d'amélioration
-  const jobUpgrade = (s, j) => BUILDINGS.some((b) => b.upgrade === j && count(s, b.id)) ? 1.5 : 1;
+  const jobUpgrade = (s, j) => 1 + 0.5 * BUILDINGS.filter((b) => b.upgrade === j && count(s, b.id)).length;
   const weaponLevel = (s, e) => WPN(e).filter((id) => count(s, id)).length;
   const capacity = (s) => 5 + totals(s).cap;
   /* ---------- L'armée : des unités différentes à chaque époque ----------
@@ -367,6 +383,7 @@
      ========================================================================== */
   const JOBS = [
     { id: 'idle', name: 'Au village', icon: '🏡', res: null, desc: 'Sans tâche : rapporte un peu d\'or et de savoir.' },
+    { id: 'farm', name: 'Agriculteur', icon: '🌾', res: 'food', base: 2.5, req: (s) => s.disc.includes('agriculture'), lock: 'Après l\'Agriculture', desc: 'Semer, cultiver et récolter.' },
     { id: 'hunt', name: 'Chasse et cueillette', icon: '🏹', res: 'food', base: 2, desc: 'Gibier, baies et racines.' },
     { id: 'wood', name: 'Bûcheron', icon: '🌲', res: 'wood', base: 1.5, desc: 'Couper du bois dans la forêt.' },
     { id: 'stone', name: 'Pierres', icon: '🪨', res: 'stone', base: 0.75, desc: 'Ramasser et tailler la pierre au pied de la montagne.' },
@@ -379,8 +396,8 @@
   const JB = byId(JOBS);
   const WORK = JOBS.filter((j) => j.id !== 'idle').map((j) => j.id);
   // Forces et faiblesses, selon la tâche
-  const STRONG = { hunt: 'Œil de lynx', wood: 'Bras solides', stone: 'Dos solide', iron: 'Endurance', coal: 'Pas peur du noir', sage: 'Esprit vif', trade: 'Beau parleur', guard: 'Courage' };
-  const WEAK = { hunt: 'Pas discret', wood: 'Mains fragiles', stone: 'Dos fragile', iron: 'Souffle court', coal: 'Peur du noir', sage: 'Tête en l\'air', trade: 'Timidité', guard: 'Peur des combats' };
+  const STRONG = { farm: 'Main verte', hunt: 'Œil de lynx', wood: 'Bras solides', stone: 'Dos solide', iron: 'Endurance', coal: 'Pas peur du noir', sage: 'Esprit vif', trade: 'Beau parleur', guard: 'Courage' };
+  const WEAK = { farm: 'Pas la main verte', hunt: 'Pas discret', wood: 'Mains fragiles', stone: 'Dos fragile', iron: 'Souffle court', coal: 'Peur du noir', sage: 'Tête en l\'air', trade: 'Timidité', guard: 'Peur des combats' };
   const STRONG_X = 1.6, WEAK_X = 0.5, XP_MAX = 0.3, XP_DAY = 0.02;
   const NAMES = ['Ako', 'Bria', 'Doran', 'Elka', 'Fenn', 'Gorm', 'Hala', 'Iko', 'Jora', 'Kali', 'Loa', 'Mako', 'Nura', 'Oki', 'Pia', 'Rok', 'Sila', 'Tao', 'Uma', 'Vik', 'Wenn', 'Yara', 'Zek', 'Arn', 'Bela', 'Cian', 'Dara', 'Eno', 'Fala', 'Gaïa', 'Hugo', 'Ilia', 'Jade', 'Kem', 'Lina', 'Milo', 'Nael', 'Opale', 'Paz', 'Quinn', 'Rena', 'Sacha', 'Timo', 'Ulla', 'Vala', 'Willa', 'Xan', 'Yanis', 'Zoé', 'Alix', 'Basile', 'Céleste', 'Dany', 'Eden', 'Flo', 'Gabin', 'Hélie', 'Isis', 'Jules', 'Kenzo', 'Léo', 'Maé', 'Nino', 'Olia', 'Pablo', 'Rosa', 'Sven', 'Tessa', 'Ugo', 'Vera', 'Wendy', 'Yuna', 'Zia', 'Anouk', 'Brune', 'Cyan', 'Dimi', 'Enzo', 'Fanny', 'Gwen', 'Hiro', 'Inès', 'Joss', 'Kaïs', 'Lou', 'Mila', 'Noa', 'Oscar', 'Pépin', 'Rémi', 'Suzon', 'Tilio', 'Vadim', 'Yaël'];
 
@@ -410,6 +427,7 @@
     if (j === 'iron' || j === 'coal') return b + (d('vapeur') ? 0.6 : 0) + (d('electricite') ? 0.4 : 0);
     if (j === 'sage') return b + (d('ecriture') ? 0.25 : 0) + (d('imprimerie') ? 0.5 : 0) + (d('informatique') ? 1 : 0);
     if (j === 'trade') return b + (d('monnaie') ? 0.4 : 0) + (d('change') ? 0.6 : 0);
+    if (j === 'farm') return b + (d('assolement') ? 1 : 0) + (d('vapeur') ? 1 : 0) + (d('electricite') ? 1 : 0);
     if (j === 'guard') return b * (1 + s.era * 0.3);
     return b;
   }
@@ -493,14 +511,15 @@
     const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed - soldierHunt(s) * mult;
     const want = {};
     for (const j of WORK) want[j] = 0;
-    want.hunt = Math.min(n, Math.max(0, Math.ceil(foodNeed / (jobBase(s, 'hunt') * mult))));
+    const foodJob = jobOpen(s, 'farm') ? 'farm' : 'hunt';
+    want[foodJob] = Math.min(n, Math.max(jobOpen(s, 'farm') ? 2 : 0, Math.ceil(foodNeed / (jobBase(s, foodJob) * mult))));
     const share = s.era < 2
       ? { wood: 0.35, stone: 0.25, sage: 0.15, trade: 0.1, guard: 0.05 }
       : s.era < 4
         ? { wood: 0.2, stone: 0.2, iron: 0.15, coal: 0.1, sage: 0.15, trade: 0.1, guard: 0.05 }
         : { wood: 0.12, stone: 0.18, iron: 0.2, coal: 0.12, sage: 0.18, trade: 0.12, guard: 0.05 };
     if (!rival(s).dead && power(s) < rivalForce(s) * 0.7) share.guard = (share.guard || 0) + 0.08;
-    const rest = Math.max(0, n - want.hunt);
+    const rest = Math.max(0, n - want[foodJob]);
     const open = Object.keys(share).filter((j) => jobOpen(s, j));
     const tot = open.reduce((a, j) => a + share[j], 0) || 1;
     for (const j of open) want[j] = Math.floor(rest * share[j] / tot);
@@ -665,7 +684,7 @@
   function bonusMalus(s, cat, id) {
     if (B[id] && (cat === 'build' || B[id].weapon != null)) {
       const b = B[id];
-      const UP = { wood: '🌲 bûcherons', stone: '🪨 villageois aux pierres', sage: '💡 savants', guard: '🛡️ gardes', trade: '💰 marchands', iron: '⛏️ mineurs de fer', coal: '⚫ mineurs de charbon' };
+      const UP = { farm: '🌾 agriculteurs', wood: '🌲 bûcherons', stone: '🪨 villageois aux pierres', sage: '💡 savants', guard: '🛡️ gardes', trade: '💰 marchands', iron: '⛏️ mineurs de fer', coal: '⚫ mineurs de charbon' };
       const plus = id === 'fusee' ? ['🏆 VICTOIRE'] : id === 'appats' ? ['+50 % 🍖 pour chaque chasseur']
         : b.weapon != null ? [`+25 % de force pour les ${UNITS[b.weapon].icon} ${UNITS[b.weapon].name.toLowerCase()}`]
         : b.upgrade ? [`+50 % pour les ${UP[b.upgrade]}`] : posEff(b.eff);
