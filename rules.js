@@ -58,9 +58,8 @@
     const J = E.JB;
     parts.push(sec('villageois', '👷 Les villageois et leurs tâches', `
       <p>Chaque habitant est une personne avec un <b>nom</b>, une <b>force</b> et une <b>faiblesse</b>. Touchez <b>👷 Villageois</b> en bas de l'écran (ou une pastille de ressource). Ce n'est pas le choix du jour : vous pouvez tout changer quand vous voulez.</p>
-      <h4>Onglet « 👥 Combien par tâche »</h4>
-      <p>Une ligne par tâche. Avec <b>− / +</b>, choisissez combien de villageois y envoyer. La ligne dit combien sont au travail, ce qu'ils rapportent par jour, et montre leurs noms (en vert ceux qui sont forts dans cette tâche, en rouge ceux qui sont faibles). Le jeu choisit lui-même <b>qui</b> y va : d'abord ceux qui <b>préfèrent</b> la tâche, puis <b>les plus forts</b>. Ceux qui ne sont envoyés nulle part restent <b>au village</b>.</p>
-      <p>L'interrupteur en haut : <b>« Le jeu choisit les nombres chaque jour »</b> (selon les besoins du pays) ou <b>« Vous choisissez les nombres »</b>. Toucher − ou + passe en mode manuel ; <b>✨ Nombres conseillés</b> applique une fois les nombres recommandés.</p>
+      <h4>Onglet « 📋 Tâches »</h4>
+      <p>La liste de toutes les tâches. Sur chaque ligne, <b>+</b> envoie un villageois de plus et <b>−</b> en retire un, selon vos besoins. La ligne montre combien de villageois y travaillent et ce qu'ils rapportent par jour. En haut, <b>« Au village, sans tâche »</b> compte ceux qui sont libres. Le jeu choisit lui-même <b>qui</b> part : d'abord ceux qui <b>préfèrent</b> la tâche, puis <b>les plus forts</b>. <b>✨ Répartir comme le conseille le jeu</b> répartit tout le monde selon les besoins du pays.</p>
       <h4>Onglet « ⭐ Préférences »</h4>
       <p>Un tableau : une ligne par villageois, une colonne par tâche. Touchez une case pour changer : <b>+ Haute</b>, <b>○ Normale</b>, <b>− Basse</b>, <b>✕ Jamais</b> (jamais envoyé à cette tâche). Au départ, la préférence est haute là où le villageois est <em>fort</em> et basse là où il est <em>faible</em> (c'est écrit sous le symbole). La case entourée en bleu est sa tâche actuelle. Touchez un nom pour voir sa fiche : ce qu'il rapporterait dans chaque tâche.</p>
       <table><tr><th>Tâche</th><th>Rapporte (par villageois et par jour)</th><th>Disponible</th></tr>
@@ -75,7 +74,7 @@
       <h4>Expérience</h4>
       <p>Chaque jour passé à la même tâche ajoute +2 % de rendement dans cette tâche, jusqu'à +30 %. L'expérience est gardée si la personne change de tâche puis revient.</p>
       <h4>Nouveaux villageois</h4>
-      <p>Quand la population grandit, les nouveaux venus remplissent les quotas s'ils sont meilleurs que ceux en place. Si vous choisissez les nombres vous-même, pensez à les augmenter : sinon ils restent au village. La pastille rouge sur 👷 compte les villageois sans tâche.</p>
+      <p>Quand la population grandit, les nouveaux venus arrivent <b>au village, sans tâche</b> : envoyez-les au travail avec <b>+</b>. La pastille rouge sur 👷 compte les villageois sans tâche.</p>
       <p>Les soldats 🪖 sont à part : ils ne comptent pas parmi les villageois.</p>`));
 
     parts.push(sec('peuple', '👤 Population et bonheur', `

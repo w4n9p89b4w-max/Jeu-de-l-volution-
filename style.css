@@ -333,3 +333,20 @@ em { font-style: normal; color: var(--yellow); }
 .vcard em { font-style: normal; font-weight: 900; font-size: 11px; }
 .vcard em.fort { color: #1f7a42; } .vcard em.faible { color: #b5332b; }
 .finfo .g { color: #1f7a42; font-weight: 900; } .finfo .b { color: #b5332b; font-weight: 800; }
+
+/* liste des tâches */
+.jrow { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 14px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.07); }
+.jrow .ti { font-size: 26px; width: 32px; text-align: center; }
+.jrow .tname small { font-size: 12px; font-weight: 800; color: #1f7a42; }
+.jrow:not(.busy) .tname small { color: var(--muted); }
+.jrow .warn { color: var(--bad); }
+.jrow.locked { background: transparent; box-shadow: none; opacity: .6; padding: 4px 10px; }
+.jrow.locked .ti { font-size: 20px; }
+.jrow.locked .tname b { font-size: 13px; }
+.jrow.locked .tname small { color: var(--muted); }
+.jrow.idle { background: #eef3fb; }
+.jrow.idle.has { background: #fff3d6; }
+.jrow.idle .tname small { color: #4a5263; }
+.idleN { font-size: 22px; min-width: 40px; text-align: center; }
+.tstep .qb:disabled { opacity: .35; }
+#bAuto { align-self: center; }

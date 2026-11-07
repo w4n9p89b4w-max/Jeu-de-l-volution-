@@ -255,8 +255,8 @@
     const d = rep.delta;
     const pd = rep.popDelta;
     const part = (v, i) => `${v >= 0 ? '+' : ''}${v}${i}`;
-    const born = (rep.born || []).map((b) => `${b.name} ${E.JB[b.job].icon}`);
-    toast(`${born.length ? `Bienvenue à ${born.slice(0, 3).join(', ')}${born.length > 3 ? ` et ${born.length - 3} autres` : ''} !<br>` : ''}Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
+    const born = (rep.born || []).map((b) => b.name);
+    toast(`${born.length ? `Bienvenue à ${born.slice(0, 3).join(', ')}${born.length > 3 ? ` et ${born.length - 3} autres` : ''} ! Touchez 👷 pour leur donner une tâche.<br>` : ''}Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
     save();
     for (const ev of rep.events) {
       await wait(350);
@@ -358,54 +358,36 @@
   $('tabJobs').onclick = () => { peopleTab = 'jobs'; renderPeople(); };
   $('tabPrefs').onclick = () => { peopleTab = 'prefs'; renderPeople(); };
 
-  // --- Onglet 1 : combien de villageois sur chaque tâche ---
+  // --- Onglet 1 : la liste de toutes les tâches, on ajoute ou on enlève ---
   function renderJobs() {
     const f = E.forecast(state), jo = f.jobs, q = state.quota || {};
-    const n = state.villagers.length, idle = jo.count.idle;
-    const open = E.WORK.filter((j) => E.jobOpen(state, j)).map((j) => E.JB[j]);
-    const locked = E.WORK.filter((j) => !E.jobOpen(state, j)).map((j) => E.JB[j]);
-    const chip = (v, j) => {
-      const m = E.traitMult(v, j) * (1 + E.xpBonus(v, j));
-      const tag = v.strong === j ? ' 💪' : v.weak === j ? ' 🐌' : '';
-      return `<span class="who${v.strong === j ? ' good' : v.weak === j ? ' bad' : ''}"><span class="dot" style="--h:${v.hue}"></span>${escapeHtml(v.name)} <small>×${num(m)}${tag}</small></span>`;
-    };
-    const rows = open.map((j) => {
-      const team = state.villagers.filter((v) => v.job === j.id)
-        .sort((a, b) => E.yieldOf(state, b, j.id) - E.yieldOf(state, a, j.id));
-      const want = q[j.id] || 0, have = team.length;
-      const out = j.res === 'def' ? `+${Math.round(jo.def)} 🛡️ de défense` : `+${num(jo[j.res] * f.mult)} ${RES_OF(j)} par jour`;
-      const status = want === 0 ? '<span class="tnone">Personne n\'est envoyé ici.</span>'
-        : `<b>${have}</b> au travail → <b class="g">${out}</b>${have < want ? `<span class="warn">⚠ ${want - have} place${want - have > 1 ? 's' : ''} vide${want - have > 1 ? 's' : ''} : personne de disponible</span>` : ''}`;
-      return `<div class="trow">
-        <div class="ttop"><span class="ti">${j.icon}</span><div class="tname"><b>${j.name}</b><small>${j.desc}</small></div>
-          <div class="tstep"><button class="qb" data-job="${j.id}" data-d="-1" aria-label="Un villageois de moins pour ${j.name}">−</button><b>${want}</b><button class="qb" data-job="${j.id}" data-d="1" aria-label="Un villageois de plus pour ${j.name}">+</button></div></div>
-        <div class="tstat">${status}</div>
-        ${team.length ? `<div class="team">${team.map((v) => chip(v, j.id)).join('')}</div>` : ''}
+    const idle = jo.count.idle;
+    const rows = E.WORK.map((id) => {
+      const j = E.JB[id];
+      if (!E.jobOpen(state, id)) {
+        return `<div class="jrow locked"><span class="ti">${j.icon}</span><div class="tname"><b>${j.name}</b><small>🔒 ${j.lock}</small></div></div>`;
+      }
+      const have = jo.count[id] || 0, want = q[id] || 0;
+      const out = j.res === 'def' ? `+${Math.round(jo.def)} 🛡️` : `+${num(jo[j.res] * f.mult)} ${RES_OF(j)}/jour`;
+      return `<div class="jrow${have ? ' busy' : ''}">
+        <span class="ti">${j.icon}</span>
+        <div class="tname"><b>${j.name}</b><small>${have ? out : 'Personne'}${have < want ? ` <span class="warn">· personne de libre</span>` : ''}</small></div>
+        <div class="tstep"><button class="qb" data-job="${id}" data-d="-1" aria-label="Retirer un villageois de ${j.name}"${want ? '' : ' disabled'}>−</button><b>${have}</b><button class="qb" data-job="${id}" data-d="1" aria-label="Ajouter un villageois à ${j.name}"${idle || have < want ? '' : ' disabled'}>+</button></div>
       </div>`;
     }).join('');
     $('peopleBody').innerHTML = `
-      <div class="psum"><b>${n} villageois</b> · ${n - idle} au travail · <b class="${idle ? 'warnc' : ''}">${idle} au village</b>${idle ? ` <small>(ils rapportent un peu d'or et de savoir)</small>` : ''}</div>
-      <div class="autobox${state.autoQuota ? ' on' : ''}">
-        <label class="switch"><input type="checkbox" id="autoQ"${state.autoQuota ? ' checked' : ''}><span class="sl"></span></label>
-        <div><b>${state.autoQuota ? 'Le jeu choisit les nombres chaque jour' : 'Vous choisissez les nombres'}</b>
-        <small>${state.autoQuota ? 'Selon les besoins du pays. Touchez − ou + pour décider vous-même.' : 'Les nouveaux villageois restent au village tant que vous n\'augmentez pas les nombres.'}</small></div>
-        ${state.autoQuota ? '' : '<button class="small" id="bAuto">✨ Nombres conseillés</button>'}
-      </div>
-      <p class="phelp">Le jeu envoie d'abord les villageois qui <b>préfèrent</b> la tâche (onglet ⭐), puis <b>les plus forts</b>.</p>
+      <div class="jrow idle${idle ? ' has' : ''}"><span class="ti">🏡</span><div class="tname"><b>Au village, sans tâche</b><small>${idle ? 'Prêts à être envoyés au travail' : 'Tout le monde travaille'}</small></div><b class="idleN">${idle}</b></div>
       ${rows}
-      ${locked.length ? `<div class="locked">🔒 <b>Plus tard :</b> ${locked.map((j) => `${j.icon} ${j.name} <small>(${j.lock.toLowerCase()})</small>`).join(' · ')}</div>` : ''}`;
+      <p class="phelp">Le jeu envoie d'abord ceux qui <b>préfèrent</b> la tâche (onglet ⭐), puis <b>les plus forts</b>.</p>
+      <button class="small" id="bAuto">✨ Répartir comme le conseille le jeu</button>`;
     $('peopleBody').querySelectorAll('.qb').forEach((bt) => (bt.onclick = () => {
-      const j = bt.dataset.job;
-      if (state.autoQuota) { state.autoQuota = false; toast('Vous choisissez maintenant les nombres vous-même'); }
-      E.setQuota(state, j, (state.quota[j] || 0) + +bt.dataset.d);
+      const id = bt.dataset.job, d = +bt.dataset.d;
+      // ajouter = demander une personne de plus ; enlever = une de moins
+      const have = E.forecast(state).jobs.count[id] || 0;
+      E.setQuota(state, id, (d > 0 ? Math.max(have, state.quota[id] || 0) : Math.min(have, state.quota[id] || 0)) + d);
       renderPeople(); updateHUD();
     }));
-    $('autoQ').onchange = () => {
-      state.autoQuota = $('autoQ').checked;
-      if (state.autoQuota) E.autoAssign(state);
-      renderPeople(); updateHUD();
-    };
-    if ($('bAuto')) $('bAuto').onclick = () => { E.autoAssign(state); renderPeople(); updateHUD(); toast('Nombres conseillés appliqués'); };
+    $('bAuto').onclick = () => { E.autoAssign(state); renderPeople(); updateHUD(); toast('Villageois répartis selon les besoins'); };
   }
 
   // --- Onglet 2 : les préférences de chaque villageois ---

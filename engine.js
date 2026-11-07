@@ -355,7 +355,7 @@
     if (!s.villagers) s.villagers = [];
     if (!s.nextId) s.nextId = 1;
     if (!s.quota) { s.quota = {}; for (const v of s.villagers) if (v.job !== 'idle') s.quota[v.job] = (s.quota[v.job] || 0) + 1; }
-    if (s.autoQuota == null) s.autoQuota = true;
+    s.autoQuota = false;   // c'est le joueur qui ajoute ou enlève des villageois
     const born = [];
     while (s.villagers.length < s.pop) {
       const v = makeVillager(s, rng);
