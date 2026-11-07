@@ -344,56 +344,79 @@
   }
   function closePeople() { $('people').hidden = true; save(); map.syncPeople(); updateHUD(); }
   function renderJobSummary() {
-    const f = E.forecast(state), jo = f.jobs;
+    const f = E.forecast(state), jo = f.jobs, q = state.quota || {};
     $('jobSummary').innerHTML = E.JOBS.map((j) => {
       const open = E.jobOpen(state, j.id);
       const n = jo.count[j.id] || 0;
-      const out = j.id === 'idle' ? `${f.free ? `+${Math.floor(f.free / 12)} 💰 +${Math.floor(f.free / 20)} 💡` : '—'}`
-        : j.res === 'def' ? `+${Math.round(jo.def)} 🛡️` : `+${num(jo[j.res] * f.mult)} ${RES_OF(j)}/j`;
-      return `<button class="jtile${open ? '' : ' locked'}${jobFilter === j.id ? ' on' : ''}" data-job="${j.id}" title="${j.desc}">
-        <span class="ji">${j.icon}</span><span class="jn">${j.name}</span>
-        <b>${open ? n : '🔒'}</b><span class="jo">${open ? out : j.lock}</span></button>`;
+      if (j.id === 'idle') {
+        return `<div class="jtile idle"><span class="ji">${j.icon}</span><span class="jn">${j.name}</span><b>${n}</b>
+          <span class="jo">${f.free ? `+${Math.floor(f.free / 12)} 💰 +${Math.floor(f.free / 20)} 💡` : 'personne'}</span></div>`;
+      }
+      if (!open) return `<div class="jtile locked"><span class="ji">${j.icon}</span><span class="jn">${j.name}</span><b>🔒</b><span class="jo">${j.lock}</span></div>`;
+      const want = q[j.id] || 0;
+      const out = j.res === 'def' ? `+${Math.round(jo.def)} 🛡️` : `+${num(jo[j.res] * f.mult)} ${RES_OF(j)}/j`;
+      const short = n < want ? ' short' : '';
+      return `<div class="jtile${jobFilter === j.id ? ' on' : ''}" data-job="${j.id}">
+        <button class="jhead" data-job="${j.id}" title="${j.desc}"><span class="ji">${j.icon}</span><span class="jn">${j.name}</span></button>
+        <div class="jq"><button class="qb" data-job="${j.id}" data-d="-1" aria-label="Moins">−</button><b class="${short}">${n}<small>/${want}</small></b><button class="qb" data-job="${j.id}" data-d="1" aria-label="Plus">+</button></div>
+        <span class="jo">${out}</span></div>`;
     }).join('');
-    $('jobSummary').querySelectorAll('.jtile').forEach((t) => (t.onclick = () => {
+    $('jobSummary').querySelectorAll('.qb').forEach((bt) => (bt.onclick = () => {
+      const j = bt.dataset.job;
+      if (state.autoQuota) { state.autoQuota = false; toast('Quotas en mode manuel'); }
+      E.setQuota(state, j, (state.quota[j] || 0) + +bt.dataset.d);
+      renderPeople(); updateHUD();
+    }));
+    $('jobSummary').querySelectorAll('.jhead').forEach((t) => (t.onclick = () => {
       jobFilter = jobFilter === t.dataset.job ? 'all' : t.dataset.job;
       renderPeople();
     }));
+    $('autoQ').checked = !!state.autoQuota;
   }
-  function villagerRow(v) {
-    const opts = E.JOBS.filter((j) => E.jobOpen(state, j.id)).map((j) => {
-      const y = E.yieldOf(state, v, j.id);
-      const tag = v.strong === j.id ? ' 💪' : v.weak === j.id ? ' 🐌' : '';
-      const txt = j.id === 'idle' ? `${j.icon} ${j.name}` : `${j.icon} ${j.name} : +${num(y)} ${RES_OF(j)}${tag}`;
-      return `<option value="${j.id}"${v.job === j.id ? ' selected' : ''}>${txt}</option>`;
-    }).join('');
-    const J = E.JB;
-    const xp = v.job !== 'idle' ? Math.round(E.xpBonus(v, v.job) * 100) : 0;
-    return `<div class="vrow" data-id="${v.id}">
-      <span class="av" style="--h:${v.hue}">${escapeHtml(v.name[0])}<i>${J[v.job].icon}</i></span>
-      <div class="vinfo">
-        <div class="vname"><b>${escapeHtml(v.name)}</b>${xp ? `<small>expérience +${xp}%</small>` : ''}</div>
-        <div class="vt"><span class="st">💪 ${E.STRONG[v.strong]} : ${J[v.strong].icon} ×1,6</span><span class="wk">🐌 ${E.WEAK[v.weak]} : ${J[v.weak].icon} ×0,5</span></div>
-        <select aria-label="Tâche de ${escapeHtml(v.name)}">${opts}</select>
-      </div></div>`;
-  }
-  function renderPeople() {
-    renderJobSummary();
-    const list = state.villagers.filter((v) => jobFilter === 'all' || v.job === jobFilter);
-    const label = jobFilter === 'all' ? `Tous les villageois (${state.villagers.length})` : `${E.JB[jobFilter].icon} ${E.JB[jobFilter].name} (${list.length})`;
-    $('peopleSub').innerHTML = `${label}${jobFilter !== 'all' ? ' · <button class="link" id="pAll">voir tout</button>' : ''}`;
-    if ($('pAll')) $('pAll').onclick = () => { jobFilter = 'all'; renderPeople(); };
-    $('peopleList').innerHTML = list.map(villagerRow).join('') || '<p class="empty">Personne ici pour l\'instant. Touchez une tâche en haut pour voir qui la fait.</p>';
-    $('peopleList').querySelectorAll('.vrow select').forEach((sel) => (sel.onchange = () => {
-      const id = +sel.closest('.vrow').dataset.id;
-      E.assign(state, id, sel.value);
+
+  // Tableau des préférences : une ligne par villageois, une colonne par tâche
+  function renderGrid() {
+    const work = E.WORK.map((id) => E.JB[id]);
+    let list = state.villagers.slice();
+    if (jobFilter !== 'all') {
+      // les plus forts pour cette tâche en premier
+      list.sort((a, b) => (E.prefOf(b, jobFilter) - E.prefOf(a, jobFilter)) || (E.yieldOf(state, b, jobFilter) - E.yieldOf(state, a, jobFilter)));
+    } else list.sort((a, b) => (a.job > b.job ? 1 : a.job < b.job ? -1 : a.id - b.id));
+    const head = `<tr><th class="nm">${jobFilter === 'all' ? 'Villageois' : `Pour ${E.JB[jobFilter].icon}`}</th>${work.map((j) => `<th class="${E.jobOpen(state, j.id) ? '' : 'lk'}${jobFilter === j.id ? ' fcol' : ''}" title="${j.name}">${j.icon}</th>`).join('')}</tr>`;
+    const rows = list.map((v) => `<tr data-id="${v.id}">
+      <td class="nm"><span class="av sm" style="--h:${v.hue}">${escapeHtml(v.name[0])}<i>${E.JB[v.job].icon}</i></span><span class="vn">${escapeHtml(v.name)}</span></td>
+      ${work.map((j) => {
+        const pr = E.prefOf(v, j.id), open = E.jobOpen(state, j.id);
+        const m = E.traitMult(v, j.id) * (1 + E.xpBonus(v, j.id));
+        const mark = v.strong === j.id ? '💪' : v.weak === j.id ? '🐌' : '';
+        return `<td><button class="pc p${pr}${v.job === j.id ? ' cur' : ''}${open ? '' : ' lk'}${jobFilter === j.id ? ' fcol' : ''}" data-job="${j.id}" aria-label="${escapeHtml(v.name)}, ${j.name} : ${E.PREF[pr].name}">
+          <span class="ps">${E.PREF[pr].sym}</span><span class="pm">×${num(m)}</span>${mark ? `<i>${mark}</i>` : ''}</button></td>`;
+      }).join('')}</tr>`).join('');
+    $('peopleList').innerHTML = `<div class="gridwrap"><table class="pgrid">${head}${rows}</table></div>`;
+    $('peopleList').querySelectorAll('.pc').forEach((c) => (c.onclick = () => {
+      const id = +c.closest('tr').dataset.id, j = c.dataset.job;
       const v = state.villagers.find((x) => x.id === id);
-      sel.closest('.vrow').outerHTML = villagerRow(v);
-      renderPeople();
-      updateHUD();
+      E.setPref(state, id, j, (E.prefOf(v, j) + 1) % 4);
+      renderPeople(); updateHUD();
     }));
   }
+
+  function renderPeople() {
+    renderJobSummary();
+    const n = state.villagers.length, idle = state.villagers.filter((v) => v.job === 'idle').length;
+    $('peopleSub').innerHTML = jobFilter === 'all'
+      ? `${n} villageois · ${idle} au village`
+      : `${E.JB[jobFilter].icon} ${E.JB[jobFilter].name} : les plus motivés et les plus forts d'abord · <button class="link" id="pAll">voir tout</button>`;
+    if ($('pAll')) $('pAll').onclick = () => { jobFilter = 'all'; renderPeople(); };
+    renderGrid();
+  }
   $('peopleClose').onclick = closePeople;
-  $('bAuto').onclick = () => { E.autoAssign(state); renderPeople(); updateHUD(); toast('Chacun a été placé selon les besoins et ses forces'); };
+  $('bAuto').onclick = () => { E.autoAssign(state); renderPeople(); updateHUD(); toast('Quotas conseillés appliqués'); };
+  $('autoQ').onchange = () => {
+    state.autoQuota = $('autoQ').checked;
+    if (state.autoQuota) E.autoAssign(state);
+    renderPeople(); updateHUD();
+  };
 
   // Après les Outils en pierre : proposer d'ouvrir une carrière
   async function proposeQuarry() {

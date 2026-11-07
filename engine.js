@@ -272,20 +272,98 @@
     return out;
   }
 
-  // Garder autant de villageois que d'habitants
+  /* ---------- Préférences (comme des priorités) ----------
+     0 = interdit, 1 = basse, 2 = normale, 3 = haute.
+     Par défaut : haute pour sa force, basse pour sa faiblesse. */
+  const PREF = [
+    { lvl: 0, sym: '✕', name: 'Interdit' },
+    { lvl: 1, sym: '−', name: 'Basse' },
+    { lvl: 2, sym: '○', name: 'Normale' },
+    { lvl: 3, sym: '+', name: 'Haute' },
+  ];
+  function prefOf(v, j) {
+    if (v.pref && v.pref[j] != null) return v.pref[j];
+    return v.strong === j ? 3 : v.weak === j ? 1 : 2;
+  }
+  function setPref(s, id, j, lvl) {
+    const v = s.villagers.find((x) => x.id === id);
+    if (!v || !JB[j] || j === 'idle') return false;
+    v.pref = v.pref || {};
+    v.pref[j] = Math.max(0, Math.min(3, lvl));
+    applyQuotas(s);
+    return true;
+  }
+  function setQuota(s, j, n) {
+    s.quota = s.quota || {};
+    s.quota[j] = Math.max(0, Math.min(s.pop, Math.round(n)));
+    applyQuotas(s);
+    return s.quota[j];
+  }
+
+  // Placer les villageois : pour chaque tâche, on envoie le nombre demandé,
+  // en prenant d'abord ceux qui la préfèrent, puis les plus forts.
+  function applyQuotas(s) {
+    const q = s.quota || {};
+    for (const v of s.villagers) v.job = 'idle';
+    const left = {};
+    for (const j of WORK) left[j] = jobOpen(s, j) ? (q[j] || 0) : 0;
+    const pairs = [];
+    for (const v of s.villagers) for (const j of WORK) {
+      if (left[j] <= 0) continue;
+      const pr = prefOf(v, j);
+      if (pr === 0) continue;
+      pairs.push({ v, j, k: pr * 100 + traitMult(v, j) * (1 + xpBonus(v, j)) * 10 });
+    }
+    pairs.sort((a, b) => b.k - a.k);
+    const done = new Set();
+    for (const p of pairs) {
+      if (done.has(p.v.id) || left[p.j] <= 0) continue;
+      p.v.job = p.j; left[p.j]--; done.add(p.v.id);
+    }
+  }
+
+  // Quotas conseillés selon les besoins du pays
+  function recommendQuotas(s) {
+    const n = s.villagers.length;
+    const t = totals(s);
+    const mult = 0.75 + s.happy / 200;
+    const lake = s.site === 'lac', river = s.site === 'riviere';
+    const foodFixed = (3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult;
+    const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed;
+    const want = {};
+    for (const j of WORK) want[j] = 0;
+    want.hunt = Math.min(n, Math.max(0, Math.ceil(foodNeed / (jobBase(s, 'hunt') * mult))));
+    const share = s.era < 2
+      ? { wood: 0.35, stone: 0.25, sage: 0.15, trade: 0.1, guard: 0.05 }
+      : s.era < 4
+        ? { wood: 0.2, stone: 0.2, iron: 0.15, coal: 0.1, sage: 0.15, trade: 0.1, guard: 0.05 }
+        : { wood: 0.12, stone: 0.18, iron: 0.2, coal: 0.12, sage: 0.18, trade: 0.12, guard: 0.05 };
+    if (power(s) < enemyStrength(s) * 0.7) share.guard = (share.guard || 0) + 0.08;
+    const rest = Math.max(0, n - want.hunt);
+    const open = Object.keys(share).filter((j) => jobOpen(s, j));
+    const tot = open.reduce((a, j) => a + share[j], 0) || 1;
+    for (const j of open) want[j] = Math.floor(rest * share[j] / tot);
+    let left = n - Object.values(want).reduce((a, b) => a + b, 0);
+    for (let i = 0; left > 0 && open.length; i++, left--) want[open[i % open.length]]++;
+    s.quota = want;
+    return want;
+  }
+
+  // Garder autant de villageois que d'habitants, puis replacer tout le monde
   function syncVillagers(s, rng) {
     rng = rng || Math.random;
     if (!s.villagers) s.villagers = [];
     if (!s.nextId) s.nextId = 1;
+    if (!s.quota) { s.quota = {}; for (const v of s.villagers) if (v.job !== 'idle') s.quota[v.job] = (s.quota[v.job] || 0) + 1; }
+    if (s.autoQuota == null) s.autoQuota = true;
     const born = [];
     while (s.villagers.length < s.pop) {
       const v = makeVillager(s, rng);
-      // un nouveau venu se met à ce qu'il fait le mieux, si c'est possible
-      v.job = jobOpen(s, v.strong) ? v.strong : 'idle';
       s.villagers.push(v); born.push(v);
     }
     while (s.villagers.length > s.pop) s.villagers.splice(Math.floor(rng() * s.villagers.length), 1);
-    for (const v of s.villagers) if (!jobOpen(s, v.job)) v.job = 'idle';
+    if (s.autoQuota) recommendQuotas(s);
+    applyQuotas(s);
     return born;
   }
   function assign(s, id, job) {
@@ -294,40 +372,11 @@
     v.job = job;
     return true;
   }
-
-  // Répartition automatique : selon les besoins, puis chacun là où il est le meilleur
+  // Ancien bouton « répartir automatiquement » : quotas conseillés
   function autoAssign(s) {
-    syncVillagers(s);
-    const n = s.villagers.length;
-    for (const v of s.villagers) v.job = 'idle';
-    const t = totals(s);
-    const mult = 0.75 + s.happy / 200;
-    const lake = s.site === 'lac', river = s.site === 'riviere';
-    const foodFixed = (3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult;
-    const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed;
-    const want = {};
-    want.hunt = Math.max(0, Math.ceil(foodNeed / (jobBase(s, 'hunt') * mult)));
-    const share = s.era < 2
-      ? { wood: 0.35, stone: 0.25, sage: 0.15, trade: 0.1, guard: 0.05 }
-      : s.era < 4
-        ? { wood: 0.2, stone: 0.2, iron: 0.15, coal: 0.1, sage: 0.15, trade: 0.1, guard: 0.05 }
-        : { wood: 0.12, stone: 0.18, iron: 0.2, coal: 0.12, sage: 0.18, trade: 0.12, guard: 0.05 };
-    if (power(s) < enemyStrength(s) * 0.7) share.guard = (share.guard || 0) + 0.08;
-    const rest = Math.max(0, n - want.hunt);
-    let open = Object.keys(share).filter((j) => jobOpen(s, j));
-    const tot = open.reduce((a, j) => a + share[j], 0) || 1;
-    for (const j of open) want[j] = Math.floor(rest * share[j] / tot);
-    let left = n - Object.values(want).reduce((a, b) => a + b, 0);
-    for (let i = 0; left > 0 && open.length; i++, left--) want[open[i % open.length]]++;
-    // les meilleurs d'abord
-    const pairs = [];
-    for (const v of s.villagers) for (const j in want) if (want[j] > 0) pairs.push({ v, j, y: traitMult(v, j) * (1 + xpBonus(v, j)) });
-    pairs.sort((a, b) => b.y - a.y);
-    const done = new Set();
-    for (const p of pairs) {
-      if (done.has(p.v.id) || want[p.j] <= 0) continue;
-      p.v.job = p.j; want[p.j]--; done.add(p.v.id);
-    }
+    if (!s.villagers) s.villagers = [];
+    recommendQuotas(s);
+    applyQuotas(s);
   }
 
   /* ---------- Prévisions de la journée ---------- */
@@ -753,7 +802,8 @@
     ERAS, RES, BUILDINGS, DISCOVERIES, LAWS, DILEMMAS, RES_ICONS, RES_NAMES, B, D, L,
     newState, migrate, totals, forecast, options, act, endDay, capacity, power, enemyStrength, log,
     known, dilemmaView, choose, buildCost, canPay,
-    JOBS, JB, STRONG, WEAK, STRONG_X, WEAK_X, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
+    JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
+    prefOf, setPref, setQuota, applyQuotas, recommendQuotas,
   };
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };

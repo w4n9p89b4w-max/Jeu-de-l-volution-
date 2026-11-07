@@ -57,7 +57,12 @@
 
     const J = E.JB;
     parts.push(sec('villageois', '👷 Les villageois et leurs tâches', `
-      <p>Chaque habitant est une personne avec un <b>nom</b>, une <b>force</b> et une <b>faiblesse</b>. Touchez <b>👷 Villageois</b> en bas de l'écran (ou une pastille de ressource) pour voir tout le monde et donner une tâche à chacun. Ce n'est pas le choix du jour : vous pouvez changer quand vous voulez.</p>
+      <p>Chaque habitant est une personne avec un <b>nom</b>, une <b>force</b> et une <b>faiblesse</b>. Touchez <b>👷 Villageois</b> en bas de l'écran (ou une pastille de ressource). Ce n'est pas le choix du jour : vous pouvez tout changer quand vous voulez.</p>
+      <h4>1. Les quotas : combien de villageois par tâche</h4>
+      <p>Sur chaque tâche, <b>− / +</b> règle le nombre de villageois à envoyer (par exemple <b>4/5</b> : 4 au travail sur 5 demandés ; en rouge s'il manque du monde). Le jeu choisit lui-même <b>qui</b> y va : d'abord ceux qui ont la <b>préférence la plus haute</b> pour cette tâche, puis <b>les plus forts</b> (force, faiblesse et expérience). Ceux qui ne sont pris nulle part restent <b>au village</b>.</p>
+      <p><b>🔁 Quotas automatiques chaque jour</b> : le jeu règle les quotas selon les besoins du pays (nourriture, bois, pierre, défense…). Dès que vous touchez un − ou un +, il passe en mode manuel. <b>✨ Quotas conseillés</b> applique les quotas recommandés une fois.</p>
+      <h4>2. Les préférences de chaque villageois</h4>
+      <p>Le tableau a une ligne par villageois et une colonne par tâche. Touchez une case pour changer la préférence : <b>+ haute</b>, <b>○ normale</b>, <b>− basse</b>, <b>✕ interdit</b> (jamais envoyé à cette tâche). Au départ, la préférence est haute pour sa force et basse pour sa faiblesse. Chaque case montre aussi son multiplicateur (par exemple ×1,6) ; la case entourée en bleu est sa tâche actuelle. Touchez l'icône d'une tâche en haut pour trier les villageois du plus motivé et du plus fort au moins bon.</p>
       <table><tr><th>Tâche</th><th>Rapporte (par villageois et par jour)</th><th>Disponible</th></tr>
       ${E.JOBS.map((j) => `<tr><td>${j.icon} <b>${j.name}</b></td><td>${j.id === 'idle' ? '1 💰 pour 12 et 1 💡 pour 20 villageois sans tâche' : `${String(j.base).replace('.', ',')} ${j.res === 'def' ? '🛡️ (plus à chaque ère)' : I[j.res]}`}<br><small>${j.desc}</small></td><td>${j.lock || 'Dès le début'}</td></tr>`).join('')}
       </table>
@@ -70,7 +75,7 @@
       <h4>Expérience</h4>
       <p>Chaque jour passé à la même tâche ajoute +2 % de rendement dans cette tâche, jusqu'à +30 %. L'expérience est gardée si la personne change de tâche puis revient.</p>
       <h4>Nouveaux villageois</h4>
-      <p>Quand la population grandit, les nouveaux venus se mettent d'eux-mêmes à la tâche où ils sont les meilleurs (si elle est disponible). Le bouton <b>✨ Répartir automatiquement</b> place tout le monde selon les besoins du pays et les forces de chacun. La pastille rouge sur 👷 indique les villageois sans tâche.</p>
+      <p>Quand la population grandit, les nouveaux venus remplissent les quotas s'ils sont meilleurs que ceux en place. Avec les quotas manuels, pensez à augmenter les quotas : sinon ils restent au village. La pastille rouge sur 👷 compte les villageois sans tâche.</p>
       <p>Les soldats 🪖 sont à part : ils ne comptent pas parmi les villageois.</p>`));
 
     parts.push(sec('peuple', '👤 Population et bonheur', `

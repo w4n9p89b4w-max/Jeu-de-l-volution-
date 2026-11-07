@@ -19,7 +19,7 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
 5. Parfois, un **dilemme** vous oblige à choisir entre **A** et **B** : accueillir des réfugiés ou fermer la frontière, couper la forêt ou la protéger, ouvrir une mine de charbon sous les champs…
 
 **Les ressources** : 🍖 nourriture, 🪵 bois, 🪨 pierre, 🔩 fer (dès le Moyen Âge), ⚫ charbon (dès la Renaissance), 💰 or et 💡 savoir.
-**Les villageois** (bouton 👷) : chaque habitant a un nom, une **force** (×1,6 dans une tâche) et une **faiblesse** (×0,5 dans une autre), et gagne de l'expérience. On leur donne une tâche à tout moment : chasse, bûcheron, pierres, mineur de fer, mineur de charbon, savant, marchand, garde, ou rester au village. Un bouton répartit tout le monde automatiquement. Après les *Outils en pierre*, le jeu propose d'ouvrir une **carrière**.
+**Les villageois** (bouton 👷) : chaque habitant a un nom, une **force** (×1,6 dans une tâche) et une **faiblesse** (×0,5 dans une autre), et gagne de l'expérience. Tâches : chasse, bûcheron, pierres, mineur de fer, mineur de charbon, savant, marchand, garde, ou rester au village. Comme dans *Oxygen Not Included* : on règle **combien de villageois envoyer** à chaque tâche (quotas, ou quotas automatiques) et les **préférences** de chacun (haute, normale, basse, interdit) ; le jeu envoie d'abord les plus motivés, puis les plus forts. Après les *Outils en pierre*, le jeu propose d'ouvrir une **carrière**.
 Carrières et mines s'installent au pied des montagnes ; hauts-fourneaux et usines consomment du charbon.
 
 **Les 6 ères** : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.
