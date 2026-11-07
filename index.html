@@ -39,7 +39,7 @@
     <div class="dock-row">
       <button class="small" id="bRest">😴 Repos</button>
       <button class="small" id="bLog">📖 Journal</button>
-      <button class="small" id="bHelp">❔ Aide</button>
+      <button class="small" id="bHelp">📘 Règles</button>
       <button class="small" id="bMenu">⚙️</button>
     </div>
   </footer>
@@ -51,6 +51,7 @@
     <div class="screen-actions">
       <button class="btn primary" id="bNew">Nouvelle partie</button>
       <button class="btn" id="bContinue">Continuer</button>
+      <button class="btn" id="bRules">📘 Règles du jeu</button>
     </div>
     <p class="hint">Une vallée immense entourée de montagnes. Pour l'instant… il n'y a <em>rien</em>.</p>
   </section>
@@ -87,6 +88,13 @@
   <div id="night"><span id="nightText"></span></div>
   <div id="toast"></div>
 
+  <!-- Annexe : règles du jeu -->
+  <section id="rules" hidden>
+    <div class="rules-head"><h2>📘 Règles du jeu</h2><button class="round" id="rulesClose" aria-label="Fermer">✕</button></div>
+    <nav id="rulesNav"></nav>
+    <div id="rulesBody"></div>
+  </section>
+
   <div id="modal" class="hidden">
     <div class="modal-card">
       <div class="modal-ico" id="mIco"></div>
@@ -99,6 +107,7 @@
 
 <script src="engine.js"></script>
 <script src="map.js"></script>
+<script src="rules.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

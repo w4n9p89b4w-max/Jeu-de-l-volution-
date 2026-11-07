@@ -330,7 +330,7 @@
     const rows = state.log.map((l) => `<div><span>J${l.day}</span>${l.text}</div>`).join('') || '<div>Rien encore…</div>';
     modal({ icon: '📖', title: `Journal de ${state.name}`, html: `<div class="log">${rows}</div>`, buttons: [{ label: 'Fermer', value: true }] });
   };
-  $('bHelp').onclick = showHelp;
+  $('bHelp').onclick = () => showHelp();
   $('hCountry').onclick = $('bLog').onclick;
   $('bMenu').onclick = async () => {
     const v = await modal({ icon: '⚙️', title: 'Menu', text: 'La partie est sauvegardée automatiquement à la fin de chaque jour.', buttons: [{ label: 'Reprendre', value: 'back', primary: true }, { label: 'Nouvelle partie', value: 'new' }] });
@@ -339,19 +339,23 @@
       if (ok) { wipe(); location.reload(); }
     }
   };
-  function showHelp() {
-    return modal({
-      icon: '❔', title: 'Comment jouer',
-      html: `<div class="help">
-        <p><b>Chaque jour, vous choisissez une carte</b> parmi 4 (A, B, C, D). Chaque carte a un <b style="color:#2e9d57">bonus</b> et un <b style="color:#d6453d">malus</b> : construire coûte des ressources, une loi a ses avantages et ses inconvénients, une carte ressources en donne une et en prend une autre… Puis la nuit tombe et de nouvelles cartes arrivent.</p><p>😴 Aucune carte ne vous plaît ? Le <b>Repos</b> passe la journée (+4 😊).</p><p>🎯 En haut, l'objectif indique la prochaine découverte : quand vous avez assez de 💡, elle apparaît dans vos cartes. 3 découvertes = ère suivante.</p><p>🪵 Bois, 🪨 pierre, 🔩 fer (Moyen Âge) et ⚫ charbon (Renaissance) servent à construire. Carrières et mines s'installent au pied des montagnes.</p>
-        <p>🍖 Nourrissez la population, 🏠 logez-la et 😊 gardez-la heureuse pour qu'elle grandisse. Un peuple malheureux manifeste !</p>
-        <p>💡 Le savoir permet les <b>découvertes</b>. Faites les 3 découvertes d'une ère pour passer à la suivante : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.</p>
-        <p>⚔️ Les voisins attaquent parfois : gardez une armée ou des remparts.</p>
-        <p>🚀 <b>But :</b> découvrir la conquête spatiale et lancer la première fusée du pays !</p>
-        <p>👆 Glissez pour vous déplacer, pincez ou utilisez la molette pour zoomer.</p></div>`,
-      buttons: [{ label: 'Compris !', value: true, primary: true }],
-    });
+  let rulesBuilt = false;
+  function showHelp(section) {
+    if (!rulesBuilt) {
+      const r = Rules.build(E);
+      $('rulesBody').innerHTML = r.html;
+      $('rulesNav').innerHTML = r.nav.map(([id, label]) => `<button data-id="${id}">${label}</button>`).join('');
+      $('rulesNav').querySelectorAll('button').forEach((b) => (b.onclick = () => {
+        const el = document.getElementById('r-' + b.dataset.id);
+        $('rulesBody').scrollTo({ top: el.offsetTop - $('rulesBody').offsetTop - 6, behavior: 'smooth' });
+      }));
+      rulesBuilt = true;
+    }
+    $('rules').hidden = false;
+    if (typeof section === 'string') requestAnimationFrame(() => { const el = document.getElementById('r-' + section); if (el) $('rulesBody').scrollTop = el.offsetTop - $('rulesBody').offsetTop - 6; });
   }
+  $('rulesClose').onclick = () => { $('rules').hidden = true; };
+  $('bRules').onclick = () => showHelp();
   map.onManual(() => $('recenter').classList.remove('hidden'));
   $('recenter').onclick = () => { map.recenter(); $('recenter').classList.add('hidden'); };
 
