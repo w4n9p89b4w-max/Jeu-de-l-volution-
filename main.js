@@ -527,18 +527,34 @@
     chasse: { icon: '🏹', title: 'Construire un camp de chasse ?', done: '🏹 CAMP DE CHASSE <em>CONSTRUIT</em> !', a: 'Construire le camp',
       text: 'Les pièges marchent bien ! Un camp à l\'orée de la forêt permettrait de fumer la viande et de la garder plus longtemps.', plus: '+4 🍖/jour pour toujours' },
   };
+  // texte d'une proposition pour n'importe quelle étape (améliorations, armes…)
+  function pitchOf(id) {
+    const b = E.B[id];
+    if (PROPOSE[id]) return PROPOSE[id];
+    const plus = E.bonusOf(state, id).plus.join(' · ');
+    if (b.weapon != null) {
+      const step = id.slice(-1);
+      const intro = step === 'a' ? 'À force de s\'entraîner, vos soldats ont une idée pour de meilleures armes.'
+        : step === 'b' ? 'La dernière bataille a beaucoup appris à vos soldats.'
+        : 'Vos armes sont au point : il est temps de les fabriquer en série.';
+      return { icon: b.icon, title: `Nouvelle arme : ${b.name} ?`, done: `${b.icon} ${b.name.toUpperCase()} <em>!</em>`, a: step === 'c' ? `Construire : ${b.name}` : `Adopter : ${b.name}`, text: `${intro} ${b.desc}`, plus };
+    }
+    if (id === 'scierie') return { icon: b.icon, title: 'Construire une scierie ?', done: '🪚 SCIERIE <em>CONSTRUITE</em> !', a: 'Construire la scierie', text: 'Les bûcherons n\'arrivent plus à suivre : une scierie couperait le bois bien plus vite.', plus };
+    return { icon: b.icon, title: `${b.name} ?`, done: `${b.icon} ${b.name.toUpperCase()} <em>!</em>`, a: `Adopter : ${b.name}`, text: `À force de pratiquer, vos villageois ont trouvé une meilleure façon de travailler. ${b.desc}`, plus };
+  }
   async function proposeBuilding(id) {
-    const P = PROPOSE[id], b = E.B[id];
+    const b = E.B[id], P = b && pitchOf(id);
     if (!P || !b) return;
     const cost = E.buildCost(state, b);
     const ok = E.canPay(state, cost);
     const price = Object.keys(cost).map((r) => `−${cost[r]} ${E.RES_ICONS[r]}`).join(' ');
+    const where = b.weapon != null ? '⚔️ Guerres' : '🏠 Constructions';
     const v = await modal({
       icon: P.icon, title: P.title,
       html: `<p>${P.text}</p><p class="finfo"><span class="g">${P.plus}</span><br><span class="b">${price}</span></p>`,
       buttons: [
-        { label: ok ? `A · ${P.a}` : 'A · Pas assez de ressources…', hint: ok ? `${price} · ${P.plus}` : 'Reste disponible dans Constructions', value: ok ? 'yes' : 'later', primary: true, cls: 'choice-a' },
-        { label: 'B · Plus tard', hint: 'Reste disponible dans Constructions', value: 'later', cls: 'choice-b' },
+        { label: ok ? `A · ${P.a}` : 'A · Pas assez de ressources…', hint: ok ? `${price} · ${P.plus}` : `Reste disponible dans ${where}`, value: ok ? 'yes' : 'later', primary: true, cls: 'choice-a' },
+        { label: 'B · Plus tard', hint: `Reste disponible dans ${where}`, value: 'later', cls: 'choice-b' },
       ],
     });
     if (v !== 'yes') return;

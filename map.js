@@ -412,6 +412,16 @@
       ell(ctx, x + 8, y - 6, 3, 3, '#ff8a1f'); ell(ctx, x + 8, y - 6, 1.5, 1.5, '#ffe08a');
       windows(ctx, x - 14, y - 10, 18, 6, 1, 3, '#f2a64a');
     },
+    armory(ctx, x, y, t, s) {
+      // atelier d'armes : un bâtiment avec deux épées croisées
+      gable(ctx, x, y, 22, 11, 12, '#b7a48a', '#5b3a2a');
+      door(ctx, x - 5, y, 4, 6, '#3b2a18');
+      ell(ctx, x + 5, y - 6, 4.5, 4.5, '#efe6d3');
+      ctx.strokeStyle = '#7d858e'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(x + 2, y - 9); ctx.lineTo(x + 8, y - 3); ctx.moveTo(x + 8, y - 9); ctx.lineTo(x + 2, y - 3); ctx.stroke();
+      ell(ctx, x + 10, y - 22, 1.6, 1.6, 'rgba(120,120,120,.5)');
+      rect(ctx, x + 8, y - 21, 3, 6, '#6d4c3a');
+    },
     traps(ctx, x, y) {
       // deux pièges à lacet et un appât au pied des arbres
       for (const [dx, dy] of [[-8, 2], [7, -3]]) {
@@ -544,6 +554,7 @@
         slots = buildSlots(s.site);
         const used = new Set();
         for (const b of s.buildings) {
+          if (!Engine.B[b.id] || !Engine.B[b.id].arch) continue;   // améliorations : rien à dessiner
           if (b.slot == null || used.has(b.slot) || !slots[b.slot] || !!slots[b.slot].edge !== isEdge(b)) b.slot = nextSlot(used, isEdge(b));
           used.add(b.slot);
           b.x = slots[b.slot].x; b.y = slots[b.slot].y;
@@ -560,7 +571,8 @@
     }
     const isEdge = (b) => !!EDGE[Engine.B[b.id].arch];
     function place(b) {
-      const used = new Set(state.buildings.filter((x) => x !== b && x.slot != null).map((x) => x.slot));
+      if (!Engine.B[b.id].arch) return b;
+      const used = new Set(state.buildings.filter((x) => x !== b && x.slot != null && Engine.B[x.id].arch).map((x) => x.slot));
       b.slot = nextSlot(used, isEdge(b));
       b.x = slots[b.slot].x; b.y = slots[b.slot].y;
       clearTrees();

@@ -56,6 +56,11 @@
       <li><b>Après ${E.HUNT_APPATS} journées de chasse</b> (une journée par chasseur et par jour), le jeu propose de <b>poser des appâts et des pièges</b> en forêt (A : les poser, B : plus tard). Les chasseurs rapportent alors <b>50 % de plus</b>.</li>
       <li><b>Une fois les appâts posés, après ${E.HUNT_CAMP} journées de chasse</b>, le jeu propose de <b>construire un camp de chasse</b> : +4 🍖 par jour. Vous pouvez ensuite en construire d'autres.</li></ol>
       <p>Si vous répondez « plus tard », la construction reste disponible dans 🏠 Constructions. Ces propositions ne comptent pas comme le choix du jour.</p>
+      <h4>📈 Tout progresse par la pratique</h4>
+      <p>Comme pour la chasse, chaque travail s'améliore à force d'être pratiqué. Quand une étape est atteinte, le jeu la <b>propose</b> la nuit (A : l'adopter tout de suite, B : plus tard). Ces propositions ne comptent pas comme le choix du jour.</p>
+      <table><tr><th>Amélioration</th><th>Quand</th><th>Effet</th><th>Prix</th></tr>
+      ${E.STEPS.filter((st) => !/^w\d/.test(st.key) && !['appats', 'camp'].includes(st.key)).map((st) => { const b = E.B[st.b]; return `<tr><td>${b.icon} <b>${b.name}</b></td><td>${st.hint}</td><td>${b.upgrade ? '+50 %' : fmtEff(b.eff)}</td><td>${fmtCost(b.cost)}</td></tr>`; }).join('')}
+      </table>
       <h4>🪨 Ouvrir une carrière</h4>
       <p>Quand vous découvrez les <b>Outils en pierre</b>, le jeu vous propose d'ouvrir une carrière (A : l'ouvrir tout de suite pour du bois, B : plus tard). Elle produit +4 🪨/jour en plus des ramasseurs. Si vous dites « plus tard », elle reste disponible dans 🏠 Constructions.</p>
       <p>Carrières et mines s'installent au pied des montagnes.</p>`));
@@ -111,6 +116,15 @@
       <li>Chaque attaque coûte des soldats (moins si vous êtes bien plus fort que lui), les plus mal armés en premier.</li>
       <li>Quand sa vie tombe à 0 : <b>🏆 victoire totale</b>. Gros butin, nouveaux habitants, +10 😊, et <b>plus aucune attaque jusqu'à la fin de l'ère</b>. Un nouvel ennemi apparaît à l'ère suivante.</li></ol>
       <p>Après une défaite partielle, vous pouvez réattaquer dès le lendemain tant qu'il vous reste des soldats. Mais attention : sa force augmente chaque jour, et sa vie ne remonte pas.</p>
+      <h4>🗡️ Les armes, étape par étape</h4>
+      <p>À chaque ère, les armes des soldats progressent en <b>3 étapes</b>, chacune <b>+25 % de force</b> pour les soldats de cette époque (jusqu'à +75 %). Elles apparaissent dans ⚔️ Guerres et sont proposées la nuit quand elles se débloquent :</p>
+      <ol><li><b>Entraînement</b> : après un certain nombre de jours d'entraînement (nombre de soldats × jours passés dans l'ère).</li>
+      <li><b>Bataille</b> : après la 1re étape et une bataille pendant l'ère (attaque ou défense).</li>
+      <li><b>Atelier d'armes</b> : un bâtiment, après la 2e étape et beaucoup d'entraînement.</li></ol>
+      <table><tr><th>Ère</th><th>1. Entraînement</th><th>2. Bataille</th><th>3. Atelier</th></tr>
+      ${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]}</td>${E.WPN(i).map((id) => `<td>${E.B[id].icon} ${E.B[id].name}<br><small>${fmtCost(E.B[id].cost)}</small></td>`).join('')}</tr>`).join('')}
+      </table>
+      <p>Les soldats d'une ancienne époque gardent les améliorations de leur époque ; « Réarmer » leur donne celles de l'époque actuelle.</p>
       <h4>Votre puissance</h4>
       <p><b>Pour vous défendre</b> : force de vos soldats + défense 🛡️ (gardes, remparts, château, lois, métallurgie). <b>Pour attaquer</b>, ce sont surtout les soldats qui comptent : la défense ne compte qu'au quart, car les remparts et les gardes restent au pays.</p>
       <h4>Temps de guerre</h4>

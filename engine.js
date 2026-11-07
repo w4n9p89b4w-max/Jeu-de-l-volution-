@@ -47,7 +47,7 @@
     { id: 'minefer', era: 2, name: 'Mine de fer', icon: '⛏️', arch: 'mine', cost: { wood: 20, stone: 15 }, eff: { iron: 4 }, req: 'metal', desc: 'Creuser la montagne pour trouver du minerai.' },
     { id: 'moulin', era: 2, name: 'Moulin', icon: '🌬️', arch: 'mill', cost: { wood: 20, stone: 8, gold: 10 }, eff: { food: 14 }, desc: 'Le vent moud le grain.' },
     { id: 'colombage', era: 2, name: 'Maison à colombages', icon: '🏘️', arch: 'timber', cost: { wood: 25, stone: 8, gold: 10 }, eff: { cap: 22 }, desc: 'Des maisons serrées le long des ruelles.' },
-    { id: 'scierie', era: 2, name: 'Scierie', icon: '🪚', arch: 'sawmill', cost: { wood: 15, stone: 10, iron: 5 }, eff: { wood: 10 }, desc: 'Des lames de fer pour couper plus vite.' },
+    { id: 'scierie', era: 2, name: 'Scierie', icon: '🪚', arch: 'sawmill', unlock: 'scierie', cost: { wood: 15, stone: 10, iron: 5 }, eff: { wood: 10 }, desc: 'Des lames de fer pour couper plus vite.' },
     { id: 'monastere', era: 2, name: 'Monastère', icon: '📖', arch: 'monastery', cost: { stone: 40, gold: 20 }, eff: { sci: 7 }, desc: 'Les moines recopient les savoirs anciens.' },
     { id: 'chateau', era: 2, name: 'Château fort', icon: '🏰', arch: 'castle', cost: { stone: 60, iron: 10, gold: 30 }, eff: { def: 20, happy: 3 }, desc: 'Remparts, tours et pont-levis.' },
     { id: 'cathedrale', era: 2, name: 'Cathédrale', icon: '⛪', arch: 'church', cost: { stone: 70, gold: 40 }, eff: { happy: 12 }, desc: 'Un chantier de plusieurs générations.' },
@@ -73,6 +73,33 @@
     { id: 'hopital', era: 5, name: 'Hôpital', icon: '🏥', arch: 'hospital', cost: { stone: 80, iron: 40, gold: 100 }, eff: { happy: 10, cap: 20 }, desc: 'Soigner tout le monde.' },
     { id: 'recyclage', era: 5, name: 'Centre de recyclage', icon: '♻️', arch: 'recycle', cost: { stone: 60, gold: 80 }, eff: { iron: 20, stone: 10, happy: 2 }, desc: 'Rien ne se perd : le vieux métal redevient neuf.' },
     { id: 'labo', era: 5, name: 'Centre de recherche', icon: '🔬', arch: 'lab', cost: { stone: 60, iron: 80, gold: 120 }, eff: { sci: 40 }, desc: 'Physique, biologie, intelligence artificielle…' },
+    // ----- Améliorations du travail (débloquées par la pratique) -----
+    { id: 'haches', era: 0, name: 'Haches en silex', icon: '🪓', upgrade: 'wood', cost: { stone: 4 }, eff: {}, unlock: 'haches', unique: true, desc: 'Des haches taillées dans le silex : les bûcherons rapportent 50 % de plus.' },
+    { id: 'leviers', era: 0, name: 'Leviers et cordes', icon: '🪢', upgrade: 'stone', cost: { wood: 10 }, eff: {}, unlock: 'leviers', unique: true, desc: 'Déplacer les gros blocs : les villageois aux pierres rapportent 50 % de plus.' },
+    { id: 'conteurs', era: 0, name: 'Conteurs et peintures', icon: '🎨', upgrade: 'sage', cost: { wood: 5, stone: 5 }, eff: {}, unlock: 'conteurs', unique: true, desc: 'Transmettre le savoir : les savants rapportent 50 % de plus.' },
+    { id: 'tours', era: 0, name: 'Tours de guet', icon: '🗼', upgrade: 'guard', cost: { wood: 15, stone: 10 }, eff: {}, unlock: 'tours', unique: true, desc: 'Voir arriver l\'ennemi de loin : les gardes défendent 50 % mieux.' },
+    { id: 'balances', era: 1, name: 'Poids et balances', icon: '⚖️', upgrade: 'trade', cost: { stone: 10, gold: 10 }, eff: {}, unlock: 'balances', unique: true, desc: 'Des mesures justes : les marchands rapportent 50 % de plus.' },
+    { id: 'etais', era: 2, name: 'Galeries étayées', icon: '🏗️', upgrade: 'iron', cost: { wood: 30 }, eff: {}, unlock: 'etais', unique: true, desc: 'Des poutres pour creuser plus loin : les mineurs de fer rapportent 50 % de plus.' },
+    { id: 'lampes', era: 3, name: 'Lampes de mineur', icon: '🪔', upgrade: 'coal', cost: { iron: 15 }, eff: {}, unlock: 'lampes', unique: true, desc: 'Y voir clair sous terre : les mineurs de charbon rapportent 50 % de plus.' },
+    // ----- Les armes : 3 étapes par ère (entraînement, bataille, atelier) -----
+    { id: 'w0a', era: 0, weapon: 0, name: 'Pointes en silex', icon: '🔺', upgrade: 'army', cost: { stone: 6 }, eff: {}, unlock: 'w0a', unique: true, desc: 'Des lances à pointe de silex : guerriers +25 % de force.' },
+    { id: 'w0b', era: 0, weapon: 0, name: 'Arcs et flèches', icon: '🏹', upgrade: 'army', cost: { wood: 12 }, eff: {}, unlock: 'w0b', unique: true, desc: 'Frapper de loin : guerriers +25 % de force.' },
+    { id: 'w0c', era: 0, weapon: 0, name: 'Atelier de taille', icon: '🪨', arch: 'armory', cost: { wood: 15, stone: 10 }, eff: {}, unlock: 'w0c', unique: true, desc: 'Des armes taillées par des artisans : guerriers +25 % de force.' },
+    { id: 'w1a', era: 1, weapon: 1, name: 'Armes en bronze', icon: '🗡️', upgrade: 'army', cost: { stone: 10, gold: 15 }, eff: {}, unlock: 'w1a', unique: true, desc: 'Le bronze remplace la pierre : légionnaires +25 % de force.' },
+    { id: 'w1b', era: 1, weapon: 1, name: 'Formation en tortue', icon: '🐢', upgrade: 'army', cost: { gold: 20 }, eff: {}, unlock: 'w1b', unique: true, desc: 'Les boucliers serrés : légionnaires +25 % de force.' },
+    { id: 'w1c', era: 1, weapon: 1, name: 'Forge de bronze', icon: '🔥', arch: 'armory', cost: { stone: 30, gold: 30 }, eff: {}, unlock: 'w1c', unique: true, desc: 'Fondre des armes en série : légionnaires +25 % de force.' },
+    { id: 'w2a', era: 2, weapon: 2, name: 'Arbalètes', icon: '🎯', upgrade: 'army', cost: { wood: 30, iron: 10 }, eff: {}, unlock: 'w2a', unique: true, desc: 'Des carreaux qui percent les armures : chevaliers +25 % de force.' },
+    { id: 'w2b', era: 2, weapon: 2, name: 'Armures de plates', icon: '🛡️', upgrade: 'army', cost: { iron: 25, gold: 20 }, eff: {}, unlock: 'w2b', unique: true, desc: 'Protégés de la tête aux pieds : chevaliers +25 % de force.' },
+    { id: 'w2c', era: 2, weapon: 2, name: 'Armurerie', icon: '⚒️', arch: 'armory', cost: { stone: 50, iron: 30 }, eff: {}, unlock: 'w2c', unique: true, desc: 'Des forgerons au service de l\'armée : chevaliers +25 % de force.' },
+    { id: 'w3a', era: 3, weapon: 3, name: 'Canons de bronze', icon: '💣', upgrade: 'army', cost: { iron: 30, coal: 10 }, eff: {}, unlock: 'w3a', unique: true, desc: 'L\'artillerie sur roues : mousquetaires +25 % de force.' },
+    { id: 'w3b', era: 3, weapon: 3, name: 'Poudre fine', icon: '🧂', upgrade: 'army', cost: { coal: 25, gold: 30 }, eff: {}, unlock: 'w3b', unique: true, desc: 'Une poudre qui ne rate pas : mousquetaires +25 % de force.' },
+    { id: 'w3c', era: 3, weapon: 3, name: 'Fonderie de canons', icon: '🏭', arch: 'armory', cost: { stone: 60, iron: 40, coal: 20 }, eff: {}, unlock: 'w3c', unique: true, desc: 'Couler des canons en série : mousquetaires +25 % de force.' },
+    { id: 'w4a', era: 4, weapon: 4, name: 'Mitrailleuses', icon: '🔫', upgrade: 'army', cost: { iron: 50, coal: 20 }, eff: {}, unlock: 'w4a', unique: true, desc: 'Une puissance de feu terrible : fusiliers +25 % de force.' },
+    { id: 'w4b', era: 4, weapon: 4, name: 'Artillerie lourde', icon: '🧨', upgrade: 'army', cost: { iron: 60, gold: 50 }, eff: {}, unlock: 'w4b', unique: true, desc: 'Des obus à longue portée : fusiliers +25 % de force.' },
+    { id: 'w4c', era: 4, weapon: 4, name: 'Usine d\'armement', icon: '🏭', arch: 'armory', cost: { stone: 80, iron: 60, coal: 40 }, eff: {}, unlock: 'w4c', unique: true, desc: 'Produire des armes à la chaîne : fusiliers +25 % de force.' },
+    { id: 'w5a', era: 5, weapon: 5, name: 'Drones', icon: '🛸', upgrade: 'army', cost: { iron: 60, gold: 80 }, eff: {}, unlock: 'w5a', unique: true, desc: 'Voir et frapper sans risque : armée moderne +25 % de force.' },
+    { id: 'w5b', era: 5, weapon: 5, name: 'Blindage composite', icon: '🧱', upgrade: 'army', cost: { iron: 90, gold: 60 }, eff: {}, unlock: 'w5b', unique: true, desc: 'Des blindés presque indestructibles : armée moderne +25 % de force.' },
+    { id: 'w5c', era: 5, weapon: 5, name: 'Complexe militaire', icon: '🏢', arch: 'armory', cost: { stone: 100, iron: 100, gold: 100 }, eff: {}, unlock: 'w5c', unique: true, desc: 'Recherche et production d\'armes : armée moderne +25 % de force.' },
     { id: 'fusee', era: 5, name: 'Base spatiale', icon: '🚀', arch: 'rocket', cost: { stone: 150, iron: 250, coal: 100, gold: 300 }, eff: {}, req: 'espace', unique: true, desc: 'Lancer la première fusée du pays. VICTOIRE !' },
   ];
 
@@ -153,6 +180,7 @@
       s.huntDays = 0;
       if (s.buildings.some((b) => b.id === 'chasse')) { s.unlocks = ['appats', 'camp']; s.huntDays = HUNT_CAMP; s.buildings.push({ id: 'appats', day: s.day }); }
     }
+    for (const b of s.buildings) { const k = B[b.id] && B[b.id].unlock; if (k && !s.unlocks.includes(k)) s.unlocks.push(k); }
     if (!s.villagers) {
       // ancienne sauvegarde : on crée les villageois et on les répartit
       s.villagers = []; s.nextId = 1;
@@ -188,18 +216,53 @@
      2. Après 8 « journées de chasseur » : on peut poser des appâts et des pièges.
      3. Appâts posés et 25 journées de chasseur : on peut construire un camp de chasse. */
   const HUNT_APPATS = 8, HUNT_CAMP = 25;
-  const UNLOCK_HINT = {
-    appats: `Se débloque après ${HUNT_APPATS} journées de chasse en forêt`,
-    camp: `Se débloque quand les appâts sont posés et après ${HUNT_CAMP} journées de chasse`,
-  };
+  /* ---------- La progression, étape par étape ----------
+     Chaque étape se débloque par la pratique (journées de travail, jours
+     d'entraînement des soldats, batailles) ; le jeu la propose alors (A/B).
+     « Plus tard » : elle reste disponible dans Constructions (ou Guerres). */
+  const work = (s, j) => ((s.work || {})[j] || 0);
+  const armyDays = (s, e) => ((s.armyDays || {})[e] || 0);
+  const eraBattles = (s, e) => ((s.eraBattles || {})[e] || 0);
+  const WPN = (e) => [`w${e}a`, `w${e}b`, `w${e}c`];
+  const STEPS = [
+    { key: 'appats', b: 'appats', ok: (s) => (s.huntDays || 0) >= HUNT_APPATS, hint: `Après ${HUNT_APPATS} journées de chasse en forêt` },
+    { key: 'camp', b: 'chasse', ok: (s) => count(s, 'appats') && (s.huntDays || 0) >= HUNT_CAMP, hint: `Quand les appâts sont posés, après ${HUNT_CAMP} journées de chasse` },
+    { key: 'haches', b: 'haches', ok: (s) => work(s, 'wood') >= 8, hint: 'Après 8 journées de bûcheron' },
+    { key: 'scierie', b: 'scierie', ok: (s) => count(s, 'haches') && work(s, 'wood') >= 60, hint: 'Avec les haches en silex, après 60 journées de bûcheron' },
+    { key: 'leviers', b: 'leviers', ok: (s) => count(s, 'carriere') && work(s, 'stone') >= 30, hint: 'Avec une carrière, après 30 journées aux pierres' },
+    { key: 'conteurs', b: 'conteurs', ok: (s) => work(s, 'sage') >= 10, hint: 'Après 10 journées de savant' },
+    { key: 'tours', b: 'tours', ok: (s) => work(s, 'guard') >= 10, hint: 'Après 10 journées de garde' },
+    { key: 'balances', b: 'balances', ok: (s) => work(s, 'trade') >= 10, hint: 'Après 10 journées de marchand' },
+    { key: 'etais', b: 'etais', ok: (s) => work(s, 'iron') >= 15, hint: 'Après 15 journées de mineur de fer' },
+    { key: 'lampes', b: 'lampes', ok: (s) => work(s, 'coal') >= 15, hint: 'Après 15 journées de mineur de charbon' },
+  ];
+  for (let e = 0; e < 6; e++) {
+    const [a1, a2, a3] = WPN(e), d1 = 15 + e * 5, d3 = 60 + e * 20;
+    STEPS.push(
+      { key: a1, b: a1, ok: (s) => armyDays(s, e) >= d1, hint: `Après ${d1} jours d'entraînement des soldats de cette époque (soldats × jours)` },
+      { key: a2, b: a2, ok: (s) => count(s, a1) && eraBattles(s, e) >= 1, hint: 'Après la première étape et une bataille pendant cette ère' },
+      { key: a3, b: a3, ok: (s) => count(s, a2) && armyDays(s, e) >= d3, hint: `Après la 2e étape et ${d3} jours d'entraînement` });
+  }
+  const STEP_OF = Object.fromEntries(STEPS.map((x) => [x.key, x]));
+  const UNLOCK_HINT = Object.fromEntries(STEPS.map((x) => [x.key, `Se débloque : ${x.hint.toLowerCase()}`]));
   const unlocked = (s, k) => (s.unlocks || []).includes(k);
+  // l'étape précédente d'une chaîne (pour n'afficher que la prochaine étape verrouillée)
+  const PREV = { chasse: 'appats', scierie: 'haches' };
+  for (let e = 0; e < 6; e++) { const [a1, a2, a3] = WPN(e); PREV[a2] = a1; PREV[a3] = a2; }
   function checkUnlocks(s) {
     s.unlocks = s.unlocks || [];
     const news = [];
-    if (!unlocked(s, 'appats') && (s.huntDays || 0) >= HUNT_APPATS) { s.unlocks.push('appats'); news.push('appats'); }
-    if (!unlocked(s, 'camp') && count(s, 'appats') && (s.huntDays || 0) >= HUNT_CAMP) { s.unlocks.push('camp'); news.push('chasse'); }
+    for (const st of STEPS) {
+      if (unlocked(s, st.key)) continue;
+      const b = B[st.b];
+      if (b.era > s.era) continue;
+      if (st.ok(s)) { s.unlocks.push(st.key); news.push(st.b); }
+    }
     return news;
   }
+  // niveaux d'amélioration
+  const jobUpgrade = (s, j) => BUILDINGS.some((b) => b.upgrade === j && count(s, b.id)) ? 1.5 : 1;
+  const weaponLevel = (s, e) => WPN(e).filter((id) => count(s, id)).length;
   const capacity = (s) => 5 + totals(s).cap;
   /* ---------- L'armée : des unités différentes à chaque époque ----------
      Chaque soldat garde les armes de l'époque où il a été recruté ou réarmé. */
@@ -231,7 +294,8 @@
     for (const t of s.troops) { const k = Math.min(t.n, n); t.n -= k; n -= k; if (n <= 0) break; }
     recount(s);
   }
-  const armyPower = (s) => troopsOf(s).reduce((a, t) => a + t.n * UNITS[t.era].power, 0);
+  const unitPower = (s, e) => UNITS[e].power * (1 + 0.25 * weaponLevel(s, e));
+  const armyPower = (s) => troopsOf(s).reduce((a, t) => a + t.n * unitPower(s, t.era), 0);
   const outdated = (s) => troopsOf(s).filter((t) => t.era < s.era).reduce((a, t) => a + t.n, 0);
   // réarmer : par soldat, environ 60 % du prix d'une recrue de l'époque
   function rearmCost(s, k) {
@@ -338,6 +402,9 @@
     const d = (x) => s.disc.includes(x);
     const b = JB[j].base || 0;
     if (j === 'hunt') return (b + (d('feu') ? 0.5 : 0)) * (count(s, 'appats') ? 1.5 : 1);
+    return jobBase0(s, j, d, b) * jobUpgrade(s, j);
+  }
+  function jobBase0(s, j, d, b) {
     if (j === 'wood') return b + (d('outils') ? 0.5 : 0) + (d('metal') ? 0.5 : 0) + (d('vapeur') ? 1 : 0);
     if (j === 'stone') return b + (d('outils') ? 0.25 : 0) + (d('metal') ? 0.25 : 0) + (d('vapeur') ? 0.5 : 0);
     if (j === 'iron' || j === 'coal') return b + (d('vapeur') ? 0.6 : 0) + (d('electricite') ? 0.4 : 0);
@@ -520,7 +587,10 @@
       for (const b of BUILDINGS) {
         if (b.era > s.era) continue;
         if (b.unique && count(s, b.id)) continue;
+        if (b.weapon != null) continue;          // les armes sont dans Guerres
         if (b.unlock && !unlocked(s, b.unlock)) {
+          if (PREV[b.id] && !count(s, PREV[b.id])) continue;
+          if (b.upgrade) continue;               // les améliorations arrivent par proposition
           out.push({ id: b.id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: fmtEff(b.eff), can: false, why: UNLOCK_HINT[b.unlock], era: b.era });
           continue;
         }
@@ -549,11 +619,23 @@
       const w = warCosts(s);
       const R = rival(s);
       const u = UNITS[s.era];
-      out.push({ id: 'recruter', icon: u.icon, name: u.verb, desc: `Armés de ${u.weapon}. Chacun vaut ${String(u.power).replace('.', ',')} ⚔️. Votre armée : ${armyText(s)}.`, cost: fmtCost(w.recruit), eff: `+${w.recruitN}`, can: canPay(s, w.recruit), why: whyNot(s, w.recruit) });
+      out.push({ id: 'recruter', icon: u.icon, name: u.verb, desc: `Armés de ${u.weapon}. Chacun vaut ${num1(unitPower(s, s.era))} ⚔️ (armes : ${weaponLevel(s, s.era)}/3). Votre armée : ${armyText(s)}.`, cost: fmtCost(w.recruit), eff: `+${w.recruitN}`, can: canPay(s, w.recruit), why: whyNot(s, w.recruit) });
       const old = outdated(s);
       if (old > 0) {
         const k = rearmMax(s);
         out.push({ id: 'rearmer', icon: '⚒️', name: `Réarmer les anciens soldats`, desc: `${old} soldat${old > 1 ? 's ont' : ' a'} des armes d'une ancienne époque. Ils reçoivent ${u.weapon}${k < old ? ` (vous pouvez en réarmer ${k})` : ''}.`, cost: fmtCost(rearmCost(s, Math.max(1, k))), eff: '', can: k > 0, why: whyNot(s, rearmCost(s, 1)) });
+      }
+      // les armes de l'époque : 3 étapes
+      for (const id of WPN(s.era)) {
+        const b = B[id];
+        if (count(s, id)) continue;
+        if (!unlocked(s, id)) {
+          if (PREV[id] && !count(s, PREV[id])) break;
+          out.push({ id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: '', can: false, why: UNLOCK_HINT[id], era: b.era, tag: 'Arme' });
+          break;
+        }
+        out.push({ id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: '', can: canPay(s, b.cost), why: whyNot(s, b.cost), era: b.era, tag: 'Arme' });
+        break;
       }
       if (!R.dead) {
         const bp = battlePreview(s);
@@ -581,7 +663,14 @@
   const negEff = (e) => Object.keys(e).filter((r) => e[r] < 0).map((r) => `${sgn(e[r])} ${ico(r)}${unit(r)}`);
   const costL = (c) => Object.keys(c).filter((r) => c[r]).map((r) => `−${c[r]} ${ico(r)}`);
   function bonusMalus(s, cat, id) {
-    if (cat === 'build') { const b = B[id]; return { plus: id === 'fusee' ? ['🏆 VICTOIRE'] : id === 'appats' ? ['+50 % 🍖 pour chaque chasseur'] : posEff(b.eff), minus: costL(buildCost(s, b)).concat(negEff(b.eff)) }; }
+    if (B[id] && (cat === 'build' || B[id].weapon != null)) {
+      const b = B[id];
+      const UP = { wood: '🌲 bûcherons', stone: '🪨 villageois aux pierres', sage: '💡 savants', guard: '🛡️ gardes', trade: '💰 marchands', iron: '⛏️ mineurs de fer', coal: '⚫ mineurs de charbon' };
+      const plus = id === 'fusee' ? ['🏆 VICTOIRE'] : id === 'appats' ? ['+50 % 🍖 pour chaque chasseur']
+        : b.weapon != null ? [`+25 % de force pour les ${UNITS[b.weapon].icon} ${UNITS[b.weapon].name.toLowerCase()}`]
+        : b.upgrade ? [`+50 % pour les ${UP[b.upgrade]}`] : posEff(b.eff);
+      return { plus, minus: costL(buildCost(s, b)).concat(negEff(b.eff)) };
+    }
     if (cat === 'law') { const l = L[id]; return { plus: posEff(l.eff), minus: costL(l.cost).concat(negEff(l.eff)) }; }
     if (cat === 'tech') {
       const d = D[id];
@@ -593,13 +682,14 @@
       if (d.id === 'espace') plus.push('débloque 🚀 Base spatiale');
       return { plus, minus: [`−${d.cost} 💡`] };
     }
+    if (cat === 'war' && B[id] && B[id].weapon != null) return act(s, 'build', id, rng);
     if (cat === 'war') {
       const w = warCosts(s);
-      if (id === 'recruter') { const u = UNITS[s.era]; return { plus: [`+${w.recruitN} ${u.icon} ${u.name.toLowerCase()}`, `+${num1(w.recruitN * u.power)} ⚔️`, `en paix : chassent +${num1(w.recruitN * huntPerSoldier(s))} 🍖/j`], minus: costL(w.recruit).concat([`mangent ${Math.ceil(w.recruitN / 4)} 🍖/j`]) }; }
+      if (id === 'recruter') { const u = UNITS[s.era]; return { plus: [`+${w.recruitN} ${u.icon} ${u.name.toLowerCase()}`, `+${num1(w.recruitN * unitPower(s, s.era))} ⚔️`, `en paix : chassent +${num1(w.recruitN * huntPerSoldier(s))} 🍖/j`], minus: costL(w.recruit).concat([`mangent ${Math.ceil(w.recruitN / 4)} 🍖/j`]) }; }
       if (id === 'rearmer') {
         const k = Math.max(1, rearmMax(s)), u = UNITS[s.era];
         let left = k, g = 0;
-        for (const t of troopsOf(s).slice().sort((a, b) => a.era - b.era)) { if (t.era >= s.era) continue; const q = Math.min(left, t.n); g += q * (u.power - UNITS[t.era].power); left -= q; }
+        for (const t of troopsOf(s).slice().sort((a, b) => a.era - b.era)) { if (t.era >= s.era) continue; const q = Math.min(left, t.n); g += q * (unitPower(s, s.era) - unitPower(s, t.era)); left -= q; }
         return { plus: [`${k} soldat${k > 1 ? 's' : ''} → ${u.icon} ${u.name.toLowerCase()}`, `+${num1(g)} ⚔️`], minus: costL(rearmCost(s, k)) };
       }
       if (id === 'fortifier') return { plus: [`+${w.fortN} 🛡️`], minus: costL(w.fort) };
@@ -713,7 +803,7 @@
       if (id === 'attaquer') {
         const R = rival(s);
         if (s.army <= 0 || R.dead) return { ok: false };
-        s.stats.battles++;
+        s.stats.battles++; s.eraBattles = s.eraBattles || {}; s.eraBattles[s.era] = (s.eraBattles[s.era] || 0) + 1;
         s.warUntil = s.day + WAR_DAYS;
         const enemy = ERAS[s.era].enemy;
         const bp = battlePreview(s);
@@ -918,7 +1008,7 @@
     const enemy = ERAS[s.era].enemy;
     const strength = Math.round(rivalForce(s) * (0.5 + rng() * 0.4));
     const p = power(s);
-    s.stats.battles++;
+    s.stats.battles++; s.eraBattles = s.eraBattles || {}; s.eraBattles[s.era] = (s.eraBattles[s.era] || 0) + 1;
     s.warUntil = s.day + WAR_DAYS;
     if (p >= strength) {
       s.stats.victories++;
@@ -955,6 +1045,7 @@
     UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
     prefOf, setPref, setQuota, applyQuotas, recommendQuotas, unlocked, HUNT_APPATS, HUNT_CAMP,
+    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, bonusOf: (s, id) => bonusMalus(s, 'build', id),
   };
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };
@@ -963,6 +1054,10 @@
     syncVillagers(s, rng);
     for (const v of s.villagers) if (v.job !== 'idle') { v.xp[v.job] = Math.min(XP_MAX / XP_DAY, (v.xp[v.job] || 0) + 1); }
     s.huntDays = (s.huntDays || 0) + s.villagers.filter((v) => v.job === 'hunt').length;
+    s.work = s.work || {};
+    for (const v of s.villagers) if (v.job !== 'idle') s.work[v.job] = (s.work[v.job] || 0) + 1;
+    s.armyDays = s.armyDays || {};
+    s.armyDays[s.era] = (s.armyDays[s.era] || 0) + s.army;
     const rep = endDay(s, rng);
     rep.born = syncVillagers(s, rng).map((v) => ({ name: v.name, job: v.job }));
     rep.proposals = checkUnlocks(s);
