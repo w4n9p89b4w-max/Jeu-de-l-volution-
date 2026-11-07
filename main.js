@@ -127,8 +127,9 @@
       const acts = $('mActions'); acts.innerHTML = '';
       for (const b of buttons || [{ label: 'Continuer', value: true, primary: true }]) {
         const bt = document.createElement('button');
-        bt.className = 'btn' + (b.primary ? ' primary' : '');
+        bt.className = 'btn' + (b.primary ? ' primary' : '') + (b.cls ? ' ' + b.cls : '');
         bt.textContent = b.label;
+        if (b.hint) { const sm = document.createElement('small'); sm.textContent = b.hint; bt.appendChild(sm); }
         bt.onclick = () => { $('modal').classList.add('hidden'); resolve(b.value); };
         acts.appendChild(bt);
       }
@@ -152,15 +153,12 @@
     $('hEra').textContent = `${era.name} · ${era.year}`;
     const d = (v) => v > 0 ? `<i class="up">+${v}</i>` : v < 0 ? `<i class="down">${v}</i>` : '';
     const peace = state.peaceUntil > state.day ? ' 🕊️' : '';
-    $('res').innerHTML = [
-      `<span class="chip${f.food < 0 ? ' warn' : ''}" title="Nourriture">🍖 ${fmt(state.res.food)} ${d(f.food)}</span>`,
-      `<span class="chip" title="Matériaux">🪵 ${fmt(state.res.mat)} ${d(f.mat)}</span>`,
-      `<span class="chip" title="Or">💰 ${fmt(state.res.gold)} ${d(f.gold)}</span>`,
-      `<span class="chip" title="Savoir">💡 ${fmt(state.res.sci)} ${d(f.sci)}</span>`,
+    $('res').innerHTML = E.known(state).map((r) =>
+      `<span class="chip${r === 'food' && f.food < 0 ? ' warn' : ''}" title="${E.RES_NAMES[r]}">${E.RES_ICONS[r]} ${fmt(state.res[r])} ${d(f[r])}</span>`).concat([
       `<span class="chip${state.happy < 30 ? ' warn' : ''}" title="Bonheur">${state.happy >= 70 ? '😄' : state.happy >= 40 ? '🙂' : state.happy >= 25 ? '😐' : '😠'} ${state.happy}%</span>`,
       `<span class="chip${state.pop >= f.cap ? ' warn' : ''}" title="Logements">🏠 ${fmt(state.pop)}/${fmt(f.cap)}</span>`,
       `<span class="chip" title="Puissance militaire">⚔️ ${E.power(state)}${peace}</span>`,
-    ].join('');
+    ]).join('');
     // pastilles : nombre de choix possibles
     document.querySelectorAll('.tile').forEach((t) => {
       const n = E.options(state, t.dataset.cat).filter((o) => o.can).length;
@@ -171,7 +169,7 @@
   /* ---------- Feuille de choix ---------- */
   const CAT = {
     build: { title: '🏠 Constructions', sub: 'Que construit-on aujourd\'hui ?' },
-    law: { title: '📜 Lois', sub: 'Une loi votée s\'applique pour toujours.' },
+    law: { title: '📜 Lois', sub: 'Une loi adoptée s\'applique pour toujours.' },
     war: { title: '⚔️ Guerres', sub: 'Défendre la vallée… ou attaquer les voisins.' },
     tech: { title: '💡 Découvertes', sub: '' },
   };
@@ -195,7 +193,7 @@
       bt.className = 'opt' + (o.can ? '' : ' off');
       const isNew = o.era != null && o.era === state.era && state.era > 0 && cat !== 'tech';
       bt.innerHTML = `<span class="oi">${o.icon}</span><span><b>${o.name}${isNew ? '<span class="new">NOUVEAU</span>' : ''}</b><p>${o.desc}</p><span class="eff">${o.eff}</span></span><span class="cost">${o.cost}${o.can ? '' : `<span class="why">${o.why}</span>`}</span>`;
-      bt.onclick = () => { if (o.can) { closeSheet(); vote(cat, o.id); } };
+      bt.onclick = () => { if (o.can) { closeSheet(); choisir(cat, o.id); } };
       list.appendChild(bt);
     }
     $('sheet').classList.add('open');
@@ -206,8 +204,8 @@
   document.querySelectorAll('.tile').forEach((t) => (t.onclick = () => openSheet(t.dataset.cat)));
   $('map').addEventListener('pointerdown', closeSheet);
 
-  /* ---------- Le vote du jour ---------- */
-  async function vote(cat, id) {
+  /* ---------- Le choix du jour ---------- */
+  async function choisir(cat, id) {
     if (busy) return;
     const r = E.act(state, cat, id);
     if (!r.ok) return;
@@ -251,11 +249,12 @@
     const d = rep.delta;
     const pd = rep.popDelta;
     const part = (v, i) => `${v >= 0 ? '+' : ''}${v}${i}`;
-    toast(`Jour ${state.day} · ${part(d.food, '🍖')} ${part(d.mat, '🪵')} ${part(d.gold, '💰')} ${part(d.sci, '💡')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
+    toast(`Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
     save();
     for (const ev of rep.events) {
       await wait(350);
-      await modal({ icon: ev.icon, title: ev.title, text: ev.text, good: ev.good });
+      if (ev.dilemma) await dilemma(ev.dilemma);
+      else await modal({ icon: ev.icon, title: ev.title, text: ev.text, good: ev.good });
       updateHUD();
     }
     if (state.lost) {
@@ -273,8 +272,18 @@
     if (f.food < 0) caption('ATTENTION : <em>FAMINE</em> EN VUE !<small>Construisez de quoi manger</small>', 2600);
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
-    else if (state.day === 2) caption('CHAQUE JOUR<br><em>VOUS VOTEZ</em>', 2200);
+    else if (state.day === 2) caption('CHAQUE JOUR<br><em>VOUS CHOISISSEZ</em>', 2200);
     else if (state.day === 4) caption('FAITES DES <em>DÉCOUVERTES</em><small>pour changer d\'ère</small>', 2400);
+  }
+
+  async function dilemma(dv) {
+    const i = await modal({
+      icon: dv.icon, title: dv.title, html: `<p>${escapeHtml(dv.text)}</p><p class="choose">À VOUS DE <em>CHOISIR</em></p>`,
+      buttons: dv.choices.map((c, k) => ({ label: `${'AB'[k]} · ${c.label}`, hint: c.hint, value: k, primary: k === 0, cls: k ? 'choice-b' : 'choice-a' })),
+    });
+    const r = E.choose(state, dv.id, i);
+    save();
+    if (r) { map.syncPeople(); updateHUD(); await modal({ icon: r.icon, title: r.title, text: r.text, good: r.good }); }
   }
 
   const ERA_ART = ['🛖🔥🦣', '🏛️🏺⚱️', '🏰⚔️⛪', '🎨🔭📜', '🏭🚂⚙️', '🏙️💻🚀'];
@@ -316,7 +325,7 @@
     });
   }
 
-  $('bRest').onclick = () => vote('rest');
+  $('bRest').onclick = () => choisir('rest');
   $('bLog').onclick = () => {
     if (!state) return;
     const rows = state.log.map((l) => `<div><span>J${l.day}</span>${l.text}</div>`).join('') || '<div>Rien encore…</div>';
@@ -335,7 +344,7 @@
     return modal({
       icon: '❔', title: 'Comment jouer',
       html: `<div class="help">
-        <p><b>Chaque jour, vous votez</b> une seule action : construire, voter une loi, faire la guerre ou une découverte. Puis la nuit tombe et le jour suivant commence.</p>
+        <p><b>Chaque jour, vous choisissez</b> une seule action : construire, adopter une loi, faire la guerre ou une découverte. Puis la nuit tombe et le jour suivant commence.</p><p>🅰️🅱️ Parfois, un événement vous oblige à <b>choisir entre A et B</b>.</p><p>🪵 Bois, 🪨 pierre, 🔩 fer (Moyen Âge) et ⚫ charbon (Renaissance) servent à construire. Carrières et mines s'installent au pied des montagnes.</p>
         <p>🍖 Nourrissez la population, 🏠 logez-la et 😊 gardez-la heureuse pour qu'elle grandisse. Un peuple malheureux manifeste !</p>
         <p>💡 Le savoir permet les <b>découvertes</b>. Faites les 3 découvertes d'une ère pour passer à la suivante : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.</p>
         <p>⚔️ Les voisins attaquent parfois : gardez une armée ou des remparts.</p>
@@ -369,10 +378,11 @@
   map.overview(true);
 
   $('bContinue').onclick = () => {
-    state = saved;
+    state = E.migrate(saved);
     flag = state.flag || flag;
     enterGame();
     caption(`BON RETOUR À<br><em>${escapeHtml(state.name)}</em>`, 2000);
+    if (state.pending) setTimeout(() => dilemma(E.dilemmaView(state, state.pending)), 1500);
   };
   $('bNew').onclick = () => {
     showScreen('setup');
@@ -408,9 +418,9 @@
       E.log(state, `📍 Fondation ${site === 'lac' ? 'au bord du lac' : 'au bord de la rivière'}`);
       enterGame();
       save();
-      caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, votez pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
+      caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('PREMIÈRE IDÉE :<br>UN <em>CAMP DE CHASSE</em> 🏹', 2600);
+      if (!busy) caption('PREMIÈRE IDÉE :<br>DU <em>BOIS</em> ET DU <em>GIBIER</em> 🪓🏹', 2600);
     };
   });
 

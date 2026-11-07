@@ -7,15 +7,19 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
 ## Déroulement
 
 1. **Nom et drapeau** : donnez un nom à votre pays et dessinez son drapeau (motif, couleurs, symbole).
-2. **Premier vote : où fonde-t-on le pays ?**
+2. **Premier choix : où fonde-t-on le pays ?**
    - **A — au bord de la rivière** : de l'eau et des terres fertiles (+25 % de nourriture).
    - **B — au bord du lac** : la pêche et un port (+3 🍖 et +2 💰 par jour).
-3. **Chaque jour, vous votez** une seule action :
+3. **Chaque jour, vous choisissez** une seule action :
    - 🏠 **Constructions** : huttes, champs, temples, châteaux, usines, gratte-ciel…
    - 📜 **Lois** : partage du gibier, impôt, suffrage universel, transition écologique…
    - ⚔️ **Guerres** : recruter, attaquer les voisins, fortifier, signer la paix.
    - 💡 **Découvertes** : les 3 découvertes d'une ère font passer à la suivante.
 4. La nuit tombe, la production tombe, la population grandit… et des événements surviennent (récoltes, épidémies, invasions, manifs !).
+5. Parfois, un **dilemme** vous oblige à choisir entre **A** et **B** : accueillir des réfugiés ou fermer la frontière, couper la forêt ou la protéger, ouvrir une mine de charbon sous les champs…
+
+**Les ressources** : 🍖 nourriture, 🪵 bois, 🪨 pierre, 🔩 fer (dès le Moyen Âge), ⚫ charbon (dès la Renaissance), 💰 or et 💡 savoir.
+Carrières et mines s'installent au pied des montagnes ; hauts-fourneaux et usines consomment du charbon.
 
 **Les 6 ères** : Préhistoire → Antiquité → Moyen Âge → Renaissance → Révolution industrielle → Monde moderne.
 

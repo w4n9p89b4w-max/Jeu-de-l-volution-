@@ -84,7 +84,15 @@
       }
     }
     slots.sort((a, b) => a.d - b.d);
-    return slots;
+    // emplacements au pied des montagnes (carrières, mines)
+    const edge = [];
+    for (let a = 0; a < Math.PI * 2; a += 0.075) {
+      const px = VX + Math.cos(a) * VRX * 0.92, py = VY + Math.sin(a) * VRY * 0.92;
+      if (isWater(px, py, 22) || py < 150) continue;
+      edge.push({ x: px, y: py, edge: true, d: Math.hypot(px - s.x, py - s.y) });
+    }
+    edge.sort((a, b) => a.d - b.d);
+    return slots.concat(edge);
   }
 
   /* ---------- dessin : petits utilitaires ---------- */
@@ -354,6 +362,59 @@
       }
     },
   };
+  Object.assign(ARCH, {
+    lumber(ctx, x, y) {
+      shadow(ctx, x, y, 18);
+      gable(ctx, x - 6, y - 2, 11, 7, 7, '#a77b4a', '#6e4e2a');
+      for (let i = 0; i < 3; i++) { rect(ctx, x + 2, y - 3 - i * 3.4, 12, 3.2, '#9c6b3c'); ell(ctx, x + 14, y - 1.4 - i * 3.4, 1.6, 1.6, '#d9b07a'); }
+      ell(ctx, x - 12, y + 3, 2.5, 1.3, '#7a5530');
+    },
+    quarry(ctx, x, y) {
+      ell(ctx, x, y - 3, 16, 10, '#8d8f93');
+      ell(ctx, x, y - 2, 11, 6.5, '#6f7176');
+      rect(ctx, x - 9, y - 12, 6, 5, '#c3c5c9'); rect(ctx, x + 4, y - 11, 7, 5, '#b4b7bc'); rect(ctx, x - 2, y + 2, 6, 4, '#c9cbcf');
+      ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x + 9, y + 4); ctx.lineTo(x + 14, y - 6); ctx.stroke();
+    },
+    mine(ctx, x, y) {
+      ell(ctx, x, y - 4, 16, 12, '#7d6a58');
+      ell(ctx, x - 3, y - 8, 9, 7, '#8f7b67');
+      ctx.fillStyle = '#1e1712'; ctx.beginPath(); ctx.arc(x, y - 1, 6, Math.PI, 0); ctx.lineTo(x + 6, y + 1); ctx.lineTo(x - 6, y + 1); ctx.fill();
+      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 1.6; ctx.strokeRect(x - 6.5, y - 7, 13, 8);
+      rect(ctx, x + 9, y - 2, 7, 4, '#5c5f63'); ell(ctx, x + 10.5, y + 2.4, 1.4, 1.4, '#222'); ell(ctx, x + 14.5, y + 2.4, 1.4, 1.4, '#222');
+      rect(ctx, x + 10, y - 4, 5, 2.4, '#a0643a');
+    },
+    coalmine(ctx, x, y) {
+      shadow(ctx, x, y, 26);
+      ell(ctx, x + 9, y - 2, 9, 5, '#26262a');
+      ctx.strokeStyle = '#4a4f57'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - 12, y); ctx.lineTo(x - 6, y - 28); ctx.lineTo(x, y); ctx.moveTo(x - 10, y - 10); ctx.lineTo(x - 2, y - 10); ctx.moveTo(x - 9, y - 18); ctx.lineTo(x - 3, y - 18); ctx.stroke();
+      ell(ctx, x - 6, y - 28, 4, 4, '#2b2f36'); ell(ctx, x - 6, y - 28, 2, 2, '#9aa3ad');
+      rect(ctx, x + 2, y - 10, 12, 8, '#7a5a44'); rect(ctx, x + 2, y - 12, 12, 2, '#3a3a3a');
+    },
+    sawmill(ctx, x, y) {
+      gable(ctx, x - 3, y, 18, 9, 10, '#b88a57', '#5d4030');
+      ell(ctx, x - 3, y - 5, 3.2, 3.2, '#c9ced4'); ell(ctx, x - 3, y - 5, 1, 1, '#555');
+      for (let i = 0; i < 2; i++) rect(ctx, x + 7, y - 2 - i * 3, 10, 2.8, '#9c6b3c');
+    },
+    stoneyard(ctx, x, y) {
+      gable(ctx, x - 5, y, 16, 9, 10, '#cfc6b8', '#6b6f75');
+      for (const [dx, dy] of [[6, -1], [12, -1], [9, -5]]) rect(ctx, x + dx, y + dy - 4, 6, 4, '#d9dbde');
+    },
+    furnace(ctx, x, y) {
+      shadow(ctx, x, y, 28);
+      rect(ctx, x - 14, y - 12, 18, 12, '#5f6670');
+      ctx.fillStyle = '#7b2f22'; ctx.beginPath(); ctx.moveTo(x + 2, y); ctx.lineTo(x + 4, y - 30); ctx.lineTo(x + 12, y - 30); ctx.lineTo(x + 14, y); ctx.fill();
+      rect(ctx, x + 3, y - 33, 10, 3, '#3d1d16');
+      ell(ctx, x + 8, y - 6, 3, 3, '#ff8a1f'); ell(ctx, x + 8, y - 6, 1.5, 1.5, '#ffe08a');
+      windows(ctx, x - 14, y - 10, 18, 6, 1, 3, '#f2a64a');
+    },
+    recycle(ctx, x, y) {
+      block(ctx, x, y, 26, 9, 12, '#d8e8d2', '#4c9a5b');
+      ctx.fillStyle = '#2e7d32'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♻', x, y - 6);
+      rect(ctx, x + 14, y - 5, 6, 5, '#8a9099');
+    },
+  });
+  const EDGE = { quarry: 1, mine: 1, coalmine: 1 };
   const DYNAMIC = { mill: 1, wind: 1, rocket: 1 };
 
   /* ---------- Le décor statique ---------- */
@@ -467,7 +528,7 @@
         slots = buildSlots(s.site);
         const used = new Set();
         for (const b of s.buildings) {
-          if (b.slot == null || used.has(b.slot)) b.slot = nextSlot(used);
+          if (b.slot == null || used.has(b.slot) || !slots[b.slot] || !!slots[b.slot].edge !== isEdge(b)) b.slot = nextSlot(used, isEdge(b));
           used.add(b.slot);
           b.x = slots[b.slot].x; b.y = slots[b.slot].y;
         }
@@ -476,10 +537,15 @@
       dirty = true;
       autoCamera(true);
     }
-    function nextSlot(used) { for (let i = 0; i < slots.length; i++) if (!used.has(i)) return i; return 0; }
+    function nextSlot(used, edge) {
+      for (let i = 0; i < slots.length; i++) if (!used.has(i) && !!slots[i].edge === !!edge) return i;
+      for (let i = 0; i < slots.length; i++) if (!used.has(i)) return i;
+      return 0;
+    }
+    const isEdge = (b) => !!EDGE[Engine.B[b.id].arch];
     function place(b) {
       const used = new Set(state.buildings.filter((x) => x !== b && x.slot != null).map((x) => x.slot));
-      b.slot = nextSlot(used);
+      b.slot = nextSlot(used, isEdge(b));
       b.x = slots[b.slot].x; b.y = slots[b.slot].y;
       clearTrees();
       dirty = true;
