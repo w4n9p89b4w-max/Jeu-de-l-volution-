@@ -102,14 +102,11 @@
   <!-- Les villageois et leurs tâches -->
   <section id="people" hidden>
     <div class="rules-head"><h2>👷 Les villageois</h2><button class="round" id="peopleClose" aria-label="Fermer">✕</button></div>
-    <div id="jobSummary"></div>
-    <div class="people-tools">
-      <label class="toggle"><input type="checkbox" id="autoQ"><span>🔁 Quotas automatiques chaque jour</span></label>
-      <button class="small" id="bAuto">✨ Quotas conseillés</button>
+    <div class="ptabs" role="tablist">
+      <button role="tab" data-tab="jobs" id="tabJobs">👥 Combien par tâche</button>
+      <button role="tab" data-tab="prefs" id="tabPrefs">⭐ Préférences</button>
     </div>
-    <div class="legend"><span class="pc p3 lg">+</span> haute <span class="pc p2 lg">○</span> normale <span class="pc p1 lg">−</span> basse <span class="pc p0 lg">✕</span> interdit · touchez une case pour changer</div>
-    <div class="people-bar"><span id="peopleSub"></span></div>
-    <div id="peopleList"></div>
+    <div id="peopleBody"></div>
   </section>
 
   <!-- Annexe : règles du jeu -->
