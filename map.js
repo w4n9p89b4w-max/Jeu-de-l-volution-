@@ -412,6 +412,46 @@
       ell(ctx, x + 8, y - 6, 3, 3, '#ff8a1f'); ell(ctx, x + 8, y - 6, 1.5, 1.5, '#ffe08a');
       windows(ctx, x - 14, y - 10, 18, 6, 1, 3, '#f2a64a');
     },
+    main(ctx, x, y, t, s) {
+      // le bâtiment principal change à chaque niveau (une fois par ère)
+      const L = s ? (s.mainLevel || 0) : 0;
+      const banner = (bx, by, c) => { ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by - 12); ctx.stroke(); rect(ctx, bx, by - 12, 6, 4, c || '#d6453d'); };
+      if (L === 0) {            // grande hutte du clan
+        shadow(ctx, x, y, 30);
+        poly(ctx, [x - 17, y, x + 17, y, x, y - 26], '#a77b4a');
+        poly(ctx, [x, y, x + 17, y, x, y - 26], '#8b6438');
+        ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x - 4, y - 32); ctx.lineTo(x + 1, y - 22); ctx.moveTo(x + 4, y - 32); ctx.lineTo(x - 1, y - 22); ctx.stroke();
+        poly(ctx, [x - 4, y, x + 4, y, x, y - 9], '#3b2a18');
+        for (const dx of [-14, 14]) { rect(ctx, x + dx - 1, y - 14, 2, 14, '#6b4a2a'); ell(ctx, x + dx, y - 15, 2.4, 2.4, '#e9e0c9'); }
+      } else if (L === 1) {     // palais antique
+        shadow(ctx, x, y, 36);
+        rect(ctx, x - 19, y - 4, 38, 4, '#cfc9b8');
+        for (let i = 0; i < 7; i++) rect(ctx, x - 17 + i * 5.3, y - 18, 2.6, 14, '#f4efe2');
+        rect(ctx, x - 19, y - 22, 38, 4, '#e6dfcd');
+        poly(ctx, [x - 20, y - 22, x + 20, y - 22, x, y - 33], '#c9533e');
+        banner(x + 20, y - 4, '#7a3fb0');
+      } else if (L === 2) {     // beffroi médiéval
+        block(ctx, x - 6, y, 24, 10, 14, '#d8cfbe', '#8a4a2e');
+        rect(ctx, x + 8, y - 34, 11, 34, '#c9bea8');
+        poly(ctx, [x + 7, y - 34, x + 20, y - 34, x + 13.5, y - 46], '#5d6670');
+        ell(ctx, x + 13.5, y - 26, 3, 3, '#f4efe2'); ell(ctx, x + 13.5, y - 26, 1, 1, '#333');
+        door(ctx, x - 6, y, 5, 7, '#4a2f1a');
+        banner(x - 18, y, '#2f5fa8');
+      } else if (L === 3) {     // hôtel de ville
+        block(ctx, x, y, 38, 10, 18, '#efe6d3', '#4a5d74');
+        windows(ctx, x - 19, y - 17, 38, 14, 2, 7, '#3c5168');
+        rect(ctx, x - 5, y - 36, 10, 10, '#efe6d3'); poly(ctx, [x - 6, y - 36, x + 6, y - 36, x, y - 44], '#4a5d74');
+        ell(ctx, x, y - 31, 2.6, 2.6, '#fff'); 
+        door(ctx, x, y, 5, 7, '#3d2b1a');
+      } else {                   // palais du gouvernement / capitole
+        block(ctx, x, y, 40, 10, 18, '#f2efe8', '#c8c2b5');
+        for (let i = 0; i < 8; i++) rect(ctx, x - 18 + i * 5, y - 17, 2.4, 15, '#fffdf7');
+        ell(ctx, x, y - 34, L === 5 ? 12 : 9, L === 5 ? 11 : 8, L === 5 ? '#e9e4d8' : '#7f97ad');
+        rect(ctx, x - (L === 5 ? 12 : 9), y - 34, L === 5 ? 24 : 18, 6, '#f2efe8');
+        ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y - (L === 5 ? 45 : 42)); ctx.lineTo(x, y - 54); ctx.stroke();
+        rect(ctx, x, y - 54, 7, 4, '#d6453d');
+      }
+    },
     research(ctx, x, y, t, s) {
       if (s && s.era >= 2) {
         // un observatoire : bâtiment de pierre et coupole

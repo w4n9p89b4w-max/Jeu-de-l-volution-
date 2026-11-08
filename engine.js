@@ -35,6 +35,7 @@
     { id: 'appats', era: 0, name: 'Appâts et pièges', icon: '🪤', arch: 'traps', cost: { wood: 6 }, eff: {}, unlock: 'appats', unique: true, desc: 'Des pièges et des appâts en forêt : les chasseurs rapportent 50 % de plus.' },
     { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 8 }, eff: { food: 4 }, unlock: 'camp', desc: 'Les chasseurs ramènent du gibier.' },
     { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Une vraie carrière : bien plus efficace que ramasser des cailloux.' },
+    { id: 'principal', era: 0, name: 'Grande hutte du clan', icon: '🛖', arch: 'main', cost: { wood: 8 }, eff: {}, unique: true, desc: 'Le bâtiment principal : sans lui, personne ne peut recevoir de tâche. Il s\'agrandit à chaque ère.' },
     { id: 'centre', era: 0, name: 'Centre de recherche', icon: '🔬', arch: 'research', cost: { wood: 10, stone: 4 }, eff: { sci: 1 }, unique: true, desc: 'Un lieu où les savants observent et réfléchissent. Indispensable pour faire avancer la recherche.' },
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
@@ -168,7 +169,7 @@
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
       day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, troops: [], fort: 0, peaceUntil: 0,
-      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [], centreChecked: true,
+      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [], centreChecked: true, mainChecked: true, mainLevel: 0,
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
     };
@@ -184,6 +185,7 @@
       if (s.buildings.some((b) => b.id === 'chasse')) { s.unlocks = ['appats', 'camp']; s.huntDays = HUNT_CAMP; s.buildings.push({ id: 'appats', day: s.day }); }
     }
     for (const b of s.buildings) { const k = B[b.id] && B[b.id].unlock; if (k && !s.unlocks.includes(k)) s.unlocks.push(k); }
+    if (!s.mainChecked) { if (s.day > 1 && !s.buildings.some((b) => b.id === 'principal')) { s.buildings.push({ id: 'principal', day: s.day }); s.mainLevel = s.era; } s.mainChecked = true; }
     if (!s.centreChecked) { if (s.day > 1 && !s.buildings.some((b) => b.id === 'centre')) s.buildings.push({ id: 'centre', day: s.day }); s.centreChecked = true; }
     if (s.research === undefined) {
       s.research = [];
@@ -214,12 +216,28 @@
     for (const key in eff) t[key] = (t[key] || 0) + eff[key] * (k == null ? 1 : k);
   }
 
+  /* ---------- Le bâtiment principal ----------
+     Il faut le construire avant de donner des tâches. Son niveau (un par ère)
+     fixe combien de villageois peuvent travailler en même temps. */
+  const MAIN = [
+    { name: 'Grande hutte du clan', icon: '🛖', workers: 10, cost: {} },
+    { name: 'Palais', icon: '🏛️', workers: 30, cost: { wood: 30, stone: 25 } },
+    { name: 'Beffroi', icon: '🔔', workers: 70, cost: { wood: 40, stone: 60, gold: 30 } },
+    { name: 'Hôtel de ville', icon: '🏤', workers: 150, cost: { stone: 100, iron: 20, gold: 80 } },
+    { name: 'Palais du gouvernement', icon: '🏦', workers: 320, cost: { stone: 150, iron: 80, coal: 40, gold: 120 } },
+    { name: 'Capitole', icon: '🕌', workers: 100000, cost: { stone: 200, iron: 150, gold: 200 } },
+  ];
+  const hasMain = (s) => s.buildings.some((b) => b.id === 'principal');
+  const mainLevel = (s) => (hasMain(s) ? Math.min(s.mainLevel || 0, MAIN.length - 1) : -1);
+  const maxWorkers = (s) => (hasMain(s) ? MAIN[mainLevel(s)].workers : 0);
+  const canUpgradeMain = (s) => hasMain(s) && mainLevel(s) < s.era;
   function totals(s) {
     const t = { food: 0, wood: 0, stone: 0, iron: 0, coal: 0, gold: 0, sci: 0, happy: 0, cap: 0, def: 0 };
     for (const b of s.buildings) addEff(t, B[b.id].eff);
     for (const d of s.disc) addEff(t, D[d].eff);
     for (const l of s.laws) addEff(t, L[l].eff);
     t.def += s.fort;
+    if (hasMain(s)) { const L = mainLevel(s); t.cap += 4 + 6 * L; t.def += 3 * L; t.happy += 2 * L; }
     return t;
   }
 
@@ -292,7 +310,7 @@
      LA RECHERCHE : tout ce qui est nouveau se débloque en recherchant.
      On choisit une recherche ; chaque nuit, le savoir 💡 du stock s'y ajoute.
      ========================================================================== */
-  const STARTERS = ['hutte', 'feu', 'menhir', 'centre'];
+  const STARTERS = ['hutte', 'feu', 'menhir', 'centre', 'principal'];
   const hasCentre = (s) => count(s, 'centre') > 0;
   for (const b of BUILDINGS) if (!STARTERS.includes(b.id) && !b.unlock) b.unlock = b.id;
   const RCOST = [5, 14, 26, 44, 70, 100];
@@ -588,15 +606,17 @@
     }
     pairs.sort((a, b) => b.k - a.k);
     const done = new Set();
+    let room = maxWorkers(s);                 // limite du bâtiment principal
     for (const p of pairs) {
+      if (room <= 0) break;
       if (done.has(p.v.id) || left[p.j] <= 0) continue;
-      p.v.job = p.j; left[p.j]--; done.add(p.v.id);
+      p.v.job = p.j; left[p.j]--; done.add(p.v.id); room--;
     }
   }
 
   // Quotas conseillés selon les besoins du pays
   function recommendQuotas(s) {
-    const n = s.villagers.length;
+    const n = Math.min(s.villagers.length, maxWorkers(s));
     const t = totals(s);
     const mult = 0.75 + s.happy / 200;
     const lake = s.site === 'lac', river = s.site === 'riviere';
@@ -706,7 +726,11 @@
         const n = count(s, b.id);
         out.push({ id: b.id, icon: b.icon, name: b.name + (n ? ` (${n})` : ''), desc: b.desc, cost: fmtCost(c), eff: fmtEff(b.eff), can: canPay(s, c), why: whyNot(s, c), era: b.era });
       }
-      out.sort((a, b) => (b.id === 'fusee') - (a.id === 'fusee') || b.era - a.era);
+      if (canUpgradeMain(s)) {
+        const L = mainLevel(s), nx = MAIN[L + 1];
+        out.push({ id: 'main_up', icon: nx.icon, name: `Agrandir le bâtiment principal : ${nx.name}`, desc: `${MAIN[L].name} → ${nx.name}. Plus de villageois peuvent travailler en même temps.`, cost: fmtCost(nx.cost), eff: '', can: canPay(s, nx.cost), why: whyNot(s, nx.cost), era: s.era });
+      }
+      out.sort((a, b) => (b.id === 'main_up') - (a.id === 'main_up') || (b.id === 'principal') - (a.id === 'principal') || (b.id === 'fusee') - (a.id === 'fusee') || b.era - a.era);
     } else if (cat === 'law') {
       for (const l of LAWS) {
         if (l.era > s.era || s.laws.includes(l.id)) continue;
@@ -763,6 +787,11 @@
   const negEff = (e) => Object.keys(e).filter((r) => e[r] < 0).map((r) => `${sgn(e[r])} ${ico(r)}${unit(r)}`);
   const costL = (c) => Object.keys(c).filter((r) => c[r]).map((r) => `−${c[r]} ${ico(r)}`);
   function bonusMalus(s, cat, id) {
+    if (id === 'main_up') {
+      const L = mainLevel(s), nx = MAIN[L + 1];
+      return { plus: [`👷 ${nx.workers > 9999 ? 'travailleurs illimités' : `${nx.workers} travailleurs`} (au lieu de ${MAIN[L].workers})`, '+6 🏠', '+3 🛡️', '+2 😊'], minus: costL(nx.cost) };
+    }
+    if (id === 'principal') return { plus: [`👷 ${MAIN[0].workers} villageois peuvent travailler`, '+4 🏠'], minus: costL(buildCost(s, B[id])) };
     if (B[id] && (cat === 'build' || B[id].weapon != null)) {
       const b = B[id];
       const UP = { farm: '🌾 agriculteurs', wood: '🌲 bûcherons', stone: '🪨 villageois aux pierres', sage: '💡 savants', guard: '🛡️ gardes', trade: '💰 marchands', iron: '⛏️ mineurs de fer', coal: '⚫ mineurs de charbon' };
@@ -819,6 +848,15 @@
   // Renvoie { ok, title, text, icon, good, built?, newEra? }
   function act(s, cat, id, rng) {
     rng = rng || Math.random;
+    if (cat === 'build' && id === 'main_up') {
+      if (!canUpgradeMain(s)) return { ok: false };
+      const nx = MAIN[mainLevel(s) + 1];
+      if (!canPay(s, nx.cost)) return { ok: false };
+      pay(s, nx.cost);
+      s.mainLevel = mainLevel(s) + 1;
+      log(s, `${nx.icon} Bâtiment principal agrandi : ${nx.name}`);
+      return { ok: true, upgraded: true, title: nx.name, text: `Le bâtiment principal devient : ${nx.name}. Jusqu'à ${nx.workers > 9999 ? 'tous les' : nx.workers} villageois peuvent travailler.`, icon: nx.icon, good: true };
+    }
     if (cat === 'build') {
       const b = B[id];
       if (!b) return { ok: false };
@@ -827,6 +865,7 @@
       pay(s, c);
       const inst = { id: b.id, day: s.day };
       s.buildings.push(inst);
+      if (b.id === 'principal') autoAssign(s);   // tout le monde peut enfin travailler
       s.stats.built++;
       log(s, `${b.icon} Construction : ${b.name}`);
       if (b.id === 'fusee') {
@@ -1145,7 +1184,7 @@
     UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
     prefOf, setPref, setQuota, applyQuotas, recommendQuotas, unlocked, HUNT_APPATS, HUNT_CAMP,
-    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, NODES, NODE, nodeState, setResearch, hasCentre, researchCost, researchProg, practicedFor, queueOf, bonusOf: (s, id) => bonusMalus(s, 'build', id),
+    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, NODES, NODE, nodeState, setResearch, hasCentre, MAIN, hasMain, mainLevel, maxWorkers, canUpgradeMain, researchCost, researchProg, practicedFor, queueOf, bonusOf: (s, id) => bonusMalus(s, 'build', id),
   };
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };

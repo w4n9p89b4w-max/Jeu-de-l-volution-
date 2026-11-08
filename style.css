@@ -435,3 +435,6 @@ em { font-style: normal; color: var(--yellow); }
 .rq.nocentre { background: #fff3d6; }
 .rq.nocentre .btn { font-size: 14px; padding: 10px; }
 .rq.nocentre .btn:disabled { opacity: .55; }
+
+.mainbar { background: #fff; border-radius: 12px; padding: 8px 10px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 0 rgba(0,0,0,.07); }
+.mainbar .up { color: #1f7a42; font-weight: 900; }

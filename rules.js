@@ -35,6 +35,14 @@
       <li>À la fin du temps, la nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
       <p><b>⏸️</b> met le jeu en pause, <b>×1 / ×2 / ×4</b> accélère le temps. Le temps s'arrête tout seul quand une fenêtre est ouverte (villageois, règles, événement…). Donner des tâches aux villageois ne compte pas comme le choix du jour.</p>`));
 
+    parts.push(sec('principal', '🛖 Le bâtiment principal', `
+      <p><b>C'est la première chose à construire</b> (8 🪵, dans 🏠 Constructions) : sans lui, <b>personne ne peut recevoir de tâche</b>, tout le monde reste au village. Il organise le travail : son niveau fixe <b>combien de villageois peuvent travailler en même temps</b>.</p>
+      <p>À chaque nouvelle ère, vous pouvez l'<b>agrandir</b> (choix du jour, dans 🏠 Constructions) : il change de nom et d'aspect sur la carte, accueille plus de travailleurs et donne +6 🏠, +3 🛡️ et +2 😊 par niveau.</p>
+      <table><tr><th>Ère</th><th>Bâtiment principal</th><th>Travailleurs</th><th>Prix pour l'agrandir</th></tr>
+      ${E.MAIN.map((m, i) => `<tr><td>${ERA_ICON[i]}</td><td>${m.icon} <b>${m.name}</b></td><td>${m.workers > 9999 ? 'illimité' : m.workers}</td><td>${i ? fmtCost(m.cost) : '8 🪵 (construction)'}</td></tr>`).join('')}
+      </table>
+      <p>Quand il est plein, les villageois en trop restent au village (ils rapportent un peu d'or et de savoir).</p>`));
+
     parts.push(sec('recherche', '🔬 La recherche', `
       <p>Tout ce qui est nouveau se <b>recherche</b> : les découvertes de chaque ère, les constructions (sauf la hutte, le cercle du feu, le menhir et le centre de recherche, disponibles dès le début), les améliorations du travail et les armes.</p>
       <p><b>D'abord, construisez le 🔬 Centre de recherche</b> (10 🪵 et 4 🪨, dans 🏠 Constructions ou directement depuis l'écran Recherche). Sans lui, aucune recherche n'avance et personne ne peut être savant ; le savoir s'accumule en attendant. Plus tard, il devient un observatoire.</p>
@@ -166,7 +174,7 @@
       <li><b>En haut</b> : le jour et le temps qui reste (⏸️ pause, ×1 / ×2 / ×4), votre pays et son ère (touchez-le pour le 📖 journal), la population. Dessous, vos ressources : touchez la ligne pour voir ce que vous gagnez ou perdez chaque jour. Puis l'ennemi de l'ère, qui grandit quand une attaque approche.</li>
       <li><b>☰ Menu</b> : les règles, le journal, ou une nouvelle partie. La partie est sauvegardée automatiquement chaque nuit, dans ce navigateur.</li></ul>`));
 
-    const nav = [['but', 'But'], ['jour', 'Journée'], ['recherche', 'Recherche'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['villageois', 'Villageois'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
+    const nav = [['but', 'But'], ['jour', 'Journée'], ['principal', 'Bâtiment principal'], ['recherche', 'Recherche'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['villageois', 'Villageois'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
     return { nav, html: parts.join('') };
   }
 
