@@ -171,7 +171,7 @@
       step = 'Étape 3 / 3 · Le temps passe';
       if (peopleOpen) text = '✅ Parfait, vos villageois vont travailler ! Vous pouvez en envoyer d\'autres, puis fermez cet écran avec <b>✕</b>.';
       else {
-        text = `⏱️ <b>Chaque jour dure 40 secondes.</b> Pendant la journée, vous faites <b>un seul choix</b> : aujourd'hui, c'était la Maison commune.<br>
+        text = `⏱️ <b>Chaque jour dure 60 secondes.</b> Vos villageois récoltent en continu : regardez vos ressources monter en haut de l'écran. Pendant la journée, vous faites <b>un seul choix</b> : aujourd'hui, c'était la Maison commune.<br>
           🔬 Demain, construisez le <b>Centre de recherche</b> pour débloquer de nouvelles constructions.<br>⏸️ met le jeu en pause, ×2 / ×4 accélère. Les règles sont dans ☰ Menu.`;
         btn = true;
       }
@@ -203,7 +203,7 @@
     // une seule ligne : l'icône et la quantité ; le détail s'ouvre en touchant la ligne
     const mood = state.happy >= 70 ? '😄' : state.happy >= 40 ? '🙂' : state.happy >= 25 ? '😐' : '😠';
     $('res').innerHTML = E.known(state).map((r) =>
-      `<span class="rc${r === 'food' && f.food < 0 ? ' warn' : ''}">${E.RES_ICONS[r]}<b>${short(state.res[r])}</b></span>`).concat([
+      `<span class="rc${r === 'food' && f.food < 0 ? ' warn' : ''}">${E.RES_ICONS[r]}<b>${short(Math.floor(state.res[r]))}</b></span>`).concat([
       `<span class="rc${state.happy < 30 ? ' warn' : ''}">${mood}<b>${state.happy}%</b></span>`,
       `<span class="rc${state.pop >= f.cap ? ' warn' : ''}">🏠<b>${fmt(state.pop)}/${fmt(f.cap)}</b></span>`,
     ]).join('');
@@ -246,7 +246,7 @@
     if (!state) return;
     const f = E.forecast(state);
     const sg = (v) => (v > 0 ? `<span class="g">+${v}</span>` : v < 0 ? `<span class="b">${v}</span>` : '0');
-    const rows = E.known(state).map((r) => `<tr><td>${E.RES_ICONS[r]} ${E.RES_NAMES[r]}</td><td><b>${fmt(state.res[r])}</b></td><td>${sg(f[r])} /jour</td></tr>`).join('');
+    const rows = E.known(state).map((r) => `<tr><td>${E.RES_ICONS[r]} ${E.RES_NAMES[r]}</td><td><b>${fmt(Math.floor(state.res[r]))}</b></td><td>${sg(f[r])} /jour</td></tr>`).join('');
     modal({
       icon: '📊', title: 'Vos ressources',
       html: `<table class="vcard">${rows}
@@ -318,7 +318,7 @@
     const perDay = Math.max(0, f.sci);
     const left = E.DISCOVERIES.filter((d) => d.era === state.era && !state.disc.includes(d.id)).length;
     $('sheetTitle').textContent = '🔬 Recherche';
-    $('sheetSub').innerHTML = `Savoir : <b>${state.res.sci} 💡</b> (+${perDay}/jour). Chaque nuit, il nourrit les recherches de votre file, dans l'ordre. Choisir une recherche ne compte pas comme le choix du jour.`;
+    $('sheetSub').innerHTML = `Savoir : <b>${Math.floor(state.res.sci)} 💡</b> (+${perDay}/jour). Chaque nuit, il nourrit les recherches de votre file, dans l'ordre. Choisir une recherche ne compte pas comme le choix du jour.`;
     const days = (n, extra) => { const r = E.researchCost(state, n) - E.researchProg(state, n.id) - (extra || 0); return perDay ? Math.max(1, Math.ceil((r - state.res.sci) / perDay) + 1) : '∞'; };
     const unlockTxt = (n) => {
       if (n.kind === 'disc') { const d = E.D[n.d]; const e = Object.keys(d.eff).filter((r) => d.eff[r]).map((r) => `${d.eff[r] > 0 ? '+' : ''}${d.eff[r]} ${E.RES_ICONS[r]}`).join(' '); return e || ''; }
@@ -328,7 +328,7 @@
     if (!E.hasCentre(state)) {
       const c = E.B.centre.cost;
       html += `<div class="rq nocentre"><b>🔨 Construisez d'abord le Centre de recherche</b>
-        <p class="rqe">Sans lui, aucune recherche n'avance et personne ne peut être savant. En attendant, le savoir s'accumule (${state.res.sci} 💡). Vous pouvez déjà préparer votre file.</p>
+        <p class="rqe">Sans lui, aucune recherche n'avance et personne ne peut être savant. En attendant, le savoir s'accumule (${Math.floor(state.res.sci)} 💡). Vous pouvez déjà préparer votre file.</p>
         <button class="btn primary" id="bCentre"${state.chosen ? ' disabled' : ''}>🔬 Construire le centre (${c.wood} 🪵 ${c.stone} 🪨)${state.chosen ? ' — demain' : ''}</button></div>`;
     }
     // la file
@@ -413,9 +413,9 @@
   }
 
   /* ---------- Le temps : chaque jour dure un temps fixe ---------- */
-  const DAY_MS = 40000;                 // 40 secondes par jour à vitesse ×1
+  const DAY_MS = 60000;                 // 60 secondes par jour à vitesse ×1
   const SPEEDS = [1, 2, 4];
-  let speed = 1, paused = false, lastTick = performance.now();
+  let speed = 1, paused = false, lastTick = performance.now(), lastHud = 0;
   const secondsLeft = () => Math.max(0, Math.ceil((DAY_MS - (state.dayTime || 0)) / 1000 / speed));
   // le temps s'arrête quand une fenêtre ou un écran est ouvert
   const blocked = () => !state || !state.site || busy || state.won || state.lost || state.tuto != null
@@ -439,7 +439,11 @@
     const now = performance.now(), dt = Math.min(500, now - lastTick);
     lastTick = now;
     if (!state || paused || blocked()) { updateClock(); return; }
+    // les ressources arrivent petit à petit pendant la journée
+    const step = Math.min(dt * speed, Math.max(0, DAY_MS - (state.dayTime || 0)));
+    E.accrue(state, step / DAY_MS);
     state.dayTime = (state.dayTime || 0) + dt * speed;
+    if (now - lastHud > 1000) { lastHud = now; updateHUD(); }
     if (state.dayTime >= DAY_MS) {
       busy = true; $('dock').classList.add('busy');
       closeSheet();
@@ -455,7 +459,7 @@
     $('night').classList.add('on');
     $('nightText').textContent = `JOUR ${state.day + 1}`;
     await wait(900);
-    const rep = E.endDay(state);
+    const rep = E.endDay(state, undefined, { accrued: true });
     state.chosen = false; state.dayTime = 0;
     map.syncPeople();
     map.redraw();
@@ -499,7 +503,7 @@
     if (f.food < 0) caption('ATTENTION : <em>FAMINE</em> EN VUE !<small>Construisez de quoi manger</small>', 2600);
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
-    else if (state.day === 2) caption('UN JOUR DURE <em>40 SECONDES</em><small>Un seul choix par jour · ⏸️ et ×2 / ×4 en haut à gauche</small>', 3000);
+    else if (state.day === 2) caption('UN JOUR DURE <em>60 SECONDES</em><small>Un seul choix par jour · ⏸️ et ×2 / ×4 en haut à gauche</small>', 3000);
     else if (state.day === 3 && !E.hasCentre(state)) caption('CONSTRUISEZ LE <em>CENTRE DE RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 3000);
     else if (state.day === 5 && E.hasCentre(state)) caption('CHOISISSEZ UNE <em>RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 2600);
   }

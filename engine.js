@@ -494,14 +494,14 @@
      ========================================================================== */
   const JOBS = [
     { id: 'idle', name: 'Au village', icon: '🏡', res: null, desc: 'Sans tâche : rapporte un peu d\'or et de savoir.' },
-    { id: 'farm', name: 'Agriculteur', icon: '🌾', res: 'food', base: 2.5, req: (s) => s.disc.includes('agriculture'), lock: 'Après l\'Agriculture', desc: 'Semer, cultiver et récolter.' },
-    { id: 'hunt', name: 'Chasse et cueillette', icon: '🏹', res: 'food', base: 2, desc: 'Gibier, baies et racines.' },
-    { id: 'wood', name: 'Bûcheron', icon: '🌲', res: 'wood', base: 1.5, desc: 'Couper du bois dans la forêt.' },
-    { id: 'stone', name: 'Pierres', icon: '🪨', res: 'stone', base: 0.75, desc: 'Ramasser et tailler la pierre au pied de la montagne.' },
-    { id: 'iron', name: 'Mineur de fer', icon: '⛏️', res: 'iron', base: 0.3, req: (s) => s.disc.includes('metal'), lock: 'Après la Métallurgie du fer', desc: 'Extraire le minerai de la montagne.' },
-    { id: 'coal', name: 'Mineur de charbon', icon: '⚫', res: 'coal', base: 0.3, req: (s) => s.era >= 3, lock: 'À partir de la Renaissance', desc: 'Descendre dans les galeries de charbon.' },
-    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.5, req: (s) => count(s, 'centre') > 0, lock: 'Après le Centre de recherche', desc: 'Observer, réfléchir, inventer au Centre de recherche.' },
-    { id: 'trade', name: 'Marchand', icon: '💰', res: 'gold', base: 0.3, req: (s) => s.era >= 1, lock: 'À partir de l\'Antiquité', desc: 'Vendre et acheter avec les voisins.' },
+    { id: 'farm', name: 'Agriculteur', icon: '🌾', res: 'food', base: 3.5, req: (s) => s.disc.includes('agriculture'), lock: 'Après l\'Agriculture', desc: 'Semer, cultiver et récolter.' },
+    { id: 'hunt', name: 'Chasse et cueillette', icon: '🏹', res: 'food', base: 3, desc: 'Gibier, baies et racines.' },
+    { id: 'wood', name: 'Bûcheron', icon: '🌲', res: 'wood', base: 2.5, desc: 'Couper du bois dans la forêt.' },
+    { id: 'stone', name: 'Pierres', icon: '🪨', res: 'stone', base: 1.5, desc: 'Ramasser et tailler la pierre au pied de la montagne.' },
+    { id: 'iron', name: 'Mineur de fer', icon: '⛏️', res: 'iron', base: 0.6, req: (s) => s.disc.includes('metal'), lock: 'Après la Métallurgie du fer', desc: 'Extraire le minerai de la montagne.' },
+    { id: 'coal', name: 'Mineur de charbon', icon: '⚫', res: 'coal', base: 0.6, req: (s) => s.era >= 3, lock: 'À partir de la Renaissance', desc: 'Descendre dans les galeries de charbon.' },
+    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.8, req: (s) => count(s, 'centre') > 0, lock: 'Après le Centre de recherche', desc: 'Observer, réfléchir, inventer au Centre de recherche.' },
+    { id: 'trade', name: 'Marchand', icon: '💰', res: 'gold', base: 0.6, req: (s) => s.era >= 1, lock: 'À partir de l\'Antiquité', desc: 'Vendre et acheter avec les voisins.' },
     { id: 'guard', name: 'Garde', icon: '🛡️', res: 'def', base: 1, desc: 'Surveiller la vallée (défense).' },
   ];
   const JB = byId(JOBS);
@@ -620,7 +620,7 @@
     const t = totals(s);
     const mult = 0.75 + s.happy / 200;
     const lake = s.site === 'lac', river = s.site === 'riviere';
-    const foodFixed = (3 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult;
+    const foodFixed = (4 + t.food + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult;
     const foodNeed = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4) + 2 - foodFixed - soldierHunt(s) * mult;
     const want = {};
     for (const j of WORK) want[j] = 0;
@@ -679,7 +679,7 @@
     const mult = 0.75 + s.happy / 200;
     const lake = s.site === 'lac', river = s.site === 'riviere';
     const prod = (base, v) => Math.round((base + v) * (base + v > 0 ? mult : 1));
-    const foodProd = Math.round((3 + t.food + jobOutput(s).food + soldierHunt(s) + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
+    const foodProd = Math.round((4 + t.food + jobOutput(s).food + soldierHunt(s) + (lake ? 3 : 0)) * (river ? 1.25 : 1) * mult);
     const foodCons = Math.ceil(s.pop / 3) + Math.ceil(s.army / 4);
     const jo = jobOutput(s), free = jo.idle;
     const f = {
@@ -1083,12 +1083,25 @@
   }
 
   /* ---------- Fin de la journée ---------- */
-  function endDay(s, rng) {
+  // Production au fil de la journée : frac = part de la journée écoulée
+  function accrue(s, frac) {
+    const f = forecast(s);
+    for (const r of RES) {
+      s.res[r] = (s.res[r] || 0) + f[r] * frac;
+      if (s.res[r] < 0) { s.res[r] = 0; if (r === 'food') s.starving = true; }
+    }
+  }
+
+  // opts.accrued : la production a déjà été versée pendant la journée
+  function endDay(s, rng, opts) {
     rng = rng || Math.random;
     const f = forecast(s);
     const report = { delta: {}, pop0: s.pop, events: [] };
-    for (const r of RES) { report.delta[r] = f[r]; s.res[r] = (s.res[r] || 0) + f[r]; }
+    const accrued = opts && opts.accrued;
+    for (const r of RES) { report.delta[r] = f[r]; if (!accrued) s.res[r] = (s.res[r] || 0) + f[r]; }
     if (s.res.gold < 0) { s.res.gold = 0; s.happy = Math.max(0, s.happy - 3); }
+    if (accrued && s.starving && f.food < 0) s.res.food = -1;   // on a manqué de nourriture pendant la journée
+    s.starving = false;
 
     // Famine
     if (s.res.food < 0) {
@@ -1189,7 +1202,8 @@
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };
   api.choose = (s, ...rest) => { const r = choose(s, ...rest); syncVillagers(s); return r; };
-  api.endDay = (s, rng) => {
+  api.accrue = accrue;
+  api.endDay = (s, rng, opts) => {
     syncVillagers(s, rng);
     for (const v of s.villagers) if (v.job !== 'idle') { v.xp[v.job] = Math.min(XP_MAX / XP_DAY, (v.xp[v.job] || 0) + 1); }
     s.huntDays = (s.huntDays || 0) + s.villagers.filter((v) => v.job === 'hunt').length;
@@ -1197,7 +1211,7 @@
     for (const v of s.villagers) if (v.job !== 'idle') s.work[v.job] = (s.work[v.job] || 0) + 1;
     s.armyDays = s.armyDays || {};
     s.armyDays[s.era] = (s.armyDays[s.era] || 0) + s.army;
-    const rep = endDay(s, rng);
+    const rep = endDay(s, rng, opts);
     rep.born = syncVillagers(s, rng).map((v) => ({ name: v.name, job: v.job }));
     rep.practiced = checkPractice(s);
     const done = advanceResearch(s);

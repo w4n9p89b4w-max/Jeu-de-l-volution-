@@ -29,7 +29,7 @@
         <li><b>B · Au bord du lac</b> : +3 🍖 et +2 💰 par jour.</li></ul></li></ol>`));
 
     parts.push(sec('jour', '📅 Une journée', `
-      <ol><li><b>Un jour dure 40 secondes</b> (à vitesse ×1). La barre sous « JOUR » se remplit et un compte à rebours s'affiche en haut.</li>
+      <ol><li><b>Un jour dure 60 secondes</b> (à vitesse ×1). La barre sous « JOUR » se remplit et un compte à rebours s'affiche en haut. <b>Les ressources arrivent petit à petit pendant la journée</b> : la nourriture est aussi mangée au fil du temps.</li>
       <li>Pendant la journée, vous faites <b>un seul choix</b> dans les 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> (ou <b>😴 Repos</b>, +4 😊). La 4e case, <b>🔬 Recherche</b>, ne compte pas : vous pouvez y choisir vos recherches à tout moment. Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Une fois le choix fait, les cases se grisent jusqu'au lendemain.</li>
       <li>Si vous ne choisissez rien, la journée passe quand même.</li>
       <li>À la fin du temps, la nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
@@ -61,16 +61,16 @@
 
     parts.push(sec('res', '🪵 Les ressources', `
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
-      <tr><td>🍖</td><td>Nourriture</td><td>Base 3/jour, villageois à la <b>chasse</b> 🏹 (voir plus bas), champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
+      <tr><td>🍖</td><td>Nourriture</td><td>Base 4/jour, villageois à la <b>chasse</b> 🏹 (voir plus bas), champs, moulins, fermes. Chaque habitant en mange (1 pour 3 habitants, 1 pour 4 soldats).</td></tr>
       <tr><td>🪵</td><td>Bois</td><td>Les villageois <b>bûcherons</b> 🌲, puis la scierie et les usines.</td></tr>
       <tr><td>🪨</td><td>Pierre</td><td>Les villageois aux <b>pierres</b> 🪨, puis la carrière, les tailleurs de pierre et la gare.</td></tr>
       <tr><td>🔩</td><td>Fer</td><td>À partir du <b>Moyen Âge</b> : villageois <b>mineurs de fer</b> ⛏️, mine de fer (après <i>Métallurgie du fer</i>), haut-fourneau, recyclage.</td></tr>
       <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : villageois <b>mineurs de charbon</b> ⚫, mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
       <tr><td>💰</td><td>Or</td><td>Villageois <b>marchands</b> 💰, 1 pour 12 villageois sans tâche, marchés, banques, gares, lois.</td></tr>
-      <tr><td>💡</td><td>Savoir</td><td>Base 1/jour, villageois <b>savants</b> 💡, 1 pour 20 villageois sans tâche, feu, temples, bibliothèques, universités…</td></tr></table>
+      <tr><td>💡</td><td>Savoir</td><td>Base 2/jour, villageois <b>savants</b> 💡, 1 pour 20 villageois sans tâche, feu, temples, bibliothèques, universités…</td></tr></table>
       <h4>🌳 Ce qui se recherche, domaine par domaine</h4>
       <ul><li><b>Chasse</b> : au début, des villageois chassent en forêt. Puis 🔬 appâts et pièges (+50 % pour les chasseurs), puis camp de chasse.</li>
-      <li><b>Agriculture</b> : avec la découverte de l'Agriculture apparaît le métier <b>🌾 Agriculteur</b> (2,5 🍖 par jour). Puis 🔬 champ de blé → charrue (+50 %) → moulin → irrigation (+50 %) → grande ferme → ferme mécanisée → ferme verticale.</li>
+      <li><b>Agriculture</b> : avec la découverte de l'Agriculture apparaît le métier <b>🌾 Agriculteur</b> (3,5 🍖 par jour). Puis 🔬 champ de blé → charrue (+50 %) → moulin → irrigation (+50 %) → grande ferme → ferme mécanisée → ferme verticale.</li>
       <li><b>Maisons</b> : hutte (dès le début) → 🔬 maison en pierre → colombages → hôtel particulier → immeuble → gratte-ciel.</li>
       <li><b>Pierre</b> : 🔬 carrière (après les outils en pierre), leviers et cordes (+50 %), atelier de tailleurs.</li>
       <li><b>Bois</b> : 🔬 haches en silex (+50 %), puis scierie.</li></ul>
