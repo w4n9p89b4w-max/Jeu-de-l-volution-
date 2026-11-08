@@ -166,6 +166,14 @@
     $('enemyBox').innerHTML = enemyChip();
     // pastilles : nombre de choix possibles
     document.querySelectorAll('.tile').forEach((t) => {
+      if (t.dataset.cat === 'tech') {
+        // recherche : « ! » si la file est vide, et la progression de la recherche en cours
+        const q = E.queueOf(state), cur = q.find((id) => E.nodeState(state, E.NODE[id]) === 'open');
+        const anyOpen = E.NODES.some((n) => E.nodeState(state, n) === 'open');
+        t.querySelector('.badge').textContent = !q.length && anyOpen ? '!' : '';
+        $('tprog').style.width = cur ? `${Math.round(100 * E.researchProg(state, cur) / E.researchCost(state, E.NODE[cur]))}%` : '0%';
+        return;
+      }
       const n = E.options(state, t.dataset.cat).filter((o) => o.can).length;
       t.querySelector('.badge').textContent = t.dataset.cat === 'war' ? '' : n ? n : '';
     });
@@ -215,6 +223,7 @@
   };
   function openSheet(cat) {
     if (busy || !state) return;
+    if (cat === 'tech') { openResearch(); return; }
     if (state.chosen) { toast(`Choix du jour déjà fait. Prochain jour dans ${secondsLeft()} s`); return; }
     const c = CAT[cat];
     $('sheetTitle').textContent = c.title;
@@ -228,7 +237,7 @@
     $('sheetSub').textContent = sub;
     const list = $('sheetList'); list.innerHTML = '';
     const opts = E.options(state, cat);
-    if (!opts.length) list.innerHTML = '<div class="empty">Rien de nouveau pour l\'instant…<br>Faites des découvertes pour changer d\'ère !</div>';
+    if (!opts.length) list.innerHTML = '<div class="empty">Rien de nouveau pour l\'instant…</div>';
     for (const o of opts) {
       const bt = document.createElement('button');
       bt.className = 'opt' + (o.can ? '' : ' off');
@@ -238,10 +247,74 @@
       bt.onclick = () => { if (o.can) { closeSheet(); choisir(cat, o.id); } };
       list.appendChild(bt);
     }
+    if (cat === 'build' || cat === 'war') {
+      const hint = document.createElement('button');
+      hint.className = 'small rhint';
+      hint.textContent = cat === 'build' ? '🔬 Débloquer de nouvelles constructions : Recherche' : '🔬 De meilleures armes : Recherche';
+      hint.onclick = () => openResearch();
+      list.appendChild(hint);
+    }
     $('sheet').classList.add('open');
     $('toast').classList.remove('show');
   }
   function closeSheet() { $('sheet').classList.remove('open'); }
+
+  /* ---------- 🔬 La recherche (ne compte pas comme le choix du jour) ---------- */
+  const KIND = { disc: ['⏳', 'Découvertes de l\'ère'], build: ['🏠', 'Constructions'], upgrade: ['📈', 'Améliorations du travail'], weapon: ['🗡️', 'Armes'] };
+  function openResearch() {
+    renderResearch();
+    $('sheet').classList.add('open');
+    $('toast').classList.remove('show');
+  }
+  function renderResearch() {
+    const f = E.forecast(state), q = E.queueOf(state);
+    const perDay = Math.max(0, f.sci);
+    const left = E.DISCOVERIES.filter((d) => d.era === state.era && !state.disc.includes(d.id)).length;
+    $('sheetTitle').textContent = '🔬 Recherche';
+    $('sheetSub').innerHTML = `Savoir : <b>${state.res.sci} 💡</b> (+${perDay}/jour). Chaque nuit, il nourrit les recherches de votre file, dans l'ordre. Choisir une recherche ne compte pas comme le choix du jour.`;
+    const days = (n, extra) => { const r = E.researchCost(state, n) - E.researchProg(state, n.id) - (extra || 0); return perDay ? Math.max(1, Math.ceil((r - state.res.sci) / perDay) + 1) : '∞'; };
+    const unlockTxt = (n) => {
+      if (n.kind === 'disc') { const d = E.D[n.d]; const e = Object.keys(d.eff).filter((r) => d.eff[r]).map((r) => `${d.eff[r] > 0 ? '+' : ''}${d.eff[r]} ${E.RES_ICONS[r]}`).join(' '); return e || ''; }
+      return E.bonusOf(state, n.b).plus.join(' · ');
+    };
+    let html = '';
+    // la file
+    html += `<div class="rq"><div class="rqh">📋 File de recherche (${q.length}/6)</div>`;
+    if (!q.length) html += '<p class="rqe">Vide : touchez une recherche ci-dessous pour l\'ajouter. Le savoir s\'accumule en attendant.</p>';
+    let before = 0;
+    q.forEach((id, k) => {
+      const n = E.NODE[id], cost = E.researchCost(state, n), prog = E.researchProg(state, id);
+      const pct = Math.round(100 * prog / cost);
+      html += `<button class="ritem inq" data-id="${id}"><span class="rnum">${k + 1}</span><span class="ri">${n.icon}</span><span class="rt"><b>${n.name}</b>
+        <span class="rbar"><span style="width:${pct}%"></span></span><small>${prog}/${cost} 💡 · environ ${days(n, -before)} j · touchez pour retirer</small></span></button>`;
+      before += cost - prog;
+    });
+    html += '</div>';
+    // ce qu'on peut rechercher
+    for (const kind of ['disc', 'build', 'upgrade', 'weapon']) {
+      const items = E.NODES.filter((n) => n.kind === kind && !q.includes(n.id) && ['open', 'locked'].includes(E.nodeState(state, n)));
+      if (!items.length) continue;
+      const [ic, label] = KIND[kind];
+      html += `<h3 class="rh">${ic} ${label}${kind === 'disc' && state.era < E.ERAS.length - 1 ? ` <small>· encore ${left} pour entrer dans : ${E.ERAS[state.era + 1].name}</small>` : ''}</h3>`;
+      for (const n of items) {
+        const st = E.nodeState(state, n), cost = E.researchCost(state, n);
+        const canQ = st === 'open' || n.pre.every((p) => E.nodeState(state, E.NODE[p]) === 'done' || q.includes(p));
+        const pre = n.pre.filter((p) => E.nodeState(state, E.NODE[p]) !== 'done').map((p) => E.NODE[p].name).join(', ');
+        const disc = E.practicedFor(state, n);
+        html += `<button class="ritem${canQ ? '' : ' off'}" data-id="${n.id}"><span class="ri">${n.icon}</span><span class="rt"><b>${n.name}</b><small class="rd">${n.desc}</small>
+          ${unlockTxt(n) ? `<span class="bm plus">${unlockTxt(n)}</span>` : ''}
+          ${st === 'locked' ? `<span class="why">Après : ${pre}</span>` : ''}</span>
+          <span class="rc2"><b>${cost} 💡</b>${disc ? '<em class="disc">−50 % pratique</em>' : ''}<small>${perDay ? `~${days(n, -before)} j` : ''}</small></span></button>`;
+      }
+    }
+    $('sheetList').innerHTML = html;
+    $('sheetList').querySelectorAll('.ritem').forEach((bt) => (bt.onclick = () => {
+      const id = bt.dataset.id, inQ = E.queueOf(state).includes(id);
+      if (!E.setResearch(state, id)) { toast(E.queueOf(state).length >= 6 ? 'La file est pleine (6 recherches)' : 'Il faut d\'abord rechercher ce qui est demandé'); return; }
+      toast(inQ ? `Retiré de la file : ${E.NODE[id].name}` : `Ajouté à la file : ${E.NODE[id].name}`);
+      save(); renderResearch(); updateHUD();
+    }));
+  }
   $('sheetClose').onclick = closeSheet;
   document.querySelectorAll('.tile').forEach((t) => (t.onclick = () => openSheet(t.dataset.cat)));
   $('map').addEventListener('pointerdown', closeSheet);
@@ -337,7 +410,17 @@
     const born = (rep.born || []).map((b) => b.name);
     toast(`${born.length ? `Bienvenue à ${born.slice(0, 3).join(', ')}${born.length > 3 ? ` et ${born.length - 3} autres` : ''} ! Touchez 👷 pour leur donner une tâche.<br>` : ''}Jour ${state.day} · ${E.known(state).filter((r) => d[r]).map((r) => part(d[r], E.RES_ICONS[r])).join(' ')}${pd ? ` · ${part(pd, '👤')}` : ''}`);
     save();
+    for (const r of rep.researched || []) {
+      await wait(350);
+      if (r.kind === 'disc') {
+        await modal({ icon: r.icon, title: 'Découverte !', text: `${r.name} — ${E.D[E.NODE[r.node].d].desc}`, good: true });
+        if (r.newEra != null) await newEra(r.newEra);
+      } else if (!(rep.proposals || []).includes(r.build)) {
+        toast(`🔬 Recherche terminée : ${r.name}`);
+      }
+    }
     for (const pr of rep.proposals || []) { await wait(350); await proposeBuilding(pr); }
+    if ((rep.practiced || []).length) toast(`📈 Grâce à la pratique, la recherche est 2 fois moins chère pour : ${rep.practiced.map((id) => E.B[id].name).join(', ')}`, 4500);
     for (const ev of rep.events) {
       await wait(350);
       if (ev.dilemma) await dilemma(ev.dilemma);
@@ -360,7 +443,7 @@
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
     else if (state.day === 2) caption('UN JOUR DURE <em>40 SECONDES</em><small>Un seul choix par jour · ⏸️ et ×2 / ×4 en haut à gauche</small>', 3000);
-    else if (state.day === 4) caption('FAITES DES <em>DÉCOUVERTES</em><small>pour changer d\'ère</small>', 2400);
+    else if (state.day === 4) caption('CHOISISSEZ UNE <em>RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 2600);
   }
 
   async function dilemma(dv) {

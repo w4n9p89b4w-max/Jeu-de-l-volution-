@@ -401,3 +401,33 @@ em { font-style: normal; color: var(--yellow); }
 .enemy { max-width: 440px; }
 .dock-title[hidden] { display: none !important; }
 #dockTitle { font-family: Nunito, sans-serif; font-size: 12.5px; font-weight: 900; color: #fff; background: rgba(30, 100, 60, .9); padding: 4px 12px; border-radius: 999px; -webkit-text-stroke: 0; text-shadow: none; }
+
+/* ---------- Recherche ---------- */
+.tile { position: relative; overflow: visible; }
+.tprog { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 4px; border-radius: 2px; background: #ece6d9; overflow: hidden; }
+.tprog span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffc93c, #2e9d57); }
+#sheetSub b { color: var(--ink); }
+.rq { background: #fff; border-radius: 14px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 6px; }
+.rqh { font-weight: 900; font-size: 13px; }
+.rqe { margin: 0; font-size: 12px; color: var(--muted); font-weight: 700; }
+.rh { margin: 10px 0 2px; font-size: 14px; font-weight: 900; }
+.rh small { color: var(--muted); font-weight: 800; }
+.ritem { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; align-items: center; background: #fff; border-radius: 12px; padding: 8px 10px; box-shadow: 0 2px 0 rgba(0,0,0,.08); text-align: left; width: 100%; }
+.ritem.inq { grid-template-columns: 22px 30px 1fr; background: #f2f8ff; box-shadow: none; padding: 4px 2px; }
+.ritem.off { opacity: .5; }
+.ritem .ri { font-size: 24px; text-align: center; }
+.ritem .rt { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.ritem .rt b { font-size: 14px; }
+.ritem .rd { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.ritem .rt small { font-size: 11px; color: var(--muted); font-weight: 700; }
+.ritem .bm { font-size: 11.5px; font-weight: 900; border-radius: 6px; padding: 1px 6px; color: #1f7a42; background: #e3f5e9; }
+.ritem .why { font-size: 11px; color: var(--bad); font-weight: 800; }
+.rc2 { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; white-space: nowrap; }
+.rc2 b { font-size: 13px; }
+.rc2 small { font-size: 10.5px; color: var(--muted); font-weight: 800; }
+.rc2 .disc { font-style: normal; font-size: 10px; font-weight: 900; color: #1f7a42; }
+.rnum { width: 20px; height: 20px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 11px; font-weight: 900; display: grid; place-items: center; }
+.rbar { width: 100%; height: 6px; border-radius: 3px; background: #e3e8ef; overflow: hidden; }
+.rbar span { display: block; height: 100%; background: linear-gradient(90deg, #ffc93c, #2e9d57); }
+
+.rhint { align-self: center; margin-top: 4px; }

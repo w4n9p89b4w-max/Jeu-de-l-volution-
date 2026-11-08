@@ -30,17 +30,25 @@
 
     parts.push(sec('jour', '📅 Une journée', `
       <ol><li><b>Un jour dure 40 secondes</b> (à vitesse ×1). La barre sous « JOUR » se remplit et un compte à rebours s'affiche en haut.</li>
-      <li>Pendant la journée, vous faites <b>un seul choix</b> dans les 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> ou <b>💡 Découvertes</b> (ou <b>😴 Repos</b>, +4 😊). Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Une fois le choix fait, les cases se grisent jusqu'au lendemain.</li>
+      <li>Pendant la journée, vous faites <b>un seul choix</b> dans les 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> (ou <b>😴 Repos</b>, +4 😊). La 4e case, <b>🔬 Recherche</b>, ne compte pas : vous pouvez y choisir vos recherches à tout moment. Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Une fois le choix fait, les cases se grisent jusqu'au lendemain.</li>
       <li>Si vous ne choisissez rien, la journée passe quand même.</li>
       <li>À la fin du temps, la nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
       <p><b>⏸️</b> met le jeu en pause, <b>×1 / ×2 / ×4</b> accélère le temps. Le temps s'arrête tout seul quand une fenêtre est ouverte (villageois, règles, événement…). Donner des tâches aux villageois ne compte pas comme le choix du jour.</p>`));
+
+    parts.push(sec('recherche', '🔬 La recherche', `
+      <p>Tout ce qui est nouveau se <b>recherche</b> : les découvertes de chaque ère, les constructions (sauf la hutte, le cercle du feu et le menhir, disponibles dès le début), les améliorations du travail et les armes.</p>
+      <ol><li>Touchez <b>🔬 Recherche</b> et choisissez une ou plusieurs recherches : elles se mettent dans votre <b>file</b> (6 au maximum). Touchez une recherche de la file pour la retirer.</li>
+      <li>Chaque nuit, le <b>savoir 💡</b> en stock nourrit la première recherche de la file, puis la suivante s'il en reste. La petite barre sous la case 🔬 montre la progression. Un « ! » apparaît si la file est vide.</li>
+      <li>Une recherche terminée : une découverte s'applique tout de suite ; une construction, une amélioration ou une arme vous est <b>proposée</b> (A : la construire, B : plus tard ; elle reste alors dans 🏠 Constructions ou ⚔️ Guerres).</li></ol>
+      <p>Certaines recherches en demandent d'autres avant (par exemple le moulin après le champ). Elles affichent « Après : … ».</p>
+      <p>Choisir une recherche <b>ne compte pas</b> comme le choix du jour. Pour produire plus de savoir : des villageois <b>savants</b>, le feu, les temples, les bibliothèques…</p>`));
 
     parts.push(sec('cartes', '🗳️ Les 4 catégories', `
       <table><tr><th>Catégorie</th><th>Bonus</th><th>Malus</th></tr>
       <tr><td>🏠 <b>Constructions</b></td><td>Production chaque jour, logements, défense…</td><td>Le prix à payer. Il augmente de 25 % à chaque exemplaire déjà construit. Certains bâtiments polluent ou consomment du charbon.</td></tr>
       <tr><td>📜 <b>Lois</b></td><td>Un effet permanent</td><td>Parfois un prix en 💰 ou un effet négatif permanent. Une loi ne s'adopte qu'une fois.</td></tr>
       <tr><td>⚔️ <b>Guerres</b></td><td>Soldats, défense, paix ou butin</td><td>Ressources, ou le risque de perdre la bataille</td></tr>
-      <tr><td>💡 <b>Découvertes</b></td><td>Un effet permanent et un pas vers l'ère suivante</td><td>Du savoir 💡</td></tr></table>`));
+      <tr><td>🔬 <b>Recherche</b></td><td>Débloque les découvertes, les constructions, les améliorations et les armes</td><td>Du savoir 💡, chaque nuit (ne compte pas comme le choix du jour)</td></tr></table>`));
 
     parts.push(sec('res', '🪵 Les ressources', `
       <table><tr><th></th><th>Ressource</th><th>D'où elle vient</th></tr>
@@ -51,22 +59,17 @@
       <tr><td>⚫</td><td>Charbon</td><td>À partir de la <b>Renaissance</b> : villageois <b>mineurs de charbon</b> ⚫, mine de charbon, machine à vapeur, éoliennes. Hauts-fourneaux et usines en consomment chaque jour.</td></tr>
       <tr><td>💰</td><td>Or</td><td>Villageois <b>marchands</b> 💰, 1 pour 12 villageois sans tâche, marchés, banques, gares, lois.</td></tr>
       <tr><td>💡</td><td>Savoir</td><td>Base 1/jour, villageois <b>savants</b> 💡, 1 pour 20 villageois sans tâche, feu, temples, bibliothèques, universités…</td></tr></table>
-      <h4>🏹 La chasse, étape par étape</h4>
-      <ol><li><b>Au début</b>, pas de bâtiment : envoyez des villageois à la <b>Chasse et cueillette</b> (👷 Villageois). Chacun rapporte du gibier de la forêt.</li>
-      <li><b>Après ${E.HUNT_APPATS} journées de chasse</b> (une journée par chasseur et par jour), le jeu propose de <b>poser des appâts et des pièges</b> en forêt (A : les poser, B : plus tard). Les chasseurs rapportent alors <b>50 % de plus</b>.</li>
-      <li><b>Une fois les appâts posés, après ${E.HUNT_CAMP} journées de chasse</b>, le jeu propose de <b>construire un camp de chasse</b> : +4 🍖 par jour. Vous pouvez ensuite en construire d'autres.</li></ol>
-      <p>Si vous répondez « plus tard », la construction reste disponible dans 🏠 Constructions. Ces propositions ne comptent pas comme le choix du jour.</p>
-      <h4>🌾 La nourriture, après la chasse</h4>
-      <p>Avec la découverte de l'<b>Agriculture</b>, un nouveau métier apparaît : <b>🌾 Agriculteur</b> (2,5 🍖 par jour, plus avec l'assolement, la vapeur et l'électricité). À force de cultiver, le jeu propose : champ de blé → charrue (+50 %) → moulin → irrigation (+50 %) → grande ferme → ferme mécanisée → ferme verticale.</p>
-      <h4>🏠 Les maisons</h4>
-      <p>À force de construire, on apprend : 3 huttes débloquent la maison en pierre, 3 maisons en pierre les colombages, 3 colombages l'hôtel particulier, 2 hôtels l'immeuble, 2 immeubles le gratte-ciel. Si vous changez d'ère sans les avoir construits, le type de maison de l'ère précédente se débloque quand même.</p>
-      <h4>📈 Tout progresse par la pratique</h4>
-      <p>Comme pour la chasse, chaque travail s'améliore à force d'être pratiqué. Quand une étape est atteinte, le jeu la <b>propose</b> la nuit (A : l'adopter tout de suite, B : plus tard). Ces propositions ne comptent pas comme le choix du jour.</p>
-      <table><tr><th>Amélioration</th><th>Quand</th><th>Effet</th><th>Prix</th></tr>
-      ${E.STEPS.filter((st) => !/^w\d/.test(st.key) && !['appats', 'camp'].includes(st.key)).map((st) => { const b = E.B[st.b]; return `<tr><td>${b.icon} <b>${b.name}</b></td><td>${st.hint}</td><td>${b.upgrade ? '+50 %' : fmtEff(b.eff)}</td><td>${fmtCost(b.cost)}</td></tr>`; }).join('')}
+      <h4>🌳 Ce qui se recherche, domaine par domaine</h4>
+      <ul><li><b>Chasse</b> : au début, des villageois chassent en forêt. Puis 🔬 appâts et pièges (+50 % pour les chasseurs), puis camp de chasse.</li>
+      <li><b>Agriculture</b> : avec la découverte de l'Agriculture apparaît le métier <b>🌾 Agriculteur</b> (2,5 🍖 par jour). Puis 🔬 champ de blé → charrue (+50 %) → moulin → irrigation (+50 %) → grande ferme → ferme mécanisée → ferme verticale.</li>
+      <li><b>Maisons</b> : hutte (dès le début) → 🔬 maison en pierre → colombages → hôtel particulier → immeuble → gratte-ciel.</li>
+      <li><b>Pierre</b> : 🔬 carrière (après les outils en pierre), leviers et cordes (+50 %), atelier de tailleurs.</li>
+      <li><b>Bois</b> : 🔬 haches en silex (+50 %), puis scierie.</li></ul>
+      <h4>📈 La pratique rend la recherche 2 fois moins chère</h4>
+      <p>À force de pratiquer, vos villageois prennent de l'expérience : la recherche correspondante coûte alors <b>−50 %</b> (c'est indiqué dans 🔬 Recherche). Un message vous prévient la nuit.</p>
+      <table><tr><th>Recherche</th><th>−50 % quand…</th><th>Effet</th><th>Prix pour construire</th></tr>
+      ${E.STEPS.filter((st) => !/^w\d/.test(st.key)).map((st) => { const b = E.B[st.b]; return `<tr><td>${b.icon} <b>${b.name}</b></td><td>${st.hint}</td><td>${b.upgrade ? '+50 %' : st.b === 'appats' ? '+50 % chasseurs' : fmtEff(b.eff)}</td><td>${fmtCost(b.cost)}</td></tr>`; }).join('')}
       </table>
-      <h4>🪨 Ouvrir une carrière</h4>
-      <p>Quand vous découvrez les <b>Outils en pierre</b>, le jeu vous propose d'ouvrir une carrière (A : l'ouvrir tout de suite pour du bois, B : plus tard). Elle produit +4 🪨/jour en plus des ramasseurs. Si vous dites « plus tard », elle reste disponible dans 🏠 Constructions.</p>
       <p>Carrières et mines s'installent au pied des montagnes.</p>`));
 
     const J = E.JB;
@@ -99,7 +102,7 @@
       <li><b>Manif</b> 📢 : sous 30 % de bonheur, le peuple descend souvent dans la rue (−30 % 💰 et −20 % 🪵).</li></ul>`));
 
     parts.push(sec('eres', '⏳ Les ères et les découvertes', `
-      <p>Chaque ère a <b>3 découvertes</b>. Quand les 3 sont faites, on passe à l'ère suivante et de nouveaux bâtiments, lois et découvertes apparaissent. La case 💡 Découvertes indique combien il en reste avant l'ère suivante.</p>
+      <p>Chaque ère a <b>3 découvertes</b>, à rechercher dans 🔬 Recherche. Quand les 3 sont faites, on passe à l'ère suivante et de nouvelles recherches, lois et unités apparaissent. La case 💡 Découvertes indique combien il en reste avant l'ère suivante.</p>
       <table><tr><th>Ère</th><th>Découvertes (coût en 💡)</th></tr>
       ${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]} <b>${er.name}</b><br><small>${er.year}</small></td><td>${E.DISCOVERIES.filter((d) => d.era === i).map((d) => `${d.icon} ${d.name} <small>(${d.cost} 💡)</small> ${fmtEff(d.eff)}<br><small>${d.desc}</small>`).join('<br>')}</td></tr>`).join('')}
       </table>`));
@@ -121,10 +124,8 @@
       <li>Quand sa vie tombe à 0 : <b>🏆 victoire totale</b>. Gros butin, nouveaux habitants, +10 😊, et <b>plus aucune attaque jusqu'à la fin de l'ère</b>. Un nouvel ennemi apparaît à l'ère suivante.</li></ol>
       <p>Après une défaite partielle, vous pouvez réattaquer dès le lendemain tant qu'il vous reste des soldats. Mais attention : sa force augmente chaque jour, et sa vie ne remonte pas.</p>
       <h4>🗡️ Les armes, étape par étape</h4>
-      <p>À chaque ère, les armes des soldats progressent en <b>3 étapes</b>, chacune <b>+25 % de force</b> pour les soldats de cette époque (jusqu'à +75 %). Elles apparaissent dans ⚔️ Guerres et sont proposées la nuit quand elles se débloquent :</p>
-      <ol><li><b>Entraînement</b> : après un certain nombre de jours d'entraînement (nombre de soldats × jours passés dans l'ère).</li>
-      <li><b>Bataille</b> : après la 1re étape et une bataille pendant l'ère (attaque ou défense).</li>
-      <li><b>Atelier d'armes</b> : un bâtiment, après la 2e étape et beaucoup d'entraînement.</li></ol>
+      <p>À chaque ère, les armes des soldats progressent en <b>3 étapes</b> à rechercher dans 🔬 Recherche, l'une après l'autre. Chacune donne <b>+25 % de force</b> aux soldats de cette époque (jusqu'à +75 %). Une fois recherchée, le jeu propose de l'adopter ; sinon elle reste dans ⚔️ Guerres.</p>
+      <p>La pratique aide : la 1re étape coûte moitié prix après assez d'<b>entraînement</b> (soldats × jours passés dans l'ère), la 2e après <b>une bataille</b> pendant l'ère, la 3e (un <b>atelier d'armes</b>) après beaucoup d'entraînement.</p>
       <table><tr><th>Ère</th><th>1. Entraînement</th><th>2. Bataille</th><th>3. Atelier</th></tr>
       ${E.ERAS.map((er, i) => `<tr><td>${ERA_ICON[i]}</td>${E.WPN(i).map((id) => `<td>${E.B[id].icon} ${E.B[id].name}<br><small>${fmtCost(E.B[id].cost)}</small></td>`).join('')}</tr>`).join('')}
       </table>
@@ -164,7 +165,7 @@
       <li><b>En haut</b> : le jour et le temps qui reste (⏸️ pause, ×1 / ×2 / ×4), votre pays et son ère (touchez-le pour le 📖 journal), la population. Dessous, vos ressources : touchez la ligne pour voir ce que vous gagnez ou perdez chaque jour. Puis l'ennemi de l'ère, qui grandit quand une attaque approche.</li>
       <li><b>☰ Menu</b> : les règles, le journal, ou une nouvelle partie. La partie est sauvegardée automatiquement chaque nuit, dans ce navigateur.</li></ul>`));
 
-    const nav = [['but', 'But'], ['jour', 'Journée'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['villageois', 'Villageois'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
+    const nav = [['but', 'But'], ['jour', 'Journée'], ['recherche', 'Recherche'], ['cartes', 'Catégories'], ['res', 'Ressources'], ['villageois', 'Villageois'], ['peuple', 'Population'], ['eres', 'Ères'], ['guerre', 'Guerre'], ['events', 'Événements'], ['constructions', 'Constructions'], ['lois', 'Lois']];
     return { nav, html: parts.join('') };
   }
 

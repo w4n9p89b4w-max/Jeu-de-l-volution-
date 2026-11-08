@@ -167,7 +167,7 @@
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
       day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, troops: [], fort: 0, peaceUntil: 0,
-      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0,
+      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [],
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
     };
@@ -183,6 +183,15 @@
       if (s.buildings.some((b) => b.id === 'chasse')) { s.unlocks = ['appats', 'camp']; s.huntDays = HUNT_CAMP; s.buildings.push({ id: 'appats', day: s.day }); }
     }
     for (const b of s.buildings) { const k = B[b.id] && B[b.id].unlock; if (k && !s.unlocks.includes(k)) s.unlocks.push(k); }
+    if (s.research === undefined) {
+      s.research = [];
+      for (const b of BUILDINGS) {
+        if (!b.unlock || s.unlocks.includes(b.unlock)) continue;
+        const was = b.era < s.era && !b.upgrade && b.weapon == null && !STEP_OF[b.unlock];
+        const reqOk = !b.req || s.disc.includes(b.req);
+        if (was && reqOk) s.unlocks.push(b.unlock);
+      }
+    }
     if (!s.villagers) {
       // ancienne sauvegarde : on crée les villageois et on les répartit
       s.villagers = []; s.nextId = 1;
@@ -265,16 +274,96 @@
   // l'étape précédente d'une chaîne (pour n'afficher que la prochaine étape verrouillée)
   const PREV = { chasse: 'appats', scierie: 'haches', moulin: 'champ', ferme: 'moulin', meca: 'ferme', vertical: 'meca', maison: 'hutte', colombage: 'maison', hotel: 'colombage', immeuble: 'hotel', gratteciel: 'immeuble' };
   for (let e = 0; e < 6; e++) { const [a1, a2, a3] = WPN(e); PREV[a2] = a1; PREV[a3] = a2; }
-  function checkUnlocks(s) {
-    s.unlocks = s.unlocks || [];
+  // La pratique rend la recherche correspondante 2 fois moins chère
+  function checkPractice(s) {
+    s.practiced = s.practiced || [];
     const news = [];
     for (const st of STEPS) {
-      if (unlocked(s, st.key)) continue;
-      const b = B[st.b];
-      if (b.era > s.era) continue;
-      if (st.ok(s)) { s.unlocks.push(st.key); news.push(st.b); }
+      if (s.practiced.includes(st.key) || unlocked(s, st.key)) continue;
+      if (B[st.b].era > s.era) continue;
+      if (st.ok(s)) { s.practiced.push(st.key); news.push(st.b); }
     }
     return news;
+  }
+
+  /* ==========================================================================
+     LA RECHERCHE : tout ce qui est nouveau se débloque en recherchant.
+     On choisit une recherche ; chaque nuit, le savoir 💡 du stock s'y ajoute.
+     ========================================================================== */
+  const STARTERS = ['hutte', 'feu', 'menhir'];
+  for (const b of BUILDINGS) if (!STARTERS.includes(b.id) && !b.unlock) b.unlock = b.id;
+  const RCOST = [5, 14, 26, 44, 70, 100];
+  const NODES = [];
+  for (const d of DISCOVERIES) NODES.push({ id: 'd:' + d.id, kind: 'disc', era: d.era, name: d.name, icon: d.icon, desc: d.desc, base: d.cost, pre: [], d: d.id });
+  for (const b of BUILDINGS) {
+    if (!b.unlock) continue;
+    const pre = [];
+    if (b.req) pre.push('d:' + b.req);
+    if (PREV[b.id] && B[PREV[b.id]].unlock) pre.push('b:' + PREV[b.id]);
+    const kind = b.weapon != null ? 'weapon' : b.upgrade ? 'upgrade' : 'build';
+    NODES.push({ id: 'b:' + b.id, kind, era: b.era, name: b.name, icon: b.icon, desc: b.desc, base: b.id === 'fusee' ? 160 : Math.round(RCOST[b.era] * (b.upgrade ? 0.8 : 1)), pre, b: b.id });
+  }
+  const NODE = Object.fromEntries(NODES.map((n) => [n.id, n]));
+  const nodeDone = (s, n) => (n.kind === 'disc' ? s.disc.includes(n.d) : unlocked(s, B[n.b].unlock));
+  const practicedFor = (s, n) => n.b && (s.practiced || []).includes(B[n.b].unlock);
+  const researchCost = (s, n) => (n.kind === 'disc' ? n.base : Math.ceil(n.base * (practicedFor(s, n) ? 0.5 : 1)));
+  function nodeState(s, n) {
+    if (nodeDone(s, n)) return 'done';
+    if (n.kind === 'disc' ? n.era !== s.era : n.era > s.era) return 'later';
+    if (n.pre.some((p) => !nodeDone(s, NODE[p]))) return 'locked';
+    return 'open';
+  }
+  // La file de recherches : on peut en mettre plusieurs à la suite
+  const queueOf = (s) => (Array.isArray(s.research) ? s.research : (s.research = s.research ? [s.research] : []));
+  function setResearch(s, id) {
+    const n = NODE[id], q = queueOf(s);
+    if (!n) return false;
+    const k = q.indexOf(id);
+    if (k >= 0) { q.splice(k, 1); return true; }             // retirer de la file
+    const st = nodeState(s, n);
+    // on peut aussi mettre en file une recherche dont le prérequis est déjà dans la file
+    const ok = st === 'open' || (st === 'locked' && n.pre.every((p) => nodeDone(s, NODE[p]) || q.includes(p)));
+    if (!ok || q.length >= 6) return false;
+    q.push(id);
+    return true;
+  }
+  const researchProg = (s, id) => ((s.rprog || {})[id] || 0);
+  function finish(s, n) {
+    const out = { node: n.id, name: n.name, icon: n.icon, kind: n.kind };
+    if (n.kind === 'disc') {
+      s.disc.push(n.d);
+      log(s, `${n.icon} Découverte : ${n.name}`);
+      const eraDone = DISCOVERIES.filter((x) => x.era === s.era).every((x) => s.disc.includes(x.id));
+      if (eraDone && s.era < ERAS.length - 1) { s.era++; out.newEra = s.era; log(s, `⏳ Nouvelle ère : ${ERAS[s.era].name}`); }
+    } else {
+      s.unlocks = s.unlocks || [];
+      s.unlocks.push(B[n.b].unlock);
+      out.build = n.b;
+      log(s, `🔬 Recherche terminée : ${n.name}`);
+    }
+    return out;
+  }
+  // Chaque nuit : le savoir en stock nourrit les recherches de la file, dans l'ordre
+  function advanceResearch(s) {
+    const q = queueOf(s), done = [];
+    s.rprog = s.rprog || {};
+    let guard = 0;
+    while (q.length && s.res.sci > 0 && guard++ < 20) {
+      const k = q.findIndex((id) => NODE[id] && nodeState(s, NODE[id]) === 'open');
+      if (k < 0) break;
+      const id = q[k], n = NODE[id];
+      const cost = researchCost(s, n);
+      const take = Math.min(s.res.sci, cost - researchProg(s, id));
+      s.res.sci -= take;
+      s.rprog[id] = researchProg(s, id) + take;
+      if (s.rprog[id] < cost) break;
+      delete s.rprog[id];
+      q.splice(k, 1);
+      done.push(finish(s, n));
+    }
+    // retirer ce qui n'a plus de sens (déjà fait)
+    for (let k = q.length - 1; k >= 0; k--) if (!NODE[q[k]] || nodeDone(s, NODE[q[k]])) q.splice(k, 1);
+    return done;
   }
   // niveaux d'amélioration
   const jobUpgrade = (s, j) => 1 + 0.5 * BUILDINGS.filter((b) => b.upgrade === j && count(s, b.id)).length;
@@ -389,7 +478,7 @@
     { id: 'stone', name: 'Pierres', icon: '🪨', res: 'stone', base: 0.75, desc: 'Ramasser et tailler la pierre au pied de la montagne.' },
     { id: 'iron', name: 'Mineur de fer', icon: '⛏️', res: 'iron', base: 0.3, req: (s) => s.disc.includes('metal'), lock: 'Après la Métallurgie du fer', desc: 'Extraire le minerai de la montagne.' },
     { id: 'coal', name: 'Mineur de charbon', icon: '⚫', res: 'coal', base: 0.3, req: (s) => s.era >= 3, lock: 'À partir de la Renaissance', desc: 'Descendre dans les galeries de charbon.' },
-    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.2, desc: 'Observer, réfléchir, inventer.' },
+    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.5, desc: 'Observer, réfléchir, inventer.' },
     { id: 'trade', name: 'Marchand', icon: '💰', res: 'gold', base: 0.3, req: (s) => s.era >= 1, lock: 'À partir de l\'Antiquité', desc: 'Vendre et acheter avec les voisins.' },
     { id: 'guard', name: 'Garde', icon: '🛡️', res: 'def', base: 1, desc: 'Surveiller la vallée (défense).' },
   ];
@@ -523,6 +612,7 @@
     const open = Object.keys(share).filter((j) => jobOpen(s, j));
     const tot = open.reduce((a, j) => a + share[j], 0) || 1;
     for (const j of open) want[j] = Math.floor(rest * share[j] / tot);
+    if (n >= 4 && want.sage < 1 && rest > 1) want.sage = 1;   // au moins un savant pour la recherche
     let left = n - Object.values(want).reduce((a, b) => a + b, 0);
     for (let i = 0; left > 0 && open.length; i++, left--) want[open[i % open.length]]++;
     s.quota = want;
@@ -575,7 +665,7 @@
       iron: prod(jo.iron, t.iron),
       coal: prod(jo.coal, t.coal),
       gold: prod(Math.floor(free / 12) + jo.gold + (lake ? 2 : 0), t.gold),
-      sci: prod(1 + Math.floor(free / 20) + jo.sci, t.sci),
+      sci: prod(2 + Math.floor(free / 20) + jo.sci, t.sci),
     };
     f.jobs = jo; f.free = free; f.mult = mult; f.soldierFood = soldierHunt(s) * mult * (river ? 1.25 : 1); f.peace = atPeace(s);
     f.cap = 5 + t.cap;
@@ -607,16 +697,7 @@
         if (b.era > s.era) continue;
         if (b.unique && count(s, b.id)) continue;
         if (b.weapon != null) continue;          // les armes sont dans Guerres
-        if (b.unlock && !unlocked(s, b.unlock)) {
-          if (PREV[b.id] && !count(s, PREV[b.id])) continue;
-          if (b.upgrade) continue;               // les améliorations arrivent par proposition
-          out.push({ id: b.id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: fmtEff(b.eff), can: false, why: UNLOCK_HINT[b.unlock], era: b.era });
-          continue;
-        }
-        if (b.req && !s.disc.includes(b.req)) {
-          if (b.era === s.era || b.id === 'carriere') out.push({ id: b.id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: fmtEff(b.eff), can: false, why: `Nécessite : ${D[b.req].name}`, era: b.era });
-          continue;
-        }
+        if (b.unlock && !unlocked(s, b.unlock)) continue;   // à rechercher d'abord (🔬)
         const c = buildCost(s, b);
         const n = count(s, b.id);
         out.push({ id: b.id, icon: b.icon, name: b.name + (n ? ` (${n})` : ''), desc: b.desc, cost: fmtCost(c), eff: fmtEff(b.eff), can: canPay(s, c), why: whyNot(s, c), era: b.era });
@@ -648,11 +729,7 @@
       for (const id of WPN(s.era)) {
         const b = B[id];
         if (count(s, id)) continue;
-        if (!unlocked(s, id)) {
-          if (PREV[id] && !count(s, PREV[id])) break;
-          out.push({ id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: '', can: false, why: UNLOCK_HINT[id], era: b.era, tag: 'Arme' });
-          break;
-        }
+        if (!unlocked(s, id)) break;              // à rechercher d'abord (🔬)
         out.push({ id, icon: b.icon, name: b.name, desc: b.desc, cost: fmtCost(b.cost), eff: '', can: canPay(s, b.cost), why: whyNot(s, b.cost), era: b.era, tag: 'Arme' });
         break;
       }
@@ -1064,7 +1141,7 @@
     UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
     prefOf, setPref, setQuota, applyQuotas, recommendQuotas, unlocked, HUNT_APPATS, HUNT_CAMP,
-    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, bonusOf: (s, id) => bonusMalus(s, 'build', id),
+    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, NODES, NODE, nodeState, setResearch, researchCost, researchProg, practicedFor, queueOf, bonusOf: (s, id) => bonusMalus(s, 'build', id),
   };
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };
@@ -1079,7 +1156,10 @@
     s.armyDays[s.era] = (s.armyDays[s.era] || 0) + s.army;
     const rep = endDay(s, rng);
     rep.born = syncVillagers(s, rng).map((v) => ({ name: v.name, job: v.job }));
-    rep.proposals = checkUnlocks(s);
+    rep.practiced = checkPractice(s);
+    const done = advanceResearch(s);
+    rep.researched = done;
+    rep.proposals = done.filter((d) => d.build).map((d) => d.build);
     return rep;
   };
   api.newState = (...a) => { const st = newState(...a); syncVillagers(st); autoAssign(st); return st; };
