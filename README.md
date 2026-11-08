@@ -31,6 +31,8 @@ Carrières et mines s'installent au pied des montagnes ; hauts-fourneaux et usin
 
 **But** : découvrir la conquête spatiale et lancer la première fusée du pays 🚀.
 
+Les villageois contournent l'eau : ils traversent la rivière par des gués puis des ponts. Dans l'Antiquité, on peut rechercher un **port** sur le lac (bateaux de commerce, +6 💰/jour, marchands +50 %).
+
 La vallée évolue sous vos yeux : les bâtiments de chaque époque apparaissent, les chemins deviennent des routes, les habitants se promènent.
 La partie est sauvegardée automatiquement dans le navigateur.
 

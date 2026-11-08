@@ -42,6 +42,7 @@
     // Antiquité
     { id: 'champ', era: 1, name: 'Champ de blé', icon: '🌾', arch: 'field', unlock: 'champ', cost: { wood: 8 }, eff: { food: 8 }, desc: 'Les premières récoltes.' },
     { id: 'maison', era: 1, name: 'Maison en pierre', icon: '🏠', arch: 'house', unlock: 'maison', cost: { wood: 5, stone: 12 }, eff: { cap: 14 }, desc: 'Solide et durable.' },
+    { id: 'port', era: 1, name: 'Port', icon: '⚓', arch: 'port', cost: { wood: 40, stone: 15 }, eff: { gold: 6 }, unique: true, desc: 'Un ponton sur le lac et des bateaux de commerce : +6 💰 par jour, et les marchands rapportent 50 % de plus.' },
     { id: 'marche', era: 1, name: 'Marché', icon: '🏺', arch: 'market', cost: { wood: 10, stone: 5 }, eff: { gold: 4 }, desc: 'On y échange poteries et épices.' },
     { id: 'temple', era: 1, name: 'Temple', icon: '🏛️', arch: 'temple', cost: { stone: 25, gold: 10 }, eff: { happy: 8, sci: 2 }, desc: 'Colonnes de marbre et offrandes.' },
     { id: 'biblio', era: 1, name: 'Bibliothèque', icon: '📜', arch: 'library', cost: { wood: 10, stone: 12, gold: 15 }, eff: { sci: 4 }, desc: 'Des rouleaux de papyrus par milliers.' },
@@ -388,7 +389,7 @@
     return done;
   }
   // niveaux d'amélioration
-  const jobUpgrade = (s, j) => 1 + 0.5 * BUILDINGS.filter((b) => b.upgrade === j && count(s, b.id)).length;
+  const jobUpgrade = (s, j) => 1 + 0.5 * BUILDINGS.filter((b) => b.upgrade === j && count(s, b.id)).length + (j === 'trade' && count(s, 'port') ? 0.5 : 0);
   const weaponLevel = (s, e) => WPN(e).filter((id) => count(s, id)).length;
   const capacity = (s) => 5 + totals(s).cap;
   /* ---------- L'armée : des unités différentes à chaque époque ----------
@@ -795,7 +796,7 @@
     if (B[id] && (cat === 'build' || B[id].weapon != null)) {
       const b = B[id];
       const UP = { farm: '🌾 agriculteurs', wood: '🌲 bûcherons', stone: '🪨 villageois aux pierres', sage: '💡 savants', guard: '🛡️ gardes', trade: '💰 marchands', iron: '⛏️ mineurs de fer', coal: '⚫ mineurs de charbon' };
-      const plus = id === 'fusee' ? ['🏆 VICTOIRE'] : id === 'appats' ? ['+50 % 🍖 pour chaque chasseur']
+      const plus = id === 'fusee' ? ['🏆 VICTOIRE'] : id === 'appats' ? ['+50 % 🍖 pour chaque chasseur'] : id === 'port' ? ['+6 💰/j', '+50 % pour les 💰 marchands', '⛵ bateaux de commerce']
         : b.weapon != null ? [`+25 % de force pour les ${UNITS[b.weapon].icon} ${UNITS[b.weapon].name.toLowerCase()}`]
         : b.upgrade ? [`+50 % pour les ${UP[b.upgrade]}`] : posEff(b.eff);
       return { plus, minus: costL(buildCost(s, b)).concat(negEff(b.eff)) };

@@ -46,7 +46,49 @@
     for (const p of RIVER) d = Math.min(d, Math.hypot(p[0] - x, p[1] - y));
     return d;
   }
-  const isWater = (x, y, margin) => riverDist(x, y) < 13 + (margin || 0) || lnorm(x, y) < 1 + (margin || 0) / 80;
+  const RIVER_HALF = 19;            // demi-largeur de la rivière (élargie)
+  const isWater = (x, y, margin) => riverDist(x, y) < RIVER_HALF + (margin || 0) || lnorm(x, y) < 1 + (margin || 0) / 80;
+
+  /* ---------- Barrières invisibles : on ne marche pas dans l'eau ----------
+     La rivière coupe la vallée en deux rives. Pour passer de l'une à
+     l'autre, on emprunte un gué (puis un pont). */
+  function nearestRiver(x, y) {
+    let best = 0, d = 1e9;
+    for (let i = 0; i < RIVER.length; i++) { const q = Math.hypot(RIVER[i][0] - x, RIVER[i][1] - y); if (q < d) { d = q; best = i; } }
+    return best;
+  }
+  function sideOf(x, y) {
+    const i = Math.min(RIVER.length - 2, nearestRiver(x, y));
+    const [ax, ay] = RIVER[i], [bx, by] = RIVER[i + 1];
+    return Math.sign((bx - ax) * (y - ay) - (by - ay) * (x - ax)) || 1;
+  }
+  const CROSS_AT = [0.3, 0.48, 0.7];
+  const CROSSINGS = CROSS_AT.map((f) => {
+    const i = Math.floor(RIVER.length * f), [ax, ay] = RIVER[i], [bx, by] = RIVER[i + 1];
+    const len = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / len, ny = (bx - ax) / len, k = RIVER_HALF + 7;
+    const P = { x: ax + nx * k, y: ay + ny * k }, Q = { x: ax - nx * k, y: ay - ny * k };
+    return { i, ends: { [sideOf(P.x, P.y)]: P, [sideOf(Q.x, Q.y)]: Q } };
+  });
+  // une ligne droite traverse-t-elle l'eau ?
+  function crossesWater(a, b) {
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 6);
+    for (let k = 1; k < n; k++) { const t = k / n; if (isWater(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, -3)) return true; }
+    return false;
+  }
+  // chemin à pied de a vers b (liste de points), ou null si impossible
+  function route(a, b) {
+    if (isWater(b.x, b.y, 2)) return null;
+    const sa = sideOf(a.x, a.y), sb = sideOf(b.x, b.y);
+    if (sa === sb) return crossesWater(a, b) ? null : [b];
+    let best = null, bd = 1e9;
+    for (const c of CROSSINGS) {
+      const P = c.ends[sa], Q = c.ends[sb];
+      if (!P || !Q) continue;
+      const d = Math.hypot(P.x - a.x, P.y - a.y) + Math.hypot(b.x - Q.x, b.y - Q.y);
+      if (d < bd && !crossesWater(a, P) && !crossesWater(Q, b)) { bd = d; best = [P, Q, b]; }
+    }
+    return best;
+  }
 
   const SITES = {
     riviere: { x: 336, y: 600, label: 'A', title: 'Au bord de la rivière', sub: 'De l\'eau et des terres fertiles : +25% de nourriture' },
@@ -412,6 +454,19 @@
       ell(ctx, x + 8, y - 6, 3, 3, '#ff8a1f'); ell(ctx, x + 8, y - 6, 1.5, 1.5, '#ffe08a');
       windows(ctx, x - 14, y - 10, 18, 6, 1, 3, '#f2a64a');
     },
+    port(ctx, x, y) {
+      // un ponton qui s'avance dans le lac, des caisses et une grue en bois
+      const a = Math.atan2(LAKE.y - y, LAKE.x - x);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      rect(ctx, -6, -5, 34, 10, '#8b6438');
+      ctx.fillStyle = '#6b4a2a'; for (let i = 0; i < 6; i++) ctx.fillRect(-4 + i * 5.5, -5, 1, 10);
+      for (const px of [2, 14, 26]) { rect(ctx, px, -7, 2, 2, '#4a3220'); rect(ctx, px, 5, 2, 2, '#4a3220'); }
+      ctx.restore();
+      shadow(ctx, x, y, 16);
+      rect(ctx, x - 9, y - 7, 6, 6, '#b88a57'); rect(ctx, x - 3, y - 6, 5, 5, '#a77b4a');
+      ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x + 4, y); ctx.lineTo(x + 4, y - 18); ctx.lineTo(x + 12, y - 14); ctx.stroke();
+      ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(x + 12, y - 14); ctx.lineTo(x + 12, y - 8); ctx.stroke();
+    },
     main(ctx, x, y, t, s) {
       // le bâtiment principal change à chaque niveau (une fois par ère)
       const L = s ? (s.mainLevel || 0) : 0;
@@ -554,11 +609,11 @@
     // rivière
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     const stroke = (w, c) => { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); RIVER.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.stroke(); };
-    stroke(28, '#cdbf8a'); stroke(22, '#4aa0d8'); stroke(8, 'rgba(255,255,255,.22)');
+    stroke(RIVER_HALF * 2 + 8, '#cdbf8a'); stroke(RIVER_HALF * 2, '#4aa0d8'); stroke(10, 'rgba(255,255,255,.22)');
 
     if (!state || !state.site) return;
     // routes : chaque bâtiment est relié au plus proche plus ancien
-    const placed = state.buildings.filter((b) => b.x != null);
+    const placed = state.buildings.filter((b) => b.x != null && b.slot !== 'port');   // le port est relié par l'eau
     const origin = SITES[state.site];
     const modern = state.era >= 4;
     ctx.strokeStyle = modern ? '#6d7177' : state.era >= 2 ? '#c7b48a' : '#b9a578';
@@ -567,17 +622,30 @@
     placed.forEach((b, i) => {
       let best = origin, bd = Math.hypot(b.x - origin.x, b.y - origin.y);
       for (let j = 0; j < i; j++) { const o = placed[j]; const d = Math.hypot(b.x - o.x, b.y - o.y); if (d < bd) { bd = d; best = o; } }
-      ctx.moveTo(best.x, best.y + 3); ctx.lineTo(b.x, b.y + 3);
+      // si la route traverse l'eau, elle passe par le gué / le pont
+      const way = crossesWater(best, b) ? (route(best, b) || [b]) : [b];
+      ctx.moveTo(best.x, best.y + 3);
+      for (const q of way) ctx.lineTo(q.x, q.y + 3);
     });
     ctx.stroke();
     if (modern) {
       ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1; ctx.setLineDash([4, 5]); ctx.stroke(); ctx.setLineDash([]);
     }
-    // ponts
-    if (state.era >= 2) {
-      for (const idx of [Math.floor(RIVER.length * 0.48), Math.floor(RIVER.length * 0.7)]) {
-        const p = RIVER[idx];
-        rect(ctx, p[0] - 16, p[1] - 3, 32, 6, modern ? '#8a8f96' : '#9b7a4f');
+    // gués (pierres de passage), puis ponts à partir du Moyen Âge
+    for (const c of CROSSINGS) {
+      const ends = Object.values(c.ends);
+      if (ends.length < 2) continue;
+      const [P, Q] = ends;
+      if (state.era >= 2) {
+        ctx.strokeStyle = modern ? '#8a8f96' : '#9b7a4f'; ctx.lineWidth = 7; ctx.lineCap = 'butt';
+        ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(Q.x, Q.y); ctx.stroke();
+        ctx.strokeStyle = modern ? '#5d6168' : '#6b4a2a'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(P.x, P.y - 3.5); ctx.lineTo(Q.x, Q.y - 3.5); ctx.moveTo(P.x, P.y + 3.5); ctx.lineTo(Q.x, Q.y + 3.5); ctx.stroke();
+        ctx.lineCap = 'round';
+      } else {
+        ctx.strokeStyle = 'rgba(214, 196, 140, .75)'; ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(Q.x, Q.y); ctx.stroke();
+        for (let k = 0; k <= 7; k++) { const t = k / 7; ell(ctx, P.x + (Q.x - P.x) * t, P.y + (Q.y - P.y) * t, 3.6, 2.8, '#8f949a'); ell(ctx, P.x + (Q.x - P.x) * t - 0.8, P.y + (Q.y - P.y) * t - 0.8, 1.6, 1.2, '#c3c7cb'); }
       }
     }
   }
@@ -616,6 +684,7 @@
         const used = new Set();
         for (const b of s.buildings) {
           if (!Engine.B[b.id] || !Engine.B[b.id].arch) continue;   // améliorations : rien à dessiner
+          if (Engine.B[b.id].arch === 'port') { const q = portSpot(); b.slot = 'port'; b.x = q.x; b.y = q.y; continue; }
           if (b.slot == null || used.has(b.slot) || !slots[b.slot] || !!slots[b.slot].edge !== isEdge(b)) b.slot = nextSlot(used, isEdge(b));
           used.add(b.slot);
           b.x = slots[b.slot].x; b.y = slots[b.slot].y;
@@ -631,8 +700,20 @@
       return 0;
     }
     const isEdge = (b) => !!EDGE[Engine.B[b.id].arch];
+    function portSpot() {
+      const o = SITES[state.site];
+      let best = null, bd = 1e9;
+      for (let a = 0; a < Math.PI * 2; a += 0.04) {
+        const x = LAKE.x + Math.cos(a) * LAKE.rx * 1.12, y = LAKE.y + Math.sin(a) * LAKE.ry * 1.12;
+        if (riverDist(x, y) < 45 || vnorm(x, y) > 0.93) continue;
+        const d = Math.hypot(x - o.x, y - o.y);
+        if (d < bd) { bd = d; best = { x, y }; }
+      }
+      return best || { x: LAKE.x, y: LAKE.y - LAKE.ry * 1.12 };
+    }
     function place(b) {
       if (!Engine.B[b.id].arch) return b;
+      if (Engine.B[b.id].arch === 'port') { const q = portSpot(); b.slot = 'port'; b.x = q.x; b.y = q.y; dirty = true; autoCamera(); return b; }
       const used = new Set(state.buildings.filter((x) => x !== b && x.slot != null && Engine.B[x.id].arch).map((x) => x.slot));
       b.slot = nextSlot(used, isEdge(b));
       b.x = slots[b.slot].x; b.y = slots[b.slot].y;
@@ -760,7 +841,7 @@
         if (v && v.hue != null) p.c = `hsl(${v.hue},65%,58%)`;
         p.lumber = !!PICK[p.job];
         p.pick = PICK[p.job] || pick;
-        if (p.job !== was) { const n = p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 400; }
+        if (p.job !== was) { goTo(p, p.pick()); p.wait = Math.random() * 400; }
       });
       // en temps de paix, une partie de l'armée part chasser
       if (state.army && state.day >= (state.warUntil || 0)) {
@@ -774,13 +855,21 @@
         }
       }
     }
+    // choisir une destination atteignable à pied (sinon on reste sur place)
+    function goTo(p, n) {
+      if (!n || vnorm(n.x, n.y) > (p.lumber ? 1.02 : 0.9)) return false;
+      const r = route(p, n);
+      if (!r) return false;
+      const q = r.shift(); p.tx = q.x; p.ty = q.y; p.path = r;
+      return true;
+    }
     function updatePeople(dt) {
       for (const p of people) {
         if (p.wait > 0) { p.wait -= dt; continue; }
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
         if (d < 1) {
-          const n = night && p.home ? p.home() : p.pick();
-          if (!isWater(n.x, n.y, 2) && vnorm(n.x, n.y) < (p.lumber ? 1.02 : 0.9)) { p.tx = n.x; p.ty = n.y; }
+          if (p.path && p.path.length) { const q = p.path.shift(); p.tx = q.x; p.ty = q.y; continue; }
+          goTo(p, night && p.home ? p.home() : p.pick());
           p.wait = (p.lumber ? 1200 : 500) + Math.random() * 3500;
           continue;
         }
@@ -876,6 +965,24 @@
       });
     }
 
+    /* --- bateaux de commerce (quand il y a un port) --- */
+    function drawBoats(t) {
+      if (!state || !state.site || !state.buildings.some((b) => b.id === 'port' && b.x != null)) return;
+      const n = Math.min(3, 1 + (state.era || 0));
+      for (let i = 0; i < n; i++) {
+        const a = t * 0.00012 * (i % 2 ? -1 : 1) + i * 2.1;
+        const x = LAKE.x + Math.cos(a) * LAKE.rx * (0.55 - i * 0.12), y = LAKE.y + Math.sin(a) * LAKE.ry * (0.55 - i * 0.12);
+        const dir = (i % 2 ? -1 : 1) * (Math.sin(a) > 0 ? -1 : 1);
+        ell(ctx, x + 2, y + 2, 8, 2.4, 'rgba(0,30,60,.25)');
+        ctx.fillStyle = '#6b4a2a'; ctx.beginPath(); ctx.moveTo(x - 8, y - 2); ctx.lineTo(x + 8, y - 2); ctx.lineTo(x + 5, y + 2); ctx.lineTo(x - 5, y + 2); ctx.fill();
+        rect(ctx, x - 0.6, y - 14, 1.2, 12, '#4a3220');
+        ctx.fillStyle = state.era >= 3 ? '#f4efe2' : '#e9d8b4';
+        ctx.beginPath(); ctx.moveTo(x, y - 13); ctx.lineTo(x + 7 * dir, y - 4); ctx.lineTo(x, y - 4); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(x - 10 * dir, y + 1); ctx.lineTo(x - 16 * dir, y + 1.5); ctx.stroke();
+      }
+    }
+
     /* --- drapeau planté au point de fondation --- */
     function drawFlag(t) {
       if (!state || !state.site) return;
@@ -961,6 +1068,7 @@
       }
       for (const sm of smoke) ell(ctx, sm.x, sm.y, sm.r, sm.r, `rgba(90,90,95,${sm.a})`);
       drawTroops(t);
+      drawBoats(t);
       if (light < 1) {
         const dark = 1 - light;
         ctx.fillStyle = `rgba(12, 20, 55, ${dark * 0.62})`;
@@ -1042,12 +1150,12 @@
         light = v;
         if (isNight !== night) {
           night = isNight;
-          for (const p of people) { const n = night && p.home ? p.home() : p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 600; }
+          for (const p of people) { p.path = []; goTo(p, night && p.home ? p.home() : p.pick()); p.wait = Math.random() * 600; }
         }
       },
       SITES,
     };
   }
 
-  root.ValleyMap = { create, SITES, W, H };
+  root.ValleyMap = { create, SITES, W, H, CROSSINGS };
 })(window);

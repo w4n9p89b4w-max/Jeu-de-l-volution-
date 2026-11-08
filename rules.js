@@ -74,13 +74,16 @@
       <li><b>Agriculture</b> : avec la découverte de l'Agriculture apparaît le métier <b>🌾 Agriculteur</b> (3,5 🍖 par jour). Puis 🔬 champ de blé → charrue (+50 %) → moulin → irrigation (+50 %) → grande ferme → ferme mécanisée → ferme verticale.</li>
       <li><b>Maisons</b> : hutte (dès le début) → 🔬 maison en pierre → colombages → hôtel particulier → immeuble → gratte-ciel.</li>
       <li><b>Pierre</b> : 🔬 carrière (après les outils en pierre), leviers et cordes (+50 %), atelier de tailleurs.</li>
-      <li><b>Bois</b> : 🔬 haches en silex (+50 %), puis scierie.</li></ul>
+      <li><b>Bois</b> : 🔬 haches en silex (+50 %), puis scierie.</li>
+      <li><b>Commerce</b> (Antiquité) : 🔬 ⚓ <b>port</b> sur la rive du lac : +6 💰 par jour, les marchands rapportent 50 % de plus, et des bateaux de commerce naviguent sur le lac.</li></ul>
       <h4>📈 La pratique rend la recherche 2 fois moins chère</h4>
       <p>À force de pratiquer, vos villageois prennent de l'expérience : la recherche correspondante coûte alors <b>−50 %</b> (c'est indiqué dans 🔬 Recherche). Un message vous prévient la nuit.</p>
       <table><tr><th>Recherche</th><th>−50 % quand…</th><th>Effet</th><th>Prix pour construire</th></tr>
       ${E.STEPS.filter((st) => !/^w\d/.test(st.key)).map((st) => { const b = E.B[st.b]; return `<tr><td>${b.icon} <b>${b.name}</b></td><td>${st.hint}</td><td>${b.upgrade ? '+50 %' : st.b === 'appats' ? '+50 % chasseurs' : fmtEff(b.eff)}</td><td>${fmtCost(b.cost)}</td></tr>`; }).join('')}
       </table>
-      <p>Carrières et mines s'installent au pied des montagnes.</p>`));
+      <p>Carrières et mines s'installent au pied des montagnes.</p>
+      <h4>🌊 La rivière et le lac</h4>
+      <p>Les villageois ne marchent pas dans l'eau. Pour passer d'une rive à l'autre, ils empruntent les <b>gués</b> (pierres de passage), remplacés par des <b>ponts</b> à partir du Moyen Âge.</p>`));
 
     const J = E.JB;
     parts.push(sec('villageois', '👷 Les villageois et leurs tâches', `
