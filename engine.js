@@ -35,7 +35,7 @@
     { id: 'appats', era: 0, name: 'Appâts et pièges', icon: '🪤', arch: 'traps', cost: { wood: 6 }, eff: {}, unlock: 'appats', unique: true, desc: 'Des pièges et des appâts en forêt : les chasseurs rapportent 50 % de plus.' },
     { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 8 }, eff: { food: 4 }, unlock: 'camp', desc: 'Les chasseurs ramènent du gibier.' },
     { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Une vraie carrière : bien plus efficace que ramasser des cailloux.' },
-    { id: 'principal', era: 0, name: 'Grande hutte du clan', icon: '🛖', arch: 'main', cost: { wood: 8 }, eff: {}, unique: true, desc: 'Le bâtiment principal : sans lui, personne ne peut recevoir de tâche. Il s\'agrandit à chaque ère.' },
+    { id: 'principal', era: 0, name: 'Grande hutte du clan', icon: '🛖', arch: 'main', cost: { wood: 8 }, eff: {}, unique: true, desc: 'La Maison commune : sans elle, personne ne peut recevoir de tâche. Elle s\'agrandit à chaque ère.' },
     { id: 'centre', era: 0, name: 'Centre de recherche', icon: '🔬', arch: 'research', cost: { wood: 10, stone: 4 }, eff: { sci: 1 }, unique: true, desc: 'Un lieu où les savants observent et réfléchissent. Indispensable pour faire avancer la recherche.' },
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
@@ -216,7 +216,7 @@
     for (const key in eff) t[key] = (t[key] || 0) + eff[key] * (k == null ? 1 : k);
   }
 
-  /* ---------- Le bâtiment principal ----------
+  /* ---------- La Maison commune (bâtiment principal) ----------
      Il faut le construire avant de donner des tâches. Son niveau (un par ère)
      fixe combien de villageois peuvent travailler en même temps. */
   const MAIN = [
@@ -606,7 +606,7 @@
     }
     pairs.sort((a, b) => b.k - a.k);
     const done = new Set();
-    let room = maxWorkers(s);                 // limite du bâtiment principal
+    let room = maxWorkers(s);                 // limite de la Maison commune
     for (const p of pairs) {
       if (room <= 0) break;
       if (done.has(p.v.id) || left[p.j] <= 0) continue;
@@ -728,7 +728,7 @@
       }
       if (canUpgradeMain(s)) {
         const L = mainLevel(s), nx = MAIN[L + 1];
-        out.push({ id: 'main_up', icon: nx.icon, name: `Agrandir le bâtiment principal : ${nx.name}`, desc: `${MAIN[L].name} → ${nx.name}. Plus de villageois peuvent travailler en même temps.`, cost: fmtCost(nx.cost), eff: '', can: canPay(s, nx.cost), why: whyNot(s, nx.cost), era: s.era });
+        out.push({ id: 'main_up', icon: nx.icon, name: `Agrandir la Maison commune : ${nx.name}`, desc: `${MAIN[L].name} → ${nx.name}. Plus de villageois peuvent travailler en même temps.`, cost: fmtCost(nx.cost), eff: '', can: canPay(s, nx.cost), why: whyNot(s, nx.cost), era: s.era });
       }
       out.sort((a, b) => (b.id === 'main_up') - (a.id === 'main_up') || (b.id === 'principal') - (a.id === 'principal') || (b.id === 'fusee') - (a.id === 'fusee') || b.era - a.era);
     } else if (cat === 'law') {
@@ -854,8 +854,8 @@
       if (!canPay(s, nx.cost)) return { ok: false };
       pay(s, nx.cost);
       s.mainLevel = mainLevel(s) + 1;
-      log(s, `${nx.icon} Bâtiment principal agrandi : ${nx.name}`);
-      return { ok: true, upgraded: true, title: nx.name, text: `Le bâtiment principal devient : ${nx.name}. Jusqu'à ${nx.workers > 9999 ? 'tous les' : nx.workers} villageois peuvent travailler.`, icon: nx.icon, good: true };
+      log(s, `${nx.icon} Maison commune agrandie : ${nx.name}`);
+      return { ok: true, upgraded: true, title: nx.name, text: `La Maison commune devient : ${nx.name}. Jusqu'à ${nx.workers > 9999 ? 'tous les' : nx.workers} villageois peuvent travailler.`, icon: nx.icon, good: true };
     }
     if (cat === 'build') {
       const b = B[id];

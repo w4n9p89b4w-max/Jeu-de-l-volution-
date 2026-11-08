@@ -341,7 +341,7 @@
     }
     updateHUD();
     if (r.upgraded) { map.redraw(); caption(`${r.icon} ${r.title.toUpperCase()}<small>Plus de villageois peuvent travailler</small>`, 2600); }
-    else if (r.built && r.built.id === 'principal') caption('🛖 BÂTIMENT PRINCIPAL <em>CONSTRUIT</em> !<small>Vos villageois peuvent travailler : 👷 Villageois</small>', 3200);
+    else if (r.built && r.built.id === 'principal') caption('🛖 MAISON COMMUNE <em>CONSTRUITE</em> !<small>Vos villageois peuvent travailler : 👷 Villageois</small>', 3200);
     else if (r.built && r.built.id === 'centre') caption('🔬 CENTRE DE RECHERCHE <em>CONSTRUIT</em> !<small>Envoyez un savant y travailler : 👷 Villageois</small>', 3200);
     else caption(`${r.icon} ${r.title}`, 1500);
 
@@ -473,7 +473,7 @@
     const e = E.ERAS[i];
     caption(`NOUVELLE ÈRE<br><em>${e.name}</em>`, 2200);
     await wait(1600);
-    await modal({ icon: '⏳', title: e.name, html: `<div class="era-art">${ERA_ART[i]}</div><p>${e.intro}</p><p>De nouvelles recherches, lois et unités sont disponibles !</p><p><b>⬆️ Pensez à agrandir le bâtiment principal</b> (🏠 Constructions) pour que plus de villageois puissent travailler.</p>`, good: true, buttons: [{ label: 'En avant !', value: true, primary: true }] });
+    await modal({ icon: '⏳', title: e.name, html: `<div class="era-art">${ERA_ART[i]}</div><p>${e.intro}</p><p>De nouvelles recherches, lois et unités sont disponibles !</p><p><b>⬆️ Pensez à agrandir la Maison commune</b> (🏠 Constructions) pour que plus de villageois puissent travailler.</p>`, good: true, buttons: [{ label: 'En avant !', value: true, primary: true }] });
     updateHUD();
   }
 
@@ -553,11 +553,11 @@
     }).join('');
     const L = E.mainLevel(state);
     const head = !E.hasMain(state)
-      ? `<div class="rq nocentre"><b>🛖 Construisez d'abord le bâtiment principal</b><p class="rqe">Sans lui, personne ne peut recevoir de tâche : il organise le travail du village. Il s'agrandit ensuite à chaque ère.</p>
+      ? `<div class="rq nocentre"><b>🛖 Construisez d'abord la Maison commune</b><p class="rqe">Sans elle, personne ne peut recevoir de tâche : elle organise le travail du village. Elle s'agrandit ensuite à chaque ère.</p>
          <button class="btn primary" id="bMain"${state.chosen ? ' disabled' : ''}>🛖 Construire la Grande hutte du clan (${E.B.principal.cost.wood} 🪵)${state.chosen ? ' — demain' : ''}</button></div>`
-      : `<div class="mainbar">${E.MAIN[L].icon} <b>${E.MAIN[L].name}</b> · 👷 ${working}/${maxW > 9999 ? '∞' : maxW} au travail${E.canUpgradeMain(state) ? ' · <span class="up">⬆️ peut être agrandi (🏠 Constructions)</span>' : ''}</div>`;
+      : `<div class="mainbar">${E.MAIN[L].icon} <b>${E.MAIN[L].name}</b> · 👷 ${working}/${maxW > 9999 ? '∞' : maxW} au travail${E.canUpgradeMain(state) ? ' · <span class="up">⬆️ peut être agrandie (🏠 Constructions)</span>' : ''}</div>`;
     $('peopleBody').innerHTML = head + `
-      <div class="jrow idle${idle ? ' has' : ''}"><span class="ti">🏡</span><div class="tname"><b>Au village, sans tâche</b><small>${!E.hasMain(state) ? 'Il faut d\'abord le bâtiment principal' : idle && working >= maxW ? 'Bâtiment principal plein : agrandissez-le' : idle ? 'Prêts à être envoyés au travail' : 'Tout le monde travaille'}</small></div><b class="idleN">${idle}</b></div>
+      <div class="jrow idle${idle ? ' has' : ''}"><span class="ti">🏡</span><div class="tname"><b>Au village, sans tâche</b><small>${!E.hasMain(state) ? 'Il faut d\'abord la Maison commune' : idle && working >= maxW ? 'Maison commune pleine : agrandissez-la' : idle ? 'Prêts à être envoyés au travail' : 'Tout le monde travaille'}</small></div><b class="idleN">${idle}</b></div>
       ${rows}
       <p class="phelp">Le jeu envoie d'abord ceux qui <b>préfèrent</b> la tâche (onglet ⭐), puis <b>les plus forts</b>.</p>
       <button class="small" id="bAuto">✨ Répartir comme le conseille le jeu</button>`;
@@ -775,7 +775,7 @@
       save();
       caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('CONSTRUISEZ LE <em>BÂTIMENT PRINCIPAL</em> 🛖<small>Sans lui, personne ne peut travailler · 🏠 Constructions</small>', 3600);
+      if (!busy) caption('CONSTRUISEZ LA <em>MAISON COMMUNE</em> 🛖<small>Sans elle, personne ne peut travailler · 🏠 Constructions</small>', 3600);
     };
   });
 
