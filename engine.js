@@ -169,7 +169,7 @@
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
       day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, troops: [], fort: 0, peaceUntil: 0,
-      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [], centreChecked: true, mainChecked: true, mainLevel: 0,
+      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [], centreChecked: true, mainChecked: true, mainLevel: 0, tuto: 0,
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
     };
@@ -865,7 +865,7 @@
       pay(s, c);
       const inst = { id: b.id, day: s.day };
       s.buildings.push(inst);
-      if (b.id === 'principal') autoAssign(s);   // tout le monde peut enfin travailler
+      if (b.id === 'principal' && s.tuto == null) autoAssign(s);   // (pendant le tutoriel, c'est le joueur qui répartit)
       s.stats.built++;
       log(s, `${b.icon} Construction : ${b.name}`);
       if (b.id === 'fusee') {

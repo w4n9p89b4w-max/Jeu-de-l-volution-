@@ -6,6 +6,8 @@ Un petit jeu de gestion jouable dans le navigateur (pensé pour le téléphone, 
 
 ## Déroulement
 
+Une nouvelle partie commence par un **tutoriel obligatoire** en 3 étapes (le temps est arrêté) : construire la Maison commune, envoyer des villageois travailler (1 chasseur, 1 bûcheron, 1 aux pierres), puis lancer le temps.
+
 1. **Nom et drapeau** : donnez un nom à votre pays et dessinez son drapeau (motif, couleurs, symbole).
 2. **Premier choix : où fonde-t-on le pays ?**
    - **A — au bord de la rivière** : de l'eau et des terres fertiles (+25 % de nourriture).

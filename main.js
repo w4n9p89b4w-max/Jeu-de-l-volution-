@@ -143,6 +143,50 @@
   const fmt = (n) => n >= 10000 ? (n / 1000).toFixed(1).replace('.0', '') + 'k' : String(n);
   const short = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace('.', ',') + 'k' : String(n));
   let lastPop = 0;
+  /* ---------- Tutoriel obligatoire du début ----------
+     0 : construire la Maison commune · 1 : envoyer des villageois travailler · 2 : lancer le temps */
+  function tutoUpdate() {
+    const box = $('tuto'), app = $('app');
+    if (!state || state.tuto == null || !state.site || !$('found').classList.contains('hidden')) { box.hidden = true; delete app.dataset.tuto; return; }
+    const c = E.forecast(state).jobs.count;
+    if (state.tuto === 0 && E.hasMain(state)) state.tuto = 1;
+    const checks = [['hunt', '🏹 1 chasseur', 'pour la nourriture'], ['wood', '🌲 1 bûcheron', 'pour le bois'], ['stone', '🪨 1 villageois aux pierres', 'pour la pierre']];
+    if (state.tuto === 1 && checks.every(([j]) => c[j] >= 1)) state.tuto = 2;
+    app.dataset.tuto = state.tuto;
+    const peopleOpen = !$('people').hidden, sheetOpen = $('sheet').classList.contains('open');
+    box.classList.toggle('bottom', peopleOpen);
+    let step = '', text = '', list = '', btn = false;
+    if (state.tuto === 0) {
+      step = 'Étape 1 / 3 · La Maison commune';
+      text = sheetOpen
+        ? '👉 Touchez <b>« Grande hutte du clan »</b> pour la construire (8 🪵).'
+        : `👋 Bienvenue, chef de <b>${escapeHtml(state.name)}</b> ! Votre peuple n'a encore rien. Il lui faut d'abord une <b>Maison commune</b> : c'est elle qui organise le travail.<br>👉 Touchez <b>🏠 Constructions</b>.`;
+    } else if (state.tuto === 1) {
+      step = 'Étape 2 / 3 · Au travail !';
+      text = peopleOpen
+        ? '👉 Appuyez sur <b>+</b> pour envoyer vos villageois :'
+        : 'Bravo, la Maison commune est construite ! Maintenant, il faut <b>envoyer les villageois travailler</b>.<br>👉 Touchez <b>👷 Villageois</b>.';
+      if (peopleOpen) list = checks.map(([j, label, why]) => `<div class="tck${c[j] >= 1 ? ' ok' : ''}">${c[j] >= 1 ? '✅' : '⬜'} ${label} <small>${why}</small></div>`).join('');
+    } else {
+      step = 'Étape 3 / 3 · Le temps passe';
+      if (peopleOpen) text = '✅ Parfait, vos villageois vont travailler ! Vous pouvez en envoyer d\'autres, puis fermez cet écran avec <b>✕</b>.';
+      else {
+        text = `⏱️ <b>Chaque jour dure 40 secondes.</b> Pendant la journée, vous faites <b>un seul choix</b> : aujourd'hui, c'était la Maison commune.<br>
+          🔬 Demain, construisez le <b>Centre de recherche</b> pour débloquer de nouvelles constructions.<br>⏸️ met le jeu en pause, ×2 / ×4 accélère. Les règles sont dans ☰ Menu.`;
+        btn = true;
+      }
+    }
+    $('tutoStep').textContent = step;
+    $('tutoText').innerHTML = text;
+    $('tutoList').innerHTML = list;
+    $('tutoBtn').hidden = !btn;
+    box.hidden = false;
+  }
+  $('tutoBtn').onclick = () => {
+    state.tuto = null; save(); tutoUpdate(); updateClock();
+    caption('À VOUS DE <em>JOUER</em> !', 1800);
+  };
+
   function updateHUD() {
     if (!state) return;
     const f = E.forecast(state);
@@ -164,6 +208,7 @@
       `<span class="rc${state.pop >= f.cap ? ' warn' : ''}">🏠<b>${fmt(state.pop)}/${fmt(f.cap)}</b></span>`,
     ]).join('');
     $('enemyBox').innerHTML = enemyChip();
+    tutoUpdate();
     // pastilles : nombre de choix possibles
     document.querySelectorAll('.tile').forEach((t) => {
       if (t.dataset.cat === 'tech') {
@@ -241,6 +286,7 @@
     for (const o of opts) {
       const bt = document.createElement('button');
       bt.className = 'opt' + (o.can ? '' : ' off');
+      bt.dataset.id = o.id;
       const isNew = o.era != null && o.era === state.era && state.era > 0 && cat !== 'tech';
       bt.innerHTML = `<span class="oi">${o.icon}</span><span class="ot"><b>${o.name}${isNew ? '<span class="new">NOUVEAU</span>' : ''}</b><p>${o.desc}</p>
         <span class="bm plus">${o.plus.join(' · ') || '—'}</span><span class="bm minus">${o.minus.join(' · ') || 'Aucun malus'}</span>${o.can ? '' : `<span class="why">${o.why}</span>`}</span>`;
@@ -256,8 +302,9 @@
     }
     $('sheet').classList.add('open');
     $('toast').classList.remove('show');
+    tutoUpdate();
   }
-  function closeSheet() { $('sheet').classList.remove('open'); }
+  function closeSheet() { $('sheet').classList.remove('open'); if (state) tutoUpdate(); }
 
   /* ---------- 🔬 La recherche (ne compte pas comme le choix du jour) ---------- */
   const KIND = { disc: ['⏳', 'Découvertes de l\'ère'], build: ['🏠', 'Constructions'], upgrade: ['📈', 'Améliorations du travail'], weapon: ['🗡️', 'Armes'] };
@@ -371,7 +418,7 @@
   let speed = 1, paused = false, lastTick = performance.now();
   const secondsLeft = () => Math.max(0, Math.ceil((DAY_MS - (state.dayTime || 0)) / 1000 / speed));
   // le temps s'arrête quand une fenêtre ou un écran est ouvert
-  const blocked = () => !state || !state.site || busy || state.won || state.lost
+  const blocked = () => !state || !state.site || busy || state.won || state.lost || state.tuto != null
     || !$('modal').classList.contains('hidden') || !$('rules').hidden || !$('people').hidden
     || !$('hud').offsetParent || document.hidden;
   function updateClock() {
@@ -515,7 +562,7 @@
     $('people').hidden = false;
     renderPeople();
   }
-  function closePeople() { $('people').hidden = true; save(); map.syncPeople(); updateHUD(); }
+  function closePeople() { $('people').hidden = true; save(); map.syncPeople(); updateHUD(); tutoUpdate(); }
   /* Deux onglets : « Combien par tâche » (quotas) et « Préférences » */
   let peopleTab = 'jobs';
   const PREF_TXT = ['Jamais', 'Basse', 'Normale', 'Haute'];
@@ -528,6 +575,7 @@
     $('tabJobs').setAttribute('aria-selected', peopleTab === 'jobs');
     $('tabPrefs').setAttribute('aria-selected', peopleTab === 'prefs');
     if (peopleTab === 'jobs') renderJobs(); else renderPrefs();
+    tutoUpdate();
   }
   $('tabJobs').onclick = () => { peopleTab = 'jobs'; renderPeople(); };
   $('tabPrefs').onclick = () => { peopleTab = 'prefs'; renderPeople(); };
@@ -775,7 +823,7 @@
       save();
       caption(`AUJOURD'HUI VOUS ÊTES <em>${state.pop}</em>…<small>Chaque jour, faites un choix pour faire évoluer ${escapeHtml(state.name)}</small>`, 3200);
       await wait(3400);
-      if (!busy) caption('CONSTRUISEZ LA <em>MAISON COMMUNE</em> 🛖<small>Sans elle, personne ne peut travailler · 🏠 Constructions</small>', 3600);
+      tutoUpdate();
     };
   });
 
