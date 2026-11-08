@@ -32,6 +32,7 @@
       <ol><li><b>Un jour dure 60 secondes</b> (à vitesse ×1). La barre sous « JOUR » se remplit et un compte à rebours s'affiche en haut. <b>Les ressources arrivent petit à petit pendant la journée</b> : la nourriture est aussi mangée au fil du temps.</li>
       <li>Pendant la journée, vous faites <b>un seul choix</b> dans les 4 cases : <b>🏠 Constructions</b>, <b>📜 Lois</b>, <b>⚔️ Guerres</b> (ou <b>😴 Repos</b>, +4 😊). La 4e case, <b>🔬 Recherche</b>, ne compte pas : vous pouvez y choisir vos recherches à tout moment. Chaque choix affiche son <span class="g">bonus</span> en vert et son <span class="b">malus</span> en rouge. Une fois le choix fait, les cases se grisent jusqu'au lendemain.</li>
       <li>Si vous ne choisissez rien, la journée passe quand même.</li>
+      <li><b>Puis vient la nuit, 35 secondes</b> (1,7 fois moins longue que le jour) : la vallée s'assombrit, les maisons s'éclairent, les villageois rentrent dormir. <b>Pas de travail ni de choix la nuit</b>, mais vous pouvez régler vos villageois et vos recherches. Le compteur affiche ☀️ le jour et 🌙 la nuit.</li>
       <li>À la fin du temps, la nuit tombe : production, consommation, croissance, puis parfois un événement.</li></ol>
       <p><b>⏸️</b> met le jeu en pause, <b>×1 / ×2 / ×4</b> accélère le temps. Le temps s'arrête tout seul quand une fenêtre est ouverte (villageois, règles, événement…). Donner des tâches aux villageois ne compte pas comme le choix du jour.</p>`));
 

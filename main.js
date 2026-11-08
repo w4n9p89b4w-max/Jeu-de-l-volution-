@@ -171,7 +171,7 @@
       step = 'Étape 3 / 3 · Le temps passe';
       if (peopleOpen) text = '✅ Parfait, vos villageois vont travailler ! Vous pouvez en envoyer d\'autres, puis fermez cet écran avec <b>✕</b>.';
       else {
-        text = `⏱️ <b>Chaque jour dure 60 secondes.</b> Vos villageois récoltent en continu : regardez vos ressources monter en haut de l'écran. Pendant la journée, vous faites <b>un seul choix</b> : aujourd'hui, c'était la Maison commune.<br>
+        text = `⏱️ <b>Chaque jour dure 60 secondes, puis la nuit 35 secondes.</b> Vos villageois récoltent en continu : regardez vos ressources monter en haut de l'écran. Pendant la journée, vous faites <b>un seul choix</b> : aujourd'hui, c'était la Maison commune.<br>
           🔬 Demain, construisez le <b>Centre de recherche</b> pour débloquer de nouvelles constructions.<br>⏸️ met le jeu en pause, ×2 / ×4 accélère. Les règles sont dans ☰ Menu.`;
         btn = true;
       }
@@ -269,6 +269,7 @@
   function openSheet(cat) {
     if (busy || !state) return;
     if (cat === 'tech') { openResearch(); return; }
+    if (isNight()) { toast(`🌙 La nuit, tout le monde dort : revenez à l'aube (dans ${secondsLeft()} s)`); return; }
     if (state.chosen) { toast(`Choix du jour déjà fait. Prochain jour dans ${secondsLeft()} s`); return; }
     const c = CAT[cat];
     $('sheetTitle').textContent = c.title;
@@ -376,6 +377,7 @@
   /* ---------- Le choix du jour ---------- */
   async function choisir(cat, id) {
     if (busy) return;
+    if (isNight()) { toast(`C'est la nuit : revenez à l'aube (dans ${secondsLeft()} s)`); return; }
     if (state.chosen) { toast(`Choix du jour déjà fait. Prochain jour dans ${secondsLeft()} s`); return; }
     const r = E.act(state, cat, id);
     if (!r.ok) return;
@@ -416,24 +418,41 @@
   const DAY_MS = 60000;                 // 60 secondes par jour à vitesse ×1
   const SPEEDS = [1, 2, 4];
   let speed = 1, paused = false, lastTick = performance.now(), lastHud = 0;
-  const secondsLeft = () => Math.max(0, Math.ceil((DAY_MS - (state.dayTime || 0)) / 1000 / speed));
+  const NIGHT_MS = Math.round(DAY_MS / 1.7);   // la nuit dure 1,7 fois moins longtemps que le jour (≈ 35 s)
+  const isNight = () => state && (state.dayTime || 0) >= DAY_MS;
+  // secondes avant l'aube (prochain jour)
+  const secondsLeft = () => Math.max(0, Math.ceil((DAY_MS + NIGHT_MS - (state.dayTime || 0)) / 1000 / speed));
+  const secondsPhase = () => Math.max(0, Math.ceil(((isNight() ? DAY_MS + NIGHT_MS : DAY_MS) - (state.dayTime || 0)) / 1000 / speed));
+  // lumière : aube et crépuscule progressifs
+  function lightLevel() {
+    const t = state ? state.dayTime || 0 : 0;
+    if (t >= DAY_MS) return 0.15;
+    if (t < 4000) return 0.15 + 0.85 * (t / 4000);
+    if (t > DAY_MS - 6000) return 0.15 + 0.85 * ((DAY_MS - t) / 6000);
+    return 1;
+  }
   // le temps s'arrête quand une fenêtre ou un écran est ouvert
   const blocked = () => !state || !state.site || busy || state.won || state.lost || state.tuto != null
     || !$('modal').classList.contains('hidden') || !$('rules').hidden || !$('people').hidden
     || !$('hud').offsetParent || document.hidden;
   function updateClock() {
     if (!state) return;
-    const k = Math.min(1, (state.dayTime || 0) / DAY_MS);
+    const night = isNight();
+    const k = night ? Math.min(1, ((state.dayTime || 0) - DAY_MS) / NIGHT_MS) : Math.min(1, (state.dayTime || 0) / DAY_MS);
     $('dayBar').style.width = `${k * 100}%`;
+    document.querySelector('.tb-day').classList.toggle('night', night);
+    $('app').classList.toggle('is-night', night);
+    map.setLight(lightLevel(), night);
     $('bPause').textContent = paused ? '▶️' : '⏸️';
     $('bPause').setAttribute('aria-label', paused ? 'Reprendre' : 'Pause');
     $('bSpeed').textContent = `×${speed}`;
     const stopped = paused || blocked();
-    $('clockTxt').textContent = paused ? 'En pause' : `${secondsLeft()} s`;
+    $('clockTxt').textContent = paused ? 'En pause' : `${night ? '🌙' : '☀️'} ${secondsPhase()} s`;
     $('clock').classList.toggle('stopped', stopped);
     $('dock').classList.toggle('done', !!state.chosen);
-    $('dockTitle').hidden = !state.chosen;
-    if (state.chosen) $('dockTitle').innerHTML = `✔ Choix du jour fait · prochain jour dans ${secondsLeft()} s`;
+    $('dockTitle').hidden = !state.chosen && !night;
+    if (night) $('dockTitle').innerHTML = `🌙 C'est la nuit, tout le monde dort · le jour se lève dans ${secondsLeft()} s`;
+    else if (state.chosen) $('dockTitle').innerHTML = `✔ Choix du jour fait · prochain jour dans ${secondsLeft()} s`;
   }
   setInterval(() => {
     const now = performance.now(), dt = Math.min(500, now - lastTick);
@@ -442,9 +461,15 @@
     // les ressources arrivent petit à petit pendant la journée
     const step = Math.min(dt * speed, Math.max(0, DAY_MS - (state.dayTime || 0)));
     E.accrue(state, step / DAY_MS);
+    const wasNight = isNight();
     state.dayTime = (state.dayTime || 0) + dt * speed;
     if (now - lastHud > 1000) { lastHud = now; updateHUD(); }
-    if (state.dayTime >= DAY_MS) {
+    if (!wasNight && isNight()) {           // le crépuscule
+      closeSheet();
+      caption('🌙 LA NUIT <em>TOMBE</em><small>Les villageois rentrent dormir · le travail reprend à l\'aube</small>', 2600);
+      map.syncPeople();
+    }
+    if (state.dayTime >= DAY_MS + NIGHT_MS) {
       busy = true; $('dock').classList.add('busy');
       closeSheet();
       endOfDay().finally(() => { busy = false; $('dock').classList.remove('busy'); updateClock(); });
@@ -456,14 +481,14 @@
 
   async function endOfDay() {
     hideCaption();
-    $('night').classList.add('on');
-    $('nightText').textContent = `JOUR ${state.day + 1}`;
-    await wait(900);
+    $('nightText').textContent = `☀️ JOUR ${state.day + 1}`;
+    $('night').classList.add('on', 'dawn');
+    await wait(700);
     const rep = E.endDay(state, undefined, { accrued: true });
     state.chosen = false; state.dayTime = 0;
     map.syncPeople();
     map.redraw();
-    $('night').classList.remove('on');
+    $('night').classList.remove('on', 'dawn');
     updateHUD();
     const d = rep.delta;
     const pd = rep.popDelta;
@@ -503,7 +528,7 @@
     if (f.food < 0) caption('ATTENTION : <em>FAMINE</em> EN VUE !<small>Construisez de quoi manger</small>', 2600);
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
-    else if (state.day === 2) caption('UN JOUR DURE <em>60 SECONDES</em><small>Un seul choix par jour · ⏸️ et ×2 / ×4 en haut à gauche</small>', 3000);
+    else if (state.day === 2) caption('JOUR <em>60 S</em> · NUIT <em>35 S</em><small>Un seul choix par jour, et la nuit tout le monde dort · ⏸️ et ×2 / ×4 en haut</small>', 3200);
     else if (state.day === 3 && !E.hasCentre(state)) caption('CONSTRUISEZ LE <em>CENTRE DE RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 3000);
     else if (state.day === 5 && E.hasCentre(state)) caption('CHOISISSEZ UNE <em>RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 2600);
   }

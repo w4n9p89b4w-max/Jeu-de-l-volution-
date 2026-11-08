@@ -461,3 +461,11 @@ em { font-style: normal; color: var(--yellow); }
 #app[data-tuto] #tabPrefs, #app[data-tuto] #bAuto { pointer-events: none; opacity: .4; }
 #app[data-tuto="1"] .jrow:not(.locked) .qb[data-d="1"] { animation: glow 1.2s infinite; }
 #app[data-tuto] #people #peopleBody { padding-bottom: 200px; }
+
+/* ---------- Nuit ---------- */
+.tb-day.night { background: #1d2a4a; color: #fff; }
+.tb-day.night small { color: #9fb3c8; }
+.tb-day.night #dayBar { background: linear-gradient(90deg, #6d7fd6, #b9c6ff); }
+#app.is-night .tile:not([data-cat="tech"]) { opacity: .5; }
+#app.is-night #dockTitle { background: rgba(29, 42, 74, .92); }
+#night.dawn { background: linear-gradient(#0d1530, #f4a35a); }

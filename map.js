@@ -606,6 +606,7 @@
     let smoke = [];
     const cam = { x: VX, y: VY, z: 1, tx: VX, ty: VY, tz: 1, manual: false };
     let markers = null;      // pendant le vote de fondation
+    let light = 1, night = false;   // cycle jour / nuit
     let flagImg = null;
 
     function setState(s) {
@@ -752,6 +753,7 @@
       const PICK = { wood: woodPick, stone: stonePick, iron: stonePick, coal: stonePick, hunt: huntPick, guard: guardPick, farm: farmPick };
       const vs = state.villagers || [];
       people.forEach((p, i) => {
+        p.home = pick;
         const was = p.job;
         const v = vs[Math.floor(i * vs.length / Math.max(1, people.length))];
         p.job = v ? v.job : 'idle';
@@ -766,7 +768,7 @@
         const best = (state.troops && state.troops.length) ? state.troops[state.troops.length - 1].era : state.era;
         const n = Math.min(18, Math.ceil(state.army * 0.6));
         for (let i = 0; i < n; i++) {
-          const q = { x: c.x + (Math.random() - 0.5) * 30, y: c.y + Math.random() * 12, c: LOOK[best].body, soldier: true, job: 'hunt', lumber: true, pick: huntPick, wait: Math.random() * 1500 };
+          const q = { x: c.x + (Math.random() - 0.5) * 30, y: c.y + Math.random() * 12, c: LOOK[best].body, soldier: true, job: 'hunt', lumber: true, pick: huntPick, home: () => ({ x: c.x + (Math.random() - 0.5) * 30, y: c.y + Math.random() * 12 }), wait: Math.random() * 1500 };
           q.tx = q.x; q.ty = q.y;
           people.push(q);
         }
@@ -777,7 +779,7 @@
         if (p.wait > 0) { p.wait -= dt; continue; }
         const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
         if (d < 1) {
-          const n = p.pick();
+          const n = night && p.home ? p.home() : p.pick();
           if (!isWater(n.x, n.y, 2) && vnorm(n.x, n.y) < (p.lumber ? 1.02 : 0.9)) { p.tx = n.x; p.ty = n.y; }
           p.wait = (p.lumber ? 1200 : 500) + Math.random() * 3500;
           continue;
@@ -959,6 +961,25 @@
       }
       for (const sm of smoke) ell(ctx, sm.x, sm.y, sm.r, sm.r, `rgba(90,90,95,${sm.a})`);
       drawTroops(t);
+      if (light < 1) {
+        const dark = 1 - light;
+        ctx.fillStyle = `rgba(12, 20, 55, ${dark * 0.62})`;
+        ctx.fillRect(-50, -50, W + 100, H + 100);
+        // les maisons s'éclairent
+        if (state && state.site) for (const b of state.buildings) {
+          if (b.x == null) continue;
+          const g = ctx.createRadialGradient(b.x, b.y - 8, 0, b.x, b.y - 8, 16);
+          g.addColorStop(0, `rgba(255, 210, 120, ${0.55 * dark})`); g.addColorStop(1, 'rgba(255, 210, 120, 0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y - 8, 16, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = `rgba(255, 225, 140, ${0.9 * dark})`; ctx.fillRect(b.x - 2, b.y - 9, 2.5, 2.5); ctx.fillRect(b.x + 3, b.y - 9, 2.5, 2.5);
+        }
+        // quelques étoiles sur les montagnes
+        for (let i = 0; i < 40; i++) {
+          const sx = (i * 197) % W, sy = (i * 113) % 260 + (i % 2 ? 0 : 820);
+          const tw = 0.5 + 0.5 * Math.sin(t * 0.003 + i);
+          ctx.fillStyle = `rgba(255,255,255,${dark * 0.8 * tw})`; ctx.fillRect(sx, sy, 1.6, 1.6);
+        }
+      }
       drawFlag(t);
       drawMarkers(t);
       // nuages qui passent
@@ -1017,6 +1038,13 @@
       recenter() { cam.manual = false; autoCamera(); },
       onManual(fn) { onManual = fn; },
       setFlag(img) { flagImg = img; },
+      setLight(v, isNight) {
+        light = v;
+        if (isNight !== night) {
+          night = isNight;
+          for (const p of people) { const n = night && p.home ? p.home() : p.pick(); p.tx = n.x; p.ty = n.y; p.wait = Math.random() * 600; }
+        }
+      },
       SITES,
     };
   }
