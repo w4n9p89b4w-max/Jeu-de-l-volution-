@@ -170,7 +170,7 @@
         // recherche : « ! » si la file est vide, et la progression de la recherche en cours
         const q = E.queueOf(state), cur = q.find((id) => E.nodeState(state, E.NODE[id]) === 'open');
         const anyOpen = E.NODES.some((n) => E.nodeState(state, n) === 'open');
-        t.querySelector('.badge').textContent = !q.length && anyOpen ? '!' : '';
+        t.querySelector('.badge').textContent = !E.hasCentre(state) ? '🔨' : !q.length && anyOpen ? '!' : '';
         $('tprog').style.width = cur ? `${Math.round(100 * E.researchProg(state, cur) / E.researchCost(state, E.NODE[cur]))}%` : '0%';
         return;
       }
@@ -278,6 +278,12 @@
       return E.bonusOf(state, n.b).plus.join(' · ');
     };
     let html = '';
+    if (!E.hasCentre(state)) {
+      const c = E.B.centre.cost;
+      html += `<div class="rq nocentre"><b>🔨 Construisez d'abord le Centre de recherche</b>
+        <p class="rqe">Sans lui, aucune recherche n'avance et personne ne peut être savant. En attendant, le savoir s'accumule (${state.res.sci} 💡). Vous pouvez déjà préparer votre file.</p>
+        <button class="btn primary" id="bCentre"${state.chosen ? ' disabled' : ''}>🔬 Construire le centre (${c.wood} 🪵 ${c.stone} 🪨)${state.chosen ? ' — demain' : ''}</button></div>`;
+    }
     // la file
     html += `<div class="rq"><div class="rqh">📋 File de recherche (${q.length}/6)</div>`;
     if (!q.length) html += '<p class="rqe">Vide : touchez une recherche ci-dessous pour l\'ajouter. Le savoir s\'accumule en attendant.</p>';
@@ -308,6 +314,7 @@
       }
     }
     $('sheetList').innerHTML = html;
+    if ($('bCentre')) $('bCentre').onclick = () => { closeSheet(); choisir('build', 'centre'); };
     $('sheetList').querySelectorAll('.ritem').forEach((bt) => (bt.onclick = () => {
       const id = bt.dataset.id, inQ = E.queueOf(state).includes(id);
       if (!E.setResearch(state, id)) { toast(E.queueOf(state).length >= 6 ? 'La file est pleine (6 recherches)' : 'Il faut d\'abord rechercher ce qui est demandé'); return; }
@@ -333,7 +340,8 @@
       map.syncPeople();
     }
     updateHUD();
-    caption(`${r.icon} ${r.title}`, 1500);
+    if (r.built && r.built.id === 'centre') caption('🔬 CENTRE DE RECHERCHE <em>CONSTRUIT</em> !<small>Envoyez un savant y travailler : 👷 Villageois</small>', 3200);
+    else caption(`${r.icon} ${r.title}`, 1500);
 
     if (state.won) {
       await launchRocket();
@@ -443,7 +451,8 @@
     else if (state.pop >= f.cap) caption('PLUS DE <em>PLACE</em> !<small>Construisez des logements</small>', 2600);
     else if (state.happy < 30) caption('LE PEUPLE <em>GRONDE</em>…<small>Lois, fêtes et temples rendent heureux</small>', 2600);
     else if (state.day === 2) caption('UN JOUR DURE <em>40 SECONDES</em><small>Un seul choix par jour · ⏸️ et ×2 / ×4 en haut à gauche</small>', 3000);
-    else if (state.day === 4) caption('CHOISISSEZ UNE <em>RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 2600);
+    else if (state.day === 3 && !E.hasCentre(state)) caption('CONSTRUISEZ LE <em>CENTRE DE RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 3000);
+    else if (state.day === 5 && E.hasCentre(state)) caption('CHOISISSEZ UNE <em>RECHERCHE</em> 🔬<small>pour débloquer de nouvelles constructions</small>', 2600);
   }
 
   async function dilemma(dv) {

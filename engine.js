@@ -35,6 +35,7 @@
     { id: 'appats', era: 0, name: 'Appâts et pièges', icon: '🪤', arch: 'traps', cost: { wood: 6 }, eff: {}, unlock: 'appats', unique: true, desc: 'Des pièges et des appâts en forêt : les chasseurs rapportent 50 % de plus.' },
     { id: 'chasse', era: 0, name: 'Camp de chasse', icon: '🏹', arch: 'camp', cost: { wood: 8 }, eff: { food: 4 }, unlock: 'camp', desc: 'Les chasseurs ramènent du gibier.' },
     { id: 'carriere', era: 0, name: 'Carrière', icon: '🪨', arch: 'quarry', cost: { wood: 8 }, eff: { stone: 4 }, req: 'outils', desc: 'Une vraie carrière : bien plus efficace que ramasser des cailloux.' },
+    { id: 'centre', era: 0, name: 'Centre de recherche', icon: '🔬', arch: 'research', cost: { wood: 10, stone: 4 }, eff: { sci: 1 }, unique: true, desc: 'Un lieu où les savants observent et réfléchissent. Indispensable pour faire avancer la recherche.' },
     { id: 'feu', era: 0, name: 'Cercle du feu', icon: '🔥', arch: 'fire', cost: { wood: 5, stone: 3 }, eff: { happy: 5, sci: 1 }, desc: 'On s\'y réunit pour raconter des histoires.' },
     { id: 'menhir', era: 0, name: 'Menhir', icon: '🗿', arch: 'menhir', cost: { stone: 12 }, eff: { happy: 4, sci: 1 }, desc: 'Une pierre dressée vers le ciel.' },
     // Antiquité
@@ -72,7 +73,7 @@
     { id: 'vertical', era: 5, name: 'Ferme verticale', icon: '🥬', arch: 'greentower', unlock: 'vertical', cost: { stone: 40, iron: 80, gold: 100 }, eff: { food: 80 }, desc: 'Des cultures sur 30 étages.' },
     { id: 'hopital', era: 5, name: 'Hôpital', icon: '🏥', arch: 'hospital', cost: { stone: 80, iron: 40, gold: 100 }, eff: { happy: 10, cap: 20 }, desc: 'Soigner tout le monde.' },
     { id: 'recyclage', era: 5, name: 'Centre de recyclage', icon: '♻️', arch: 'recycle', cost: { stone: 60, gold: 80 }, eff: { iron: 20, stone: 10, happy: 2 }, desc: 'Rien ne se perd : le vieux métal redevient neuf.' },
-    { id: 'labo', era: 5, name: 'Centre de recherche', icon: '🔬', arch: 'lab', cost: { stone: 60, iron: 80, gold: 120 }, eff: { sci: 40 }, desc: 'Physique, biologie, intelligence artificielle…' },
+    { id: 'labo', era: 5, name: 'Laboratoire', icon: '🔬', arch: 'lab', cost: { stone: 60, iron: 80, gold: 120 }, eff: { sci: 40 }, desc: 'Physique, biologie, intelligence artificielle…' },
     // ----- Améliorations du travail (débloquées par la pratique) -----
     { id: 'haches', era: 0, name: 'Haches en silex', icon: '🪓', upgrade: 'wood', cost: { stone: 4 }, eff: {}, unlock: 'haches', unique: true, desc: 'Des haches taillées dans le silex : les bûcherons rapportent 50 % de plus.' },
     { id: 'leviers', era: 0, name: 'Leviers et cordes', icon: '🪢', upgrade: 'stone', cost: { wood: 10 }, eff: {}, unlock: 'leviers', unique: true, desc: 'Déplacer les gros blocs : les villageois aux pierres rapportent 50 % de plus.' },
@@ -167,7 +168,7 @@
     return {
       v: 2, name: name || 'Pays sans nom', flag: flag || null, site: null,
       day: 1, era: 0, pop: 5, villagers: [], nextId: 1, happy: 60, army: 0, troops: [], fort: 0, peaceUntil: 0,
-      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [],
+      res: { food: 15, wood: 12, stone: 4, iron: 0, coal: 0, gold: 0, sci: 0 }, unlocks: [], huntDays: 0, research: [], rprog: {}, practiced: [], centreChecked: true,
       buildings: [], disc: [], laws: [], log: [], pending: null,
       won: false, lost: false, stats: { battles: 0, victories: 0, built: 0 },
     };
@@ -183,6 +184,7 @@
       if (s.buildings.some((b) => b.id === 'chasse')) { s.unlocks = ['appats', 'camp']; s.huntDays = HUNT_CAMP; s.buildings.push({ id: 'appats', day: s.day }); }
     }
     for (const b of s.buildings) { const k = B[b.id] && B[b.id].unlock; if (k && !s.unlocks.includes(k)) s.unlocks.push(k); }
+    if (!s.centreChecked) { if (s.day > 1 && !s.buildings.some((b) => b.id === 'centre')) s.buildings.push({ id: 'centre', day: s.day }); s.centreChecked = true; }
     if (s.research === undefined) {
       s.research = [];
       for (const b of BUILDINGS) {
@@ -290,7 +292,8 @@
      LA RECHERCHE : tout ce qui est nouveau se débloque en recherchant.
      On choisit une recherche ; chaque nuit, le savoir 💡 du stock s'y ajoute.
      ========================================================================== */
-  const STARTERS = ['hutte', 'feu', 'menhir'];
+  const STARTERS = ['hutte', 'feu', 'menhir', 'centre'];
+  const hasCentre = (s) => count(s, 'centre') > 0;
   for (const b of BUILDINGS) if (!STARTERS.includes(b.id) && !b.unlock) b.unlock = b.id;
   const RCOST = [5, 14, 26, 44, 70, 100];
   const NODES = [];
@@ -346,6 +349,7 @@
   // Chaque nuit : le savoir en stock nourrit les recherches de la file, dans l'ordre
   function advanceResearch(s) {
     const q = queueOf(s), done = [];
+    if (!hasCentre(s)) return done;                 // pas de centre : le savoir attend
     s.rprog = s.rprog || {};
     let guard = 0;
     while (q.length && s.res.sci > 0 && guard++ < 20) {
@@ -478,7 +482,7 @@
     { id: 'stone', name: 'Pierres', icon: '🪨', res: 'stone', base: 0.75, desc: 'Ramasser et tailler la pierre au pied de la montagne.' },
     { id: 'iron', name: 'Mineur de fer', icon: '⛏️', res: 'iron', base: 0.3, req: (s) => s.disc.includes('metal'), lock: 'Après la Métallurgie du fer', desc: 'Extraire le minerai de la montagne.' },
     { id: 'coal', name: 'Mineur de charbon', icon: '⚫', res: 'coal', base: 0.3, req: (s) => s.era >= 3, lock: 'À partir de la Renaissance', desc: 'Descendre dans les galeries de charbon.' },
-    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.5, desc: 'Observer, réfléchir, inventer.' },
+    { id: 'sage', name: 'Savant', icon: '💡', res: 'sci', base: 0.5, req: (s) => count(s, 'centre') > 0, lock: 'Après le Centre de recherche', desc: 'Observer, réfléchir, inventer au Centre de recherche.' },
     { id: 'trade', name: 'Marchand', icon: '💰', res: 'gold', base: 0.3, req: (s) => s.era >= 1, lock: 'À partir de l\'Antiquité', desc: 'Vendre et acheter avec les voisins.' },
     { id: 'guard', name: 'Garde', icon: '🛡️', res: 'def', base: 1, desc: 'Surveiller la vallée (défense).' },
   ];
@@ -612,7 +616,7 @@
     const open = Object.keys(share).filter((j) => jobOpen(s, j));
     const tot = open.reduce((a, j) => a + share[j], 0) || 1;
     for (const j of open) want[j] = Math.floor(rest * share[j] / tot);
-    if (n >= 4 && want.sage < 1 && rest > 1) want.sage = 1;   // au moins un savant pour la recherche
+    if (n >= 4 && jobOpen(s, 'sage') && want.sage < 1 && rest > 1) want.sage = 1;   // au moins un savant pour la recherche
     let left = n - Object.values(want).reduce((a, b) => a + b, 0);
     for (let i = 0; left > 0 && open.length; i++, left--) want[open[i % open.length]]++;
     s.quota = want;
@@ -1141,7 +1145,7 @@
     UNITS, troopsOf, armyPower, outdated, armyText, atPeace, huntPerSoldier, WAR_DAYS,
     JOBS, JB, WORK, STRONG, WEAK, STRONG_X, WEAK_X, PREF, jobOpen, jobBase, yieldOf, xpBonus, traitMult, jobOutput, syncVillagers, assign, autoAssign,
     prefOf, setPref, setQuota, applyQuotas, recommendQuotas, unlocked, HUNT_APPATS, HUNT_CAMP,
-    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, NODES, NODE, nodeState, setResearch, researchCost, researchProg, practicedFor, queueOf, bonusOf: (s, id) => bonusMalus(s, 'build', id),
+    STEPS, STEP_OF, UNLOCK_HINT, unitPower, weaponLevel, WPN, NODES, NODE, nodeState, setResearch, hasCentre, researchCost, researchProg, practicedFor, queueOf, bonusOf: (s, id) => bonusMalus(s, 'build', id),
   };
   // Après chaque action, les villageois suivent la population
   api.act = (s, ...rest) => { syncVillagers(s); const r = act(s, ...rest); syncVillagers(s); return r; };

@@ -431,3 +431,7 @@ em { font-style: normal; color: var(--yellow); }
 .rbar span { display: block; height: 100%; background: linear-gradient(90deg, #ffc93c, #2e9d57); }
 
 .rhint { align-self: center; margin-top: 4px; }
+
+.rq.nocentre { background: #fff3d6; }
+.rq.nocentre .btn { font-size: 14px; padding: 10px; }
+.rq.nocentre .btn:disabled { opacity: .55; }

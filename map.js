@@ -412,6 +412,26 @@
       ell(ctx, x + 8, y - 6, 3, 3, '#ff8a1f'); ell(ctx, x + 8, y - 6, 1.5, 1.5, '#ffe08a');
       windows(ctx, x - 14, y - 10, 18, 6, 1, 3, '#f2a64a');
     },
+    research(ctx, x, y, t, s) {
+      if (s && s.era >= 2) {
+        // un observatoire : bâtiment de pierre et coupole
+        block(ctx, x, y, 24, 9, 13, '#d9cfbd', '#a89c86');
+        windows(ctx, x - 12, y - 12, 24, 8, 1, 4, '#3c5168');
+        ell(ctx, x + 3, y - 26, 8, 7, '#7f97ad');
+        rect(ctx, x - 5, y - 26, 16, 4, '#d9cfbd');
+        ctx.strokeStyle = '#3b4652'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x + 4, y - 29); ctx.lineTo(x + 12, y - 36); ctx.stroke();
+        return;
+      }
+      // la hutte du savoir : hutte ronde, tablettes gravées et un bâton à étoile
+      shadow(ctx, x, y, 22);
+      ell(ctx, x, y - 6, 11, 7, '#c9b48c');
+      poly(ctx, [x - 12, y - 7, x + 12, y - 7, x, y - 22], '#8a6a43');
+      poly(ctx, [x, y - 7, x + 12, y - 7, x, y - 22], '#735634');
+      rect(ctx, x - 2, y - 7, 4, 7, '#3b2a18');
+      rect(ctx, x + 12, y - 8, 5, 7, '#a3a8ae'); rect(ctx, x + 13, y - 7, 3, 1, '#6d737a'); rect(ctx, x + 13, y - 5, 3, 1, '#6d737a');
+      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - 14, y); ctx.lineTo(x - 14, y - 24); ctx.stroke();
+      ctx.fillStyle = '#ffd34d'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', x - 14, y - 26);
+    },
     armory(ctx, x, y, t, s) {
       // atelier d'armes : un bâtiment avec deux épées croisées
       gable(ctx, x, y, 22, 11, 12, '#b7a48a', '#5b3a2a');

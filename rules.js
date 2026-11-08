@@ -36,7 +36,8 @@
       <p><b>⏸️</b> met le jeu en pause, <b>×1 / ×2 / ×4</b> accélère le temps. Le temps s'arrête tout seul quand une fenêtre est ouverte (villageois, règles, événement…). Donner des tâches aux villageois ne compte pas comme le choix du jour.</p>`));
 
     parts.push(sec('recherche', '🔬 La recherche', `
-      <p>Tout ce qui est nouveau se <b>recherche</b> : les découvertes de chaque ère, les constructions (sauf la hutte, le cercle du feu et le menhir, disponibles dès le début), les améliorations du travail et les armes.</p>
+      <p>Tout ce qui est nouveau se <b>recherche</b> : les découvertes de chaque ère, les constructions (sauf la hutte, le cercle du feu, le menhir et le centre de recherche, disponibles dès le début), les améliorations du travail et les armes.</p>
+      <p><b>D'abord, construisez le 🔬 Centre de recherche</b> (10 🪵 et 4 🪨, dans 🏠 Constructions ou directement depuis l'écran Recherche). Sans lui, aucune recherche n'avance et personne ne peut être savant ; le savoir s'accumule en attendant. Plus tard, il devient un observatoire.</p>
       <ol><li>Touchez <b>🔬 Recherche</b> et choisissez une ou plusieurs recherches : elles se mettent dans votre <b>file</b> (6 au maximum). Touchez une recherche de la file pour la retirer.</li>
       <li>Chaque nuit, le <b>savoir 💡</b> en stock nourrit la première recherche de la file, puis la suivante s'il en reste. La petite barre sous la case 🔬 montre la progression. Un « ! » apparaît si la file est vide.</li>
       <li>Une recherche terminée : une découverte s'applique tout de suite ; une construction, une amélioration ou une arme vous est <b>proposée</b> (A : la construire, B : plus tard ; elle reste alors dans 🏠 Constructions ou ⚔️ Guerres).</li></ol>
